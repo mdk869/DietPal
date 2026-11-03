@@ -1051,9 +1051,9 @@ function rescueResult() {
 /* ============================================================
    MENU SUGGESTION ENGINE (Enjin A — rule-based, offline)
    ============================================================ */
-// Set this to your Vercel function URL (e.g. '/api/coach') once the Claude API key is ready.
-// While empty, the "Tanya Coach AI" button stays hidden and the app relies on Enjin A only.
-const AI_ENDPOINT = '';
+// Vercel function that calls OpenAI (key is stored as OPENAI_API_KEY in Vercel, never in this file).
+// Set to '' to hide the "Tanya Coach AI" button; Enjin A keeps working offline either way.
+const AI_ENDPOINT = '/api/coach';
 
 const VENUES = {
   gerai:    { label: 'Gerai / warung', ic: 'tent' },
@@ -1250,8 +1250,8 @@ function suggestBlock(inSheet = false) {
   <div class="flex gap-2 mt-3">
     ${!showAll && list.length > 1 ? `<button data-act="sugMore" class="tap flex-1 btn btn-secondary py-2.5 text-[14px]">Lihat ${list.length - 1} lagi</button>` : ''}
     <button data-act="sugShuffle" class="tap flex-1 btn btn-secondary py-2.5 text-[14px]">${icon('refresh', 'w-4 h-4')}Cadangan lain</button>
-    ${AI_ENDPOINT ? `<button data-act="askAI" class="tap flex-1 btn btn-primary py-2.5 text-[14px]">Tanya Coach AI</button>` : ''}
-  </div>`;
+  </div>
+  ${AI_ENDPOINT ? `<button data-act="askAI" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">${icon('lightbulb', 'w-4 h-4')}Tanya Coach AI — soalan bebas</button>` : ''}`;
 }
 
 // Context the AI coach (Enjin B) will receive later — no name, no weight history.
@@ -1259,10 +1259,121 @@ function buildAIContext(extra = {}) {
   const d = peekDay(todayKey()), p = S.profile, t = mealTarget(UI.sug.meal);
   return {
     meal: UI.sug.meal, location: UI.sug.loc, venue: UI.sug.loc === 'luar' ? UI.sug.venue : null,
-    targetKcal: t.ideal, remainingKcal: t.remaining, dailyRange: [p.kcalMin, p.kcalMax],
+    targetKcal: t.ideal, remainingKcal: t.remaining, dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
     eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal })),
-    plateToday: plateCounts(d), ...extra
+    plateToday: plateCounts(d),
+    avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy, health: p.health || [], ...extra
   };
+}
+
+
+/* ---------- COACH AI (Enjin B) ---------- */
+const AI_CHIPS = [
+  'Apa yang sesuai saya makan sekarang?',
+  'Ada telur, kobis & ayam di rumah. Nak masak apa?',
+  'Saya kat kenduri. Apa pilihan terbaik?',
+  'Snek sihat bawah 150 kcal?'
+];
+const AI_ERRORS = {
+  offline: 'Tiada internet. Coach AI perlukan sambungan — cadangan menu biasa masih berfungsi offline.',
+  not_configured: 'Coach AI belum disediakan di server.',
+  rate_limited: 'Terlalu banyak soalan dalam masa singkat. Cuba lagi dalam beberapa minit.',
+  default: 'Coach AI tak dapat dihubungi sekarang. Cuba lagi sekejap lagi.'
+};
+UI.ai = { q: '', loading: false, result: null, error: '', logged: {} };
+// Safety net: flag AI items whose names hint at something the user avoids
+const TAG_WORDS = {
+  ayam: ['ayam', 'chicken'], daging: ['daging', 'lembu', 'kambing', 'rendang', 'beef', 'burger daging'],
+  ikan: ['ikan', 'tuna', 'sardin', 'bilis', 'salmon', 'yong tau'], laut: ['udang', 'sotong', 'ketam', 'kerang', 'belacan', 'seafood', 'cencaru'],
+  kacang: ['kacang', 'badam', 'peanut', 'satay sauce'], telur: ['telur', 'egg'], susu: ['susu', 'yogurt', 'keju', 'cheese', 'mentega', 'butter'],
+  pedas: ['pedas', 'sambal', 'cili', 'chili', 'masak merah', 'kari']
+};
+function aiConflicts(name) {
+  const n = String(name).toLowerCase(), a = avoidSet();
+  return Object.keys(TAG_WORDS).filter(t => a.has(t) && TAG_WORDS[t].some(w => n.includes(w)));
+}
+
+function sheetAI() {
+  UI.ai = { q: UI.ai.q, loading: false, result: null, error: '', logged: {} };
+  openSheet(aiBody, true);
+}
+function aiBody() {
+  const a = UI.ai, s = UI.sug, t = mealTarget(s.meal);
+  const where = s.loc === 'luar' ? `Di luar${VENUES[s.venue] ? ' · ' + VENUES[s.venue].label : ''}` : 'Di rumah';
+  return `
+  <div class="sticky top-0 bg-white z-10 px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+    <div><div class="font-bold text-xl">Tanya Coach AI</div>
+      <div class="text-[13px] text-slate-500">${MEALS.find(m => m.id === s.meal).label} · ${where} · sasaran ~${fmt(t.ideal)} kcal</div></div>
+    <button data-act="closeSheet" class="tap w-9 h-9 grid place-items-center rounded-xl text-slate-500" aria-label="Tutup">${icon('x')}</button>
+  </div>
+  <div class="px-5 pb-6 pt-3">
+    <textarea id="aiQ" maxlength="300" rows="3" placeholder="Cth: Saya kat kenduri, ada nasi minyak & dalca. Apa patut ambil?" class="w-full bg-slate-50 rounded-xl px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-brand-500 resize-none">${esc(a.q)}</textarea>
+    <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mt-2">
+      ${AI_CHIPS.map((c, i) => `<button data-act="aiChip" data-i="${i}" class="tap chip">${c}</button>`).join('')}
+    </div>
+    <button data-act="aiAsk" class="tap mt-3 w-full btn btn-primary py-3 text-[16px]" ${a.loading ? 'disabled' : ''}>${a.loading ? 'Coach sedang fikir…' : 'Tanya'}</button>
+    <p class="text-[12px] text-slate-500 mt-2">Soalan anda, ringkasan makanan hari ini, pilihan makanan & nota kesihatan dihantar ke OpenAI untuk jawapan. Nama dan berat tidak dihantar.</p>
+
+    ${a.loading ? `<div class="mt-4 space-y-2">${[1, 2].map(() => '<div class="h-20 rounded-xl bg-slate-100 animate-pulse"></div>').join('')}</div>` : ''}
+
+    ${a.error ? `
+      <div class="mt-4 text-[14px] bg-amber-50 text-amber-800 rounded-xl p-3">${a.error}</div>
+      <button data-act="aiFallback" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">Guna cadangan menu biasa</button>` : ''}
+
+    ${a.result ? aiResultHtml(a.result) : ''}
+  </div>`;
+}
+function aiResultHtml(r) {
+  return `
+    <div class="mt-4">
+      ${r.safety_note ? `<div class="mb-3 bg-red-50 border border-red-200 rounded-xl p-3 text-[14px] text-red-800 flex gap-2"><span class="text-red-600 mt-0.5">${icon('alert', 'w-5 h-5')}</span><span>${esc(r.safety_note)}</span></div>` : ''}
+      ${r.reply ? `<div class="flex gap-3"><img src="icons/icon-192.png" alt="" class="w-9 h-9 rounded-xl shrink-0"><p class="text-[14px] text-slate-700 leading-relaxed">${esc(r.reply)}</p></div>` : ''}
+      <div class="space-y-2.5 mt-3">
+        ${(r.menus || []).map((m, i) => `
+          <div class="rounded-xl border border-slate-200 p-3">
+            <div class="flex items-start gap-2.5">
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-[14px] leading-snug">${esc(m.name)}</div>
+                <div class="mt-1 text-[13px] text-slate-500 leading-relaxed">
+                  ${m.items.map(x => `<span class="inline-flex items-center gap-1 whitespace-nowrap mr-2"><span class="w-1.5 h-1.5 rounded-full" style="background:${PLATE[x.plate || 'lain'].color}"></span>${esc(x.name)} <span class="text-slate-400">${esc(x.unit)}</span></span>`).join('')}
+                </div>
+                ${(() => { const c = [...new Set(m.items.flatMap(x => aiConflicts(x.name)))]; return c.length ? `<div class="mt-1.5 text-[13px] font-semibold text-amber-700 flex items-center gap-1">${icon('alert', 'w-4 h-4')}Ada ${c.map(t => TAG_LABEL[t]).join(', ')} — tak sesuai dengan pilihan anda</div>` : ''; })()}
+              </div>
+              <div class="text-right shrink-0"><div class="font-extrabold text-[16px]">~${fmt(m.kcal)}</div><div class="text-[12px] text-slate-500">kcal</div></div>
+            </div>
+            ${m.tip ? `<div class="text-[13px] text-slate-600 mt-2"><b class="font-semibold">Tip:</b> ${esc(m.tip)}</div>` : ''}
+            ${UI.ai.logged[i]
+              ? `<div class="mt-2.5 text-[14px] font-semibold text-green-700 flex items-center justify-center gap-1.5 py-2">${icon('check', 'w-4 h-4', 2.5)}Dah dilog</div>`
+              : `<button data-act="aiLog" data-i="${i}" class="tap mt-2.5 w-full btn btn-secondary py-2 text-[14px]">${icon('plus', 'w-4 h-4')}Log menu ini</button>`}
+          </div>`).join('')}
+      </div>
+      <p class="text-[12px] text-slate-500 mt-3">Jawapan dijana oleh AI. Kalori ialah anggaran — semak semula jika ada alahan.</p>
+    </div>`;
+}
+async function aiAsk() {
+  const box = document.getElementById('aiQ'); if (box) UI.ai.q = box.value.trim().slice(0, 300);
+  if (UI.ai.loading) return;
+  if (!navigator.onLine) { UI.ai.error = AI_ERRORS.offline; UI.ai.result = null; refreshSheet(); return; }
+  UI.ai.loading = true; UI.ai.error = ''; UI.ai.result = null; UI.ai.logged = {}; refreshSheet();
+  try {
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 30000);
+    const r = await fetch(AI_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+      body: JSON.stringify({ question: UI.ai.q, context: buildAIContext() }) });
+    clearTimeout(timer);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'default');
+    UI.ai.result = data;
+  } catch (e) {
+    UI.ai.error = AI_ERRORS[e.message] || AI_ERRORS.default;
+  }
+  UI.ai.loading = false;
+  if (sheetFn === aiBody) refreshSheet();
+}
+function aiLog(i) {
+  const m = UI.ai.result?.menus?.[i]; if (!m || UI.ai.logged[i]) return;
+  m.items.forEach(x => addMeal({ id: 'ai_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate }, 1, UI.sug.meal));
+  UI.ai.logged[i] = true; render(); refreshSheet();
+  toast(`${m.name} dilog (~${fmt(m.kcal)} kcal)`);
 }
 
 function sheetSuggest() {
@@ -1272,7 +1383,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1817,11 +1928,16 @@ document.addEventListener('click', (e) => {
       if (sheetFn) closeSheet();
       render(); break;
     }
-    case 'askAI': toast('Coach AI belum disambung'); break;
+    case 'askAI': sheetAI(); break;
+    case 'aiAsk': aiAsk(); break;
+    case 'aiChip': UI.ai.q = AI_CHIPS[Number(el.dataset.i)]; refreshSheet(); break;
+    case 'aiLog': aiLog(Number(el.dataset.i)); break;
+    case 'aiFallback': sheetSuggest(); break;
   }
 });
 
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'aiQ') UI.ai.q = e.target.value.slice(0, 300);
   if (e.target.id === 'addSearch') {
     UI.q = e.target.value;
     const box = document.getElementById('addResults'); if (box) box.innerHTML = addResultsHtml();
