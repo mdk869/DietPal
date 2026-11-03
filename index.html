@@ -1189,10 +1189,10 @@ function suggestMenus(venue) {
     its.forEach(x => { if (eatenToday.has(x.f.id) && x.f.plate !== 'serat' && x.f.id !== 'kopio') score -= 8; });
     if (hasHealth('diabetes')) its.forEach(x => { if (['kurma', 'tehtarik', 'milo', 'sirap', 'rotibakar'].includes(x.f.id)) score -= 40; if (x.f.id === 'nasib') score += 6; });
     if (hasHealth('gastrik')) its.forEach(x => { if (foodTags(x.f).includes('pedas')) score -= 10; });
-    score += seeded(todayKey() + s.meal + s.loc + venue + s.seed + m.id) * 22; // variety + "Cadangan lain"
+    score += seeded(todayKey() + s.meal + s.loc + venue + m.id) * 22; // daily variety
     return { m, kc, score };
   }).sort((a, b) => b.score - a.score);
-  return { list: scored.slice(0, 3), t, needVeg };
+  return { list: scored, t, needVeg };
 }
 
 function venuesFor(meal) {
@@ -1208,7 +1208,8 @@ function suggestBlock(inSheet = false) {
   const mealInfo = MEALS.find(m => m.id === s.meal);
   const logged = peekDay(todayKey()).meals.some(x => x.meal === s.meal);
   const showAll = inSheet || UI.sugAll;
-  const shown = showAll ? list : list.slice(0, 1);
+  const per = showAll ? 3 : 1, start = list.length > per ? (s.seed * per) % list.length : 0;
+  const shown = [...list, ...list].slice(start, start + Math.min(per, list.length));
   const seg = (act, key, cur, opts) => `<div class="seg grid-cols-${Object.keys(opts).length}">${Object.entries(opts).map(([k, l]) => `<button data-act="${act}" data-${key}="${k}" class="tap seg-btn ${cur === k ? 'seg-on' : ''}">${l}</button>`).join('')}</div>`;
   return `
   <div class="flex items-start justify-between gap-2">
@@ -1234,7 +1235,7 @@ function suggestBlock(inSheet = false) {
       <div class="rounded-xl border ${i === 0 ? 'border-brand-200 bg-brand-50/40' : 'border-slate-200'} p-3">
         <div class="flex items-start gap-2.5">
           <div class="flex-1 min-w-0">
-            ${i === 0 ? '<div class="text-[12px] font-semibold text-brand-700 mb-0.5">Pilihan utama</div>' : ''}
+            ${i === 0 && start === 0 ? '<div class="text-[12px] font-semibold text-brand-700 mb-0.5">Pilihan utama</div>' : ''}
             <div class="font-semibold text-[14px] leading-snug">${esc(m.name)}</div>
             <div class="mt-1 text-[13px] text-slate-500 leading-relaxed">
               ${its.map(x => `<span class="inline-flex items-center gap-1 whitespace-nowrap mr-2"><span class="w-1.5 h-1.5 rounded-full" style="background:${PLATE[x.f.plate || 'lain'].color}"></span>${x.qty !== 1 ? x.qty + '× ' : ''}${esc(x.f.name)}</span>`).join('')}
@@ -1248,8 +1249,8 @@ function suggestBlock(inSheet = false) {
   </div>
 
   <div class="flex gap-2 mt-3">
-    ${!showAll && list.length > 1 ? `<button data-act="sugMore" class="tap flex-1 btn btn-secondary py-2.5 text-[14px]">Lihat ${list.length - 1} lagi</button>` : ''}
-    <button data-act="sugShuffle" class="tap flex-1 btn btn-secondary py-2.5 text-[14px]">${icon('refresh', 'w-4 h-4')}Cadangan lain</button>
+    ${!showAll && list.length > 1 ? `<button data-act="sugMore" class="tap flex-1 btn btn-secondary py-2.5 text-[14px]">Lihat ${Math.min(2, list.length - 1)} lagi</button>` : ''}
+    ${list.length > per ? `<button data-act="sugShuffle" class="tap flex-1 btn btn-secondary py-2.5 text-[14px]">${icon('refresh', 'w-4 h-4')}Cadangan lain</button>` : ''}
   </div>
   ${AI_ENDPOINT ? `<button data-act="askAI" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">${icon('lightbulb', 'w-4 h-4')}Tanya Coach AI — soalan bebas</button>` : ''}`;
 }
@@ -1261,7 +1262,7 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
   return {
     meal, location: general ? null : UI.sug.loc, venue: !general && UI.sug.loc === 'luar' ? UI.sug.venue : null,
     targetKcal: general ? null : t.ideal, remainingKcal: (p.kcalMax || 0) - kcalOf(d),
-    nowMeal: general ? guessMeal() : undefined, nowTargetKcal: general ? mealTarget(guessMeal()).ideal : undefined, dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
+    nowMeal: guessMeal(), mealTargets: Object.fromEntries(MEALS.map(m => [m.id, mealTarget(m.id).ideal])), dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
     eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal })),
     plateToday: plateCounts(d),
     avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy, health: p.health || [],
@@ -1306,7 +1307,7 @@ function aiConflicts(name) {
 }
 
 function sheetAI(meal = UI.sug.meal) {
-  UI.ai = { q: UI.ai.q, meal, loading: false, result: null, error: '', logged: {}, pickFor: null };
+  UI.ai = { q: '', meal, loading: false, result: null, error: '', logged: {}, pickFor: null };
   openSheet(aiBody, true);
 }
 const AI_MEALS = [...MEALS.map(m => [m.id, m.short || m.label]), ['umum', 'Umum']];
@@ -1368,7 +1369,7 @@ function aiResultHtml(r) {
               : UI.ai.pickFor === i
                 ? `<div class="mt-2.5"><div class="text-[12px] font-semibold text-slate-500 mb-1.5">Log ke waktu makan:</div>
                     <div class="grid grid-cols-4 gap-1.5">${MEALS.map(x => `<button data-act="aiLogTo" data-i="${i}" data-meal="${x.id}" class="tap btn btn-secondary py-2 text-[12px]">${x.short || x.label}</button>`).join('')}</div></div>`
-                : `<button data-act="aiLog" data-i="${i}" class="tap mt-2.5 w-full btn btn-secondary py-2 text-[14px]">${icon('plus', 'w-4 h-4')}Log menu ini</button>`}
+                : `<button data-act="aiLog" data-i="${i}" class="tap mt-2.5 w-full btn btn-secondary py-2 text-[14px]">${icon('plus', 'w-4 h-4')}${(() => { const lm = MEALS.find(x => x.id === (r.meal || UI.ai.meal)); return lm ? 'Log ke ' + lm.label : 'Log menu ini'; })()}</button>`}
           </div>`).join('')}
       </div>
       <p class="text-[12px] text-slate-500 mt-3">Jawapan dijana oleh AI. Kalori ialah anggaran — semak semula jika ada alahan.</p>
@@ -1393,7 +1394,7 @@ async function aiAsk() {
   UI.ai.loading = false;
   if (sheetFn === aiBody) refreshSheet();
 }
-function aiLog(i, meal = UI.ai.meal) {
+function aiLog(i, meal = UI.ai.result?.meal || UI.ai.meal) {
   const m = UI.ai.result?.menus?.[i]; if (!m || UI.ai.logged[i]) return;
   if (meal === 'umum') { UI.ai.pickFor = i; refreshSheet(); return; }   // ask which meal first
   m.items.forEach(x => addMeal({ id: 'ai_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate }, x.qty || 1, meal));

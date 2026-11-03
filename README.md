@@ -81,7 +81,7 @@ Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna
 | Nama | Wajib | Keterangan |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
-| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4o-mini`). |
+| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
 | `COACH_RATE_LIMIT` | Tidak | Had permintaan setiap IP dalam 10 minit (lalai: 12). |
 | `ALLOWED_ORIGINS` | Tidak | Domain tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). |
 
