@@ -30,7 +30,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Sumber rujukan** – senarai rujukan yang digunakan dalam app (lihat di bawah).
 
 **Tetapan**
-- Tema cerah / gelap / ikut telefon, saiz teks, waktu makan biasa, peringatan.
+- Tema cerah / gelap / ikut telefon, saiz teks, waktu makan biasa, jenis peringatan (log makan, air, timbang, ringkasan malam), status notifikasi dan butang *Hantar notifikasi ujian*.
 - Backup / restore (JSON), export CSV (makanan, air, berat), padam semua data.
 
 ## Teknologi
