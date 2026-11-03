@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, berjalan terus dalam browser telefon, boleh dipasang ke home screen dan berfungsi offline. Semua data disimpan dalam telefon pengguna — tiada akaun atau server.
 
-**Versi semasa:** 1.2.2
+**Versi semasa:** 1.3.0
 
 ## Ciri utama
 
@@ -15,7 +15,8 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 
 **Harian**
 - **Dashboard kalori** – ring progress ikut sasaran pengguna, log ikut waktu makan (Sarapan, Tengah hari, Makan malam, Snek).
-- **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.), dikumpul ikut kategori, + makanan sendiri.
+- **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
+- **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Berfungsi offline.
 - **Penjejak air** – tekan untuk tambah gelas/botol, sasaran ikut berat badan.
 - **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot: langkah bernombor, semakan data hari ini, log segera, dan amaran bila perlu hubungi 999.
@@ -41,7 +42,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v8)
+sw.js           Service worker (cache dietpal-v9)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
 
@@ -55,7 +56,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v8` → `dietpal-v9`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v9` → `dietpal-v10`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
