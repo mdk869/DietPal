@@ -444,8 +444,8 @@ function viewHome() {
   <button data-act="rescue" class="w-full tap rounded-2xl bg-white border border-red-200 p-3.5 flex items-center gap-3 text-left shadow-card">
     <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 grid place-items-center">${icon('heartPulse')}</div>
     <div class="flex-1">
-      <div class="font-bold text-[14px] text-slate-800">Rasa pening atau masuk angin?</div>
-      <div class="text-[13px] text-slate-500">Langkah lega yang selamat</div>
+      <div class="font-bold text-[14px] text-slate-800">Rasa tak selesa?</div>
+      <div class="text-[13px] text-slate-500">Panduan ringkas untuk rasa lebih baik</div>
     </div>
     <span class="text-red-600">${icon('chevR')}</span>
   </button>
@@ -901,7 +901,7 @@ function rescueHistory() {
   if (!S.rescues.length) return '';
   const r = [...S.rescues].reverse().slice(0, 6);
   return card(`
-    <div class="font-bold text-[16px] mb-1">Rekod pening / masuk angin</div>
+    <div class="font-bold text-[16px] mb-1">Rekod rasa tak selesa</div>
     <p class="text-[12px] text-slate-500 mb-2">Tengok corak — selalunya berlaku bila makan terlalu sikit atau kurang air.</p>
     <div class="divide-y divide-slate-100">
       ${r.map(x => { const d = new Date(x.t); return `<div class="py-2 text-[13px]"><div class="flex justify-between"><span class="font-semibold">${x.symptoms.map(s => SYMPTOMS[s]?.label || s).join(', ')}</span><span class="text-slate-500">${d.getDate()} ${BULAN[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span></div>
@@ -931,13 +931,13 @@ function rescueBody() {
   <div class="p-5">
     <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
     <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-xl bg-red-50 text-red-600 grid place-items-center">${icon('heartPulse', 'w-6 h-6')}</div>
-      <div><div class="font-extrabold text-xl leading-tight">Bantuan Pening</div><div class="text-[13px] text-slate-500">Tenang dulu. Apa yang anda rasa sekarang?</div></div></div>
+      <div><div class="font-extrabold text-xl leading-tight">Rasa tak selesa</div><div class="text-[13px] text-slate-500">Pilih apa yang anda rasa</div></div></div>
     ${redFlags()}
     <div class="grid grid-cols-2 gap-2 mt-4">
       ${Object.entries(SYMPTOMS).map(([k, s]) => `<button data-act="sym" data-s="${k}" class="tap rounded-xl border-2 px-3 py-3 text-left flex items-center gap-2.5 ${UI.sym.has(k) ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white text-slate-600'}">
         ${icon(s.ic, 'w-5 h-5')}<span class="text-[14px] font-semibold text-slate-800 leading-tight">${s.label}</span></button>`).join('')}
     </div>
-    <button data-act="rescueGo" class="tap mt-5 w-full btn btn-primary py-3.5 disabled:opacity-40" ${UI.sym.size ? '' : 'disabled'}>Tunjuk langkah lega</button>
+    <button data-act="rescueGo" class="tap mt-5 w-full btn btn-primary py-3.5 disabled:opacity-40" ${UI.sym.size ? '' : 'disabled'}>Lihat panduan</button>
   </div>`;
 }
 function redFlags() {
@@ -979,7 +979,7 @@ function rescueResult() {
   return `
   <div class="p-5">
     <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
-    <div class="font-extrabold text-xl">Langkah lega untuk anda</div>
+    <div class="font-extrabold text-xl">Langkah yang boleh dicuba</div>
     <p class="text-[13px] text-slate-500">${[...s].map(x => SYMPTOMS[x].label).join(' · ')}</p>
 
     ${insights.length ? `<div class="mt-3 bg-amber-50 rounded-xl p-3 space-y-1.5 text-[13px] text-amber-900">
@@ -1004,7 +1004,7 @@ function rescueResult() {
     <p class="text-[12px] text-slate-500 mt-3">${(S.profile.health || []).length
       ? `Langkah di atas mengambil kira nota kesihatan anda (${S.profile.health.map(h => HEALTH[h]).join(', ')}). Ikut nasihat doktor jika berbeza.`
       : 'Ada kencing manis atau ambil ubat darah tinggi? Simptom ini mungkin berkaitan ubat atau gula rendah — semak bacaan dan rujuk doktor. Boleh tambah nota kesihatan di Profil.'}</p>
-    <button data-act="closeSheet" class="tap mt-4 w-full btn btn-primary py-3.5">Saya dah rasa okay</button>
+    <button data-act="closeSheet" class="tap mt-4 w-full btn btn-primary py-3.5">Dah rasa lebih baik</button>
   </div>`;
 }
 
@@ -1438,7 +1438,7 @@ function prefsBlock(act, d) {
     <div class="flex flex-wrap gap-2">${chip(act, 'noSpicy', '1', !!d.noSpicy, 'Tak gemar pedas')}</div>
     <div class="text-[12px] font-semibold text-slate-500 mt-5 mb-1.5">Nota kesihatan (pilihan)</div>
     <div class="flex flex-wrap gap-2">${Object.entries(HEALTH).map(([k, l]) => chip(act, 'health', k, has('health', k), l)).join('')}</div>
-    <p class="text-[12px] text-slate-500 mt-2">Digunakan untuk sesuaikan nasihat Bantuan Pening & cadangan menu. Disimpan dalam telefon sahaja, dan bukan pengganti nasihat doktor.</p>`;
+    <p class="text-[12px] text-slate-500 mt-2">Digunakan untuk sesuaikan panduan "Rasa tak selesa" & cadangan menu. Disimpan dalam telefon sahaja, dan bukan pengganti nasihat doktor.</p>`;
 }
 
 function obCollect() {

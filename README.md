@@ -6,7 +6,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu, mobile-first, berjala
 - **Dashboard kalori** – ring progress untuk sasaran 1,500–1,700 kcal, log ikut waktu makan (Sarapan, Tengah hari, Makan malam, Snek).
 - **Preset makanan Malaysia** – 67 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, dll.) + makanan sendiri.
 - **Cadangan Menu Coach (Enjin A)** – 58 gabungan menu di rumah atau di luar (mamak, gerai, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dikira ikut baki kalori. Berfungsi offline.
-- **Bantuan Pening / Masuk Angin** – langkah lega yang selamat (elektrolit, kraker, pisang), semakan data hari ini, amaran bila perlu hubungi 999.
+- **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot (elektrolit, snek ringan, rehat), semakan data hari ini, amaran bila perlu hubungi 999.
 - **Berat & milestone** – graf trend, BMI (had Asia), milestone 87 / 77 / 65 kg.
 - **Penjejak air** – sasaran 2.5–3 L.
 - **Panduan pinggan Suku-Suku Separuh** – ½ sayur, ¼ protein, ¼ karbo kompleks; prinsip 80/20.
