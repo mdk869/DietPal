@@ -873,15 +873,7 @@ function viewGuide() {
       <li class="flex gap-2"><span class="text-sky-600 mt-0.5">${icon('droplet', 'w-4 h-4')}</span><span>Minum ${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L air sehari. Kadang-kadang "lapar" sebenarnya dahaga.</span></li>
     </ul>`)}
 
-  ${card(`
-    <div class="font-bold text-[16px] mb-2">Pilihan pintar di kedai</div>
-    <div class="grid grid-cols-1 gap-2 text-[13px]">
-      ${swap('Nasi lemak (400)', 'Nasi lemak tanpa goreng-goreng, sambal sikit')}
-      ${swap('Roti canai (300)', 'Tosai kosong (170) / capati (120)')}
-      ${swap('Teh tarik (150)', 'Teh O / kopi O kosong (5)')}
-      ${swap('Ayam goreng (290)', 'Ayam bakar/grill tanpa kulit (220)')}
-      ${swap('Mee goreng (550)', 'Mee sup + tambah sayur (350)')}
-    </div>`)}
+  ${eatOutCard()}
 
   ${rescueHistory()}
 
@@ -894,7 +886,50 @@ function viewGuide() {
   <p class="text-[12px] text-slate-500 text-center px-6 pb-2">App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.</p>`;
 }
 const guideRow = (c, t, d) => `<div class="flex gap-3 items-start"><span class="w-3 h-3 rounded-full mt-1 shrink-0" style="background:${c}"></span><div><div class="font-semibold text-[14px]">${t}</div><div class="text-[13px] text-slate-500 leading-snug">${d}</div></div></div>`;
-const swap = (a, b) => `<div class="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2"><span class="text-slate-500 line-through decoration-rose-300 flex-1">${a}</span><span class="text-slate-400">→</span><span class="text-brand-800 font-semibold flex-1">${b}</span></div>`;
+// "Makan di luar dengan bijak": kcal saved is computed from the food presets so it always matches the log
+const EAT_OUT_RULES = [
+  'Pilih bakar, kukus atau sup berbanding goreng',
+  'Minta kuah, sambal & sos diasingkan',
+  'Pilih minuman kosong atau kurang manis'
+];
+const EAT_OUT_SWAPS = [
+  { from: [['tehtarik', 1]], to: [['kopio', 1]], fromLabel: 'Teh tarik', toLabel: 'Teh O / kopi O kosong' },
+  { from: [['rcanai', 1]], to: [['tosai', 1]], fromLabel: 'Roti canai', toLabel: 'Tosai kosong' },
+  { from: [['agoreng', 1]], to: [['agrill', 1]], fromLabel: 'Ayam goreng', toLabel: 'Ayam bakar / grill' },
+  { from: [['mgoreng', 1]], to: [['msup', 1], ['sayurr', 1]], fromLabel: 'Mee goreng', toLabel: 'Mee sup + sayur' },
+  { from: [['nlemak', 1]], to: [['nlemak', 0.5], ['telurr', 1]], fromLabel: 'Nasi lemak', toLabel: 'Nasi lemak separuh + telur rebus' }
+];
+function itemsKcal(items) { return items.reduce((a, [id, q]) => a + (findFood(id)?.kcal || 0) * q, 0); }
+function eatOutCard() {
+  const swaps = EAT_OUT_SWAPS
+    .filter(x => ![...x.from, ...x.to].some(([id]) => { const f = findFood(id); return f && foodConflicts(f).length; }))
+    .map(x => ({ ...x, saved: Math.round((itemsKcal(x.from) - itemsKcal(x.to)) / 5) * 5 }))
+    .filter(x => x.saved > 0);
+  return card(`
+    <div class="font-bold text-[16px]">Makan di luar dengan bijak</div>
+    <p class="text-[14px] text-slate-600 mt-1">Ubah sikit cara pesan — tak perlu elak makanan kegemaran.</p>
+
+    <div class="text-[12px] font-semibold text-slate-500 mt-4 mb-2">3 cara mudah</div>
+    <ul class="space-y-2 text-[14px] text-slate-700">
+      ${EAT_OUT_RULES.map(r => `<li class="flex gap-2"><span class="text-green-600 mt-0.5">${icon('check', 'w-4 h-4', 2.5)}</span><span>${r}</span></li>`).join('')}
+    </ul>
+
+    ${swaps.length ? `
+    <div class="text-[12px] font-semibold text-slate-500 mt-5 mb-1">Tukar kecil, jimat besar</div>
+    <div class="divide-y divide-slate-100">
+      ${swaps.map(x => `
+        <div class="flex items-center gap-3 py-2.5">
+          <div class="flex-1 min-w-0 text-[14px] leading-snug">
+            <span class="text-slate-500">${x.fromLabel}</span>
+            <span class="inline-block align-middle text-slate-400 mx-0.5">${icon('chevR', 'w-4 h-4')}</span>
+            <span class="font-semibold text-slate-800">${x.toLabel}</span>
+          </div>
+          <div class="shrink-0 text-right"><div class="text-[12px] text-slate-500">jimat</div><div class="text-[14px] font-bold text-green-700">~${fmt(x.saved)} kcal</div></div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <button data-act="eatOutMenus" class="tap mt-3 w-full btn btn-secondary py-2.5 text-[14px]">Lihat cadangan menu di luar${icon('chevR', 'w-4 h-4')}</button>`);
+}
 const field = (id, label, val, type = 'number') => `<div><label class="block text-[12px] font-semibold text-slate-500">${label}</label><input id="${id}" type="${type}" ${type === 'number' ? 'inputmode="decimal" step="any"' : ''} value="${esc(val ?? '')}" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-500"></div>`;
 
 function rescueHistory() {
@@ -1772,6 +1807,7 @@ document.addEventListener('click', (e) => {
     case 'sugVenue': UI.sug.venue = el.dataset.v; UI.sug.seed = 0; S.sugPrefs = { loc: UI.sug.loc, venue: UI.sug.venue }; save(); refreshSheet(); render(); break;
     case 'sugShuffle': UI.sug.seed++; refreshSheet(); render(); break;
     case 'sugMore': UI.sugAll = true; render(); break;
+    case 'eatOutMenus': UI.sug.meal = guessMeal(); UI.sug.loc = 'luar'; UI.sug.seed = 0; sheetSuggest(); break;
     case 'logMenu': {
       const m = MENUS.find(x => x.id === el.dataset.id); if (!m) break;
       const meal = UI.sug.meal;
