@@ -155,6 +155,41 @@ const EMERGENCY = {
   menus: []
 };
 
+const FRUIT = /buah|epal|pisang|oren|betik|tembikai|mangga|jambu|anggur|nanas|kurma/i;
+const menuTotal = items => Math.round(items.reduce((a, i) => a + i.kcal * i.qty, 0));
+
+// Bring a menu into the kcal range by adjusting portions, the way a dietitian would:
+// too low → more carbs (½ serving at a time), then protein, then add fruit; too high → fewer carbs first.
+function fitPortions(menu, lo, hi, catalog) {
+  const items = menu.items.map(i => ({ ...i }));
+  const fruit = catalog.find(f => /^buah/i.test(f.name));
+  let total = menuTotal(items), adjusted = false;
+  for (let step = 0; step < 8 && (total < lo || total > hi); step++) {
+    let changed = false;
+    if (total < lo) {
+      const fits = i => i && total + i.kcal * 0.5 <= hi + 40;
+      const it = [items.find(i => i.plate === 'karbo' && i.qty < 2), items.find(i => i.plate === 'protein' && i.qty < 2)].find(fits);
+      const hasFruit = items.some(i => FRUIT.test(i.name));
+      if (it) { it.qty += 0.5; changed = true; }
+      else if (fruit && !hasFruit && total + fruit.kcal <= hi + 40) {
+        items.push({ name: fruit.name, unit: fruit.unit, qty: 1, kcal: fruit.kcal, plate: 'serat' }); changed = true;
+      } else {
+        // a one-dish meal (e.g. mee sup): a bigger portion, then more vegetables (not fruit)
+        const more = [items.find(i => i.plate === 'lain' && i.qty < 1.5), items.find(i => i.plate === 'serat' && !FRUIT.test(i.name) && i.qty < 2)].find(fits);
+        const any = more || items.find(i => i.qty < 2 && fits(i));   // last resort, e.g. a fruit-only snack
+        if (any) { any.qty += 0.5; changed = true; }
+      }
+    } else {
+      const it = [...items].sort((a, b) => b.kcal * b.qty - a.kcal * a.qty)
+        .find(i => (i.plate === 'karbo' || i.plate === 'lain') && i.qty > 0.5);
+      if (it) { it.qty -= 0.5; changed = true; }
+    }
+    if (!changed) break;
+    adjusted = true; total = menuTotal(items);
+  }
+  return { ...menu, items, kcal: total, adjusted };
+}
+
 function cleanCatalog(list) {
   return Array.isArray(list) ? list.slice(0, 120).map(f => ({ name: str(f?.name, 50), unit: str(f?.unit, 30), kcal: num(f?.kcal, 0, 1500) }))
     .filter(f => f.name && f.unit && f.kcal !== null) : [];
@@ -174,10 +209,10 @@ function clean(out, catalog = []) {
     const items = (Array.isArray(m.items) ? m.items : []).slice(0, 8).map(i => {
       const name = sentenceCase(str(i.name, 60)), unit = str(i.unit, 30) || '1 hidangan';
       const preset = ref.get(norm(name) + '|' + norm(unit));
-      return { name, unit, kcal: preset ?? num(i.kcal, 0, 1500) ?? 0,
+      return { name, unit, qty: 1, kcal: preset ?? num(i.kcal, 0, 1500) ?? 0,
         plate: ['serat', 'protein', 'karbo', 'lain'].includes(i.plate) ? i.plate : 'lain' };
     }).filter(i => i.name);
-    return { name: sentenceCase(str(m.name, 70)), tip: str(m.tip, 200), items, kcal: items.reduce((a, i) => a + i.kcal, 0) };
+    return { name: sentenceCase(str(m.name, 70)), tip: str(m.tip, 200), items, kcal: menuTotal(items) };
   }).filter(m => m.name && m.items.length) : [];
   return { reply: str(out.reply, 500), safety_note: str(out.safety_note, 300), menus };
 }
@@ -201,26 +236,14 @@ module.exports = async function handler(req, res) {
   const target = c.meal === 'umum' ? null : num(c.targetKcal, 60, 1500);
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(body) }];
   try {
-    let first = await callOpenAI(messages);
+    const first = await callOpenAI(messages);
     if (first.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', menus: [] });
-    let out = clean(first.parsed, catalog);
+    const out = clean(first.parsed, catalog);
 
-    // One correction pass if any menu is outside the kcal range for this meal.
+    // Fit each menu into this meal's kcal range by adjusting portions (no second AI call).
     if (target && out.menus.length) {
       const [lo, hi] = targetRange(target, c.meal);
-      const off = out.menus.filter(m => m.kcal < lo || m.kcal > hi);
-      if (off.length) {
-        const fix = off.map(m => `"${m.name}" jumlahnya ${m.kcal} kcal`).join('; ');
-        try {
-          const second = await callOpenAI([...messages, { role: 'assistant', content: first.raw },
-            { role: 'user', content: `Betulkan: ${fix}, sedangkan julat setiap menu ialah ${lo}–${hi} kcal. Laraskan sukatan atau tambah item supaya SETIAP menu dalam julat. Kekalkan bahan yang saya sebut dan format yang sama.` }]);
-          if (!second.refusal) {
-            const out2 = clean(second.parsed, catalog);
-            const inRange = x => x.menus.filter(m => m.kcal >= lo && m.kcal <= hi).length;
-            if (out2.menus.length && inRange(out2) >= inRange(out)) out = out2;
-          }
-        } catch (e) { console.error('Correction pass failed', e?.message); }
-      }
+      out.menus = out.menus.map(m => fitPortions(m, lo, hi, catalog));
       out.menus.forEach(m => { m.offTarget = m.kcal < lo ? 'low' : m.kcal > hi ? 'high' : ''; });
       out.range = [lo, hi];
     }
@@ -261,4 +284,4 @@ async function callOpenAI(messages) {
 }
 
 // exported for local tests
-module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, SCHEMA };
+module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, SCHEMA };

@@ -1353,7 +1353,7 @@ function aiResultHtml(r) {
               <div class="flex-1 min-w-0">
                 <div class="font-semibold text-[14px] leading-snug">${esc(m.name)}</div>
                 <div class="mt-1 text-[13px] text-slate-500 leading-relaxed">
-                  ${m.items.map(x => `<span class="inline-flex items-center gap-1 whitespace-nowrap mr-2"><span class="w-1.5 h-1.5 rounded-full" style="background:${PLATE[x.plate || 'lain'].color}"></span>${esc(x.name)} <span class="text-slate-400">${esc(x.unit)}</span></span>`).join('')}
+                  ${m.items.map(x => `<span class="inline-flex items-center gap-1 whitespace-nowrap mr-2"><span class="w-1.5 h-1.5 rounded-full" style="background:${PLATE[x.plate || 'lain'].color}"></span>${esc(x.name)} <span class="text-slate-400">${(x.qty || 1) !== 1 ? x.qty + ' × ' : ''}${esc(x.unit)}</span></span>`).join('')}
                 </div>
                 ${(() => { const c = [...new Set(m.items.flatMap(x => aiConflicts(x.name)))]; return c.length ? `<div class="mt-1.5 text-[13px] font-semibold text-amber-700 flex items-center gap-1">${icon('alert', 'w-4 h-4')}Ada ${c.map(t => TAG_LABEL[t]).join(', ')} — tak sesuai dengan pilihan anda</div>` : ''; })()}
               </div>
@@ -1361,6 +1361,7 @@ function aiResultHtml(r) {
                 <div class="text-[12px] ${m.offTarget ? 'text-amber-700 font-semibold' : r.range ? 'text-green-700 font-semibold' : 'text-slate-500'}">${m.offTarget === 'low' ? 'bawah sasaran' : m.offTarget === 'high' ? 'atas sasaran' : r.range ? 'sesuai' : 'kcal'}</div></div>
             </div>
             ${m.tip ? `<div class="text-[13px] text-slate-600 mt-2"><b class="font-semibold">Tip:</b> ${esc(m.tip)}</div>` : ''}
+            ${m.adjusted ? `<div class="text-[12px] text-slate-500 mt-1">Sukatan dilaraskan ikut sasaran kalori anda.</div>` : ''}
             ${UI.ai.logged[i]
               ? `<div class="mt-2.5 text-[14px] font-semibold text-green-700 flex items-center justify-center gap-1.5 py-2">${icon('check', 'w-4 h-4', 2.5)}Dah dilog ke ${MEALS.find(x => x.id === UI.ai.logged[i]).label}</div>`
               : UI.ai.pickFor === i
@@ -1394,7 +1395,7 @@ async function aiAsk() {
 function aiLog(i, meal = UI.ai.meal) {
   const m = UI.ai.result?.menus?.[i]; if (!m || UI.ai.logged[i]) return;
   if (meal === 'umum') { UI.ai.pickFor = i; refreshSheet(); return; }   // ask which meal first
-  m.items.forEach(x => addMeal({ id: 'ai_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate }, 1, meal));
+  m.items.forEach(x => addMeal({ id: 'ai_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate }, x.qty || 1, meal));
   UI.ai.logged[i] = meal; UI.ai.pickFor = null; render(); refreshSheet();
   toast(`${m.name} dilog ke ${MEALS.find(x => x.id === meal).label}`);
 }
