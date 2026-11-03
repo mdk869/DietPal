@@ -1263,7 +1263,11 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
     targetKcal: general ? null : t.ideal, remainingKcal: (p.kcalMax || 0) - kcalOf(d), dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
     eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal })),
     plateToday: plateCounts(d),
-    avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy, health: p.health || [], ...extra
+    avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy, health: p.health || [],
+    // grounding: app presets the user can eat + Enjin A dishes for this place & meal
+    catalog: allFoods().filter(f => !foodConflicts(f).length).map(f => ({ name: f.name, unit: f.unit, kcal: f.kcal })),
+    venueMenus: general ? [] : MENUS.filter(m => m.meals.includes(MEAL_CODE[meal]) && m.loc === UI.sug.loc && (UI.sug.loc === 'rumah' || m.venue === UI.sug.venue)
+      && !menuItems(m).some(x => foodConflicts(x.f).length)).map(m => m.name), ...extra
   };
 }
 

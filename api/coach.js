@@ -17,26 +17,32 @@ const HEALTH = { diabetes: 'kencing manis', bp: 'darah tinggi', gastrik: 'gastri
 
 const SYSTEM_PROMPT = `Anda ialah Coach DietPal, pembantu pemakanan yang mesra untuk pengguna di Malaysia.
 
-GAYA
-- Jawab dalam Bahasa Melayu Malaysia yang mudah dan santai (bukan Bahasa Indonesia). Istilah Inggeris biasa boleh.
-- Ringkas: "reply" maksimum 3 ayat pendek. Jangan berceramah.
-- Cadangkan makanan tempatan yang realistik dan mudah didapati di Malaysia.
+CARA MENJAWAB
+1. Baca soalan pengguna dengan teliti dan jawab SOALAN ITU dahulu, secara terus, dalam ayat pertama "reply".
+   - Soalan kalori ("berapa kalori X?") → beri anggaran kcal dengan sukatan (cth: "Nasi lemak biasa (1 bungkus) sekitar 400 kcal.").
+   - Soalan boleh/tidak ("boleh makan X?") → jawab ya/tidak/boleh dengan syarat, dan sebab ringkas.
+   - Soalan cara ("macam mana nak…") → beri 1–2 langkah paling penting.
+   - Minta cadangan makan ("nak makan apa", "apa sesuai", "nak masak apa", "pilihan terbaik") → reply ringkas + menus.
+2. "reply" maksimum 2 ayat pendek. JANGAN ulang senarai item menu dalam reply.
+3. Bahasa Melayu Malaysia yang mudah dan santai (bukan Bahasa Indonesia). Istilah Inggeris biasa boleh.
 
-PERATURAN KESELAMATAN (WAJIB)
-1. Ikut konsep Pinggan Sihat Malaysia (KKM): ½ pinggan sayur & buah, ¼ protein, ¼ karbohidrat.
-2. Jangan sesekali cadangkan pengguna skip makan, berpuasa untuk turun berat, atau makan bawah had kalori minimum harian yang diberi.
-3. Jangan suruh potong nasi/karbohidrat atau garam sepenuhnya. Kurangkan sikit-sikit sahaja.
-4. Patuhi SEMUA pantang makanan dan alahan pengguna. Jangan masukkan bahan itu langsung, termasuk dalam sos, kuah atau sambal.
-5. Jika ada nota kesihatan: kencing manis → elak minuman/makanan manis; darah tinggi → kurangkan garam, kicap & makanan proses; gastrik → elak pedas, kopi & perut kosong lama.
-6. Jangan beri diagnosis, nasihat ubat atau dos. Jika soalan tentang simptom serius (sakit dada, sesak nafas, pengsan, dll.), nasihatkan jumpa doktor / hubungi 999 dalam "safety_note" dan jangan cadangkan menu.
-7. Jika soalan bukan tentang makanan, pemakanan atau gaya hidup sihat, jawab dengan sopan bahawa anda hanya boleh bantu tentang makanan, dan "menus" kosong.
-8. Nilai kalori ialah anggaran munasabah; sasarkan jumlah setiap menu dekat dengan sasaran kalori waktu makan yang diberi.
-9. Jika waktu makan ialah "soalan umum", jawab soalan pemakanan itu terus dalam "reply". Beri "menus" hanya jika pengguna minta cadangan makanan; jika tidak, biarkan kosong.
+MENU
+4. Beri 2–3 pilihan menu yang berbeza HANYA jika pengguna minta cadangan makanan atau soalan itu memerlukannya. Untuk soalan fakta/kalori/boleh-tidak, "menus" kosong kecuali pengguna minta cadangan.
+5. Menu mesti realistik untuk lokasi yang diberi. Utamakan hidangan dalam "Hidangan lazim di tempat ini" dan item dalam "Rujukan makanan". Jangan cadang hidangan yang jarang dijual di tempat itu.
+6. Untuk item yang ada dalam "Rujukan makanan", guna NAMA, SUKATAN dan KCAL yang sama tepat. Item lain: anggarkan dengan munasabah.
+7. Setiap item = satu komponen makanan atau minuman (cth: "Nasi putih", "Ikan bakar / kukus", "Teh O kosong"). Nama dalam huruf biasa (cth: "Sayur campur goreng", bukan "Sayur Campur Goreng").
+8. Jumlah kcal setiap menu hampir dengan sasaran waktu makan (±20%). Ikut Pinggan Sihat Malaysia (KKM): ½ sayur & buah, ¼ protein, ¼ karbohidrat — setiap menu ada sayur atau buah.
+9. Jika pengguna sebut bahan atau hidangan tertentu (cth: "ada telur & kobis", "ada nasi minyak & dalca"), gunakan bahan/hidangan itu.
 
-OUTPUT
-- "menus": 0 hingga 3 pilihan. Setiap item: nama, sukatan rumah (cth: "1 senduk", "1 ketul"), anggaran kcal, dan jenis pinggan: serat (sayur/buah), protein, karbo, atau lain.
-- "tip": satu ayat praktikal (cara memesan atau memasak).
-- "safety_note": kosongkan ("") jika tiada perkara keselamatan.`;
+KESELAMATAN (WAJIB)
+10. Jangan cadang skip makan, puasa untuk turun berat, atau makan bawah had kalori minimum harian.
+11. Jangan suruh potong nasi/karbohidrat atau garam sepenuhnya. Kurangkan sikit-sikit sahaja.
+12. Patuhi SEMUA pantang & alahan — termasuk dalam sos, kuah, sambal dan minuman.
+13. Nota kesihatan: kencing manis → elak manis; darah tinggi → kurangkan garam, kicap & makanan proses; gastrik → elak pedas, kopi & perut kosong lama.
+14. Tiada diagnosis, nasihat ubat atau dos. Simptom serius (sakit dada, sesak nafas, pengsan, dll.) → nasihat jumpa doktor / hubungi 999 dalam "safety_note", "menus" kosong.
+15. Soalan bukan tentang makanan/pemakanan/gaya hidup sihat → jawab sopan bahawa anda hanya bantu tentang makanan; "menus" kosong.
+
+"tip": satu ayat praktikal untuk menu itu (cara memesan atau memasak). "safety_note": "" jika tiada.`;
 
 const SCHEMA = {
   type: 'object',
@@ -121,21 +127,39 @@ function buildUserMessage(body) {
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
   if (health.length) lines.push(`Nota kesihatan: ${health.join(', ')}.`);
+  const venueMenus = Array.isArray(c.venueMenus) ? c.venueMenus.slice(0, 12).map(x => str(x, 70)).filter(Boolean) : [];
+  if (venueMenus.length) lines.push(`Hidangan lazim di tempat ini: ${venueMenus.join('; ')}.`);
+  const catalog = cleanCatalog(c.catalog);
+  if (catalog.length) lines.push(`Rujukan makanan (nama | sukatan | kcal): ${catalog.map(f => `${f.name} | ${f.unit} | ${f.kcal}`).join('; ')}.`);
   const pantry = str(body.pantry, 200);
   if (pantry) lines.push(`Bahan yang ada: ${pantry}.`);
   lines.push('', `Soalan pengguna: ${str(body.question, MAX_QUESTION) || 'Apa yang sesuai saya makan sekarang?'}`);
   return lines.join('\n');
 }
 
-// Recompute totals server-side and drop anything malformed.
-function clean(out) {
+function cleanCatalog(list) {
+  return Array.isArray(list) ? list.slice(0, 120).map(f => ({ name: str(f?.name, 50), unit: str(f?.unit, 30), kcal: num(f?.kcal, 0, 1500) }))
+    .filter(f => f.name && f.unit && f.kcal !== null) : [];
+}
+// "Sayur Campur Goreng" → "Sayur campur goreng" (keeps short all-caps words like "KFC")
+function sentenceCase(t) {
+  const w = t.split(' ');
+  if (w.length > 1 && w.every(x => /^[A-Z][a-z]/.test(x) || !/[a-z]/i.test(x))) return t.charAt(0) + t.slice(1).toLowerCase();
+  return t;
+}
+const norm = t => t.toLowerCase().replace(/\s+/g, ' ').trim();
+
+// Recompute totals server-side, align kcal with the app's presets, drop anything malformed.
+function clean(out, catalog = []) {
+  const ref = new Map(catalog.map(f => [norm(f.name) + '|' + norm(f.unit), f.kcal]));
   const menus = Array.isArray(out.menus) ? out.menus.slice(0, 3).map(m => {
-    const items = (Array.isArray(m.items) ? m.items : []).slice(0, 8).map(i => ({
-      name: str(i.name, 60), unit: str(i.unit, 30) || '1 hidangan',
-      kcal: num(i.kcal, 0, 1500) ?? 0,
-      plate: ['serat', 'protein', 'karbo', 'lain'].includes(i.plate) ? i.plate : 'lain'
-    })).filter(i => i.name);
-    return { name: str(m.name, 70), tip: str(m.tip, 200), items, kcal: items.reduce((a, i) => a + i.kcal, 0) };
+    const items = (Array.isArray(m.items) ? m.items : []).slice(0, 8).map(i => {
+      const name = sentenceCase(str(i.name, 60)), unit = str(i.unit, 30) || '1 hidangan';
+      const preset = ref.get(norm(name) + '|' + norm(unit));
+      return { name, unit, kcal: preset ?? num(i.kcal, 0, 1500) ?? 0,
+        plate: ['serat', 'protein', 'karbo', 'lain'].includes(i.plate) ? i.plate : 'lain' };
+    }).filter(i => i.name);
+    return { name: sentenceCase(str(m.name, 70)), tip: str(m.tip, 200), items, kcal: items.reduce((a, i) => a + i.kcal, 0) };
   }).filter(m => m.name && m.items.length) : [];
   return { reply: str(out.reply, 500), safety_note: str(out.safety_note, 300), menus };
 }
@@ -150,7 +174,7 @@ module.exports = async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'bad_request' });
-  if (JSON.stringify(body).length > 8000) return res.status(413).json({ error: 'too_large' });
+  if (JSON.stringify(body).length > 16000) return res.status(413).json({ error: 'too_large' });
 
   try {
     const ctrl = new AbortController();
@@ -180,7 +204,7 @@ module.exports = async function handler(req, res) {
     if (msg?.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', menus: [] });
     let parsed;
     try { parsed = JSON.parse(msg?.content || '{}'); } catch { return res.status(502).json({ error: 'bad_output' }); }
-    return res.status(200).json(clean(parsed));
+    return res.status(200).json(clean(parsed, cleanCatalog(body.context?.catalog)));
   } catch (e) {
     console.error('Coach error', e?.name, e?.message);
     return res.status(504).json({ error: e?.name === 'AbortError' ? 'timeout' : 'failed' });
@@ -188,4 +212,4 @@ module.exports = async function handler(req, res) {
 };
 
 // exported for local tests
-module.exports._test = { buildUserMessage, clean, originAllowed, SCHEMA };
+module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, SCHEMA };
