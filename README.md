@@ -75,7 +75,7 @@ Anggaran umum tanpa sumber khusus: nilai kalori makanan & menu, sasaran air (~30
 - Peringatan hanya dipaparkan bila app dibuka (push notification belum disokong).
 
 ## Coach AI (Enjin B)
-Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas (cth: "Saya kat kenduri, ada nasi minyak & dalca"). Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat Completions dengan *Structured Outputs*.
+Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna pilih waktu makan (Sarapan, Tengah hari, Malam, Snek) untuk cadangan menu ikut sasaran kalori waktu itu, atau **Umum** untuk soalan pemakanan biasa (cth: "Nasi lemak berapa kalori?"); menu dari mod Umum boleh dilog ke mana-mana waktu makan. Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat Completions dengan *Structured Outputs*.
 
 **Environment variables di Vercel**
 | Nama | Wajib | Keterangan |

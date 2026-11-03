@@ -31,6 +31,7 @@ PERATURAN KESELAMATAN (WAJIB)
 6. Jangan beri diagnosis, nasihat ubat atau dos. Jika soalan tentang simptom serius (sakit dada, sesak nafas, pengsan, dll.), nasihatkan jumpa doktor / hubungi 999 dalam "safety_note" dan jangan cadangkan menu.
 7. Jika soalan bukan tentang makanan, pemakanan atau gaya hidup sihat, jawab dengan sopan bahawa anda hanya boleh bantu tentang makanan, dan "menus" kosong.
 8. Nilai kalori ialah anggaran munasabah; sasarkan jumlah setiap menu dekat dengan sasaran kalori waktu makan yang diberi.
+9. Jika waktu makan ialah "soalan umum", jawab soalan pemakanan itu terus dalam "reply". Beri "menus" hanya jika pengguna minta cadangan makanan; jika tidak, biarkan kosong.
 
 OUTPUT
 - "menus": 0 hingga 3 pilihan. Setiap item: nama, sukatan rumah (cth: "1 senduk", "1 ketul"), anggaran kcal, dan jenis pinggan: serat (sayur/buah), protein, karbo, atau lain.
@@ -101,12 +102,15 @@ function originAllowed(req) {
 // Only whitelisted, size-limited fields reach the model.
 function buildUserMessage(body) {
   const c = body.context || {};
-  const meal = MEALS[c.meal] || 'waktu makan seterusnya';
+  const general = c.meal === 'umum';
+  const meal = general ? 'soalan umum (tiada waktu makan khusus)' : (MEALS[c.meal] || 'waktu makan seterusnya');
   const lines = [];
   lines.push(`Waktu makan: ${meal}.`);
-  if (c.location === 'luar') lines.push(`Lokasi: di luar${VENUES[c.venue] ? ` (${VENUES[c.venue]})` : ''}.`);
-  else lines.push('Lokasi: di rumah.');
-  const target = num(c.targetKcal, 60, 1500), remaining = num(c.remainingKcal, -3000, 5000);
+  if (!general) {
+    if (c.location === 'luar') lines.push(`Lokasi: di luar${VENUES[c.venue] ? ` (${VENUES[c.venue]})` : ''}.`);
+    else lines.push('Lokasi: di rumah.');
+  }
+  const target = general ? null : num(c.targetKcal, 60, 1500), remaining = num(c.remainingKcal, -3000, 5000);
   const floor = num(c.minDailyKcal, 1200, 1500) || 1500;
   if (target) lines.push(`Sasaran kalori untuk waktu makan ini: ~${target} kcal.`);
   if (remaining !== null) lines.push(`Baki kalori hari ini: ${remaining} kcal.`);
