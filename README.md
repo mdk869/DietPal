@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, berjalan terus dalam browser telefon, boleh dipasang ke home screen dan berfungsi offline. Semua data disimpan dalam telefon pengguna — tiada akaun atau server.
 
-**Versi semasa:** 1.2.1
+**Versi semasa:** 1.2.2
 
 ## Ciri utama
 
@@ -41,7 +41,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v7)
+sw.js           Service worker (cache dietpal-v8)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
 
@@ -55,7 +55,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v7` → `dietpal-v8`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v8` → `dietpal-v9`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
