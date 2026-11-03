@@ -88,6 +88,9 @@ Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna
 **Perlindungan**
 - Prompt sistem: Pinggan Sihat Malaysia, had kalori minimum, tiada skip makan atau potong karbo/garam terus, patuhi pantang & alahan, nasihat kesihatan asas, rujuk doktor untuk simptom serius.
 - Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
+- AI dirujukkan kepada preset makanan app & hidangan lazim tempat dipilih; kcal item diselaraskan dengan preset bila sepadan.
+- Julat kcal setiap menu (±20%, snek ±40%) disemak; jika terkeluar, satu pusingan pembetulan dibuat. Menu yang masih terkeluar ditanda "bawah/atas sasaran".
+- Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
 - Had kadar setiap IP, semakan origin, had panjang jawapan, tamat masa 25 saat.
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
 - Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, nota kesihatan. **Nama dan berat tidak dihantar.**

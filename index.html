@@ -1357,7 +1357,8 @@ function aiResultHtml(r) {
                 </div>
                 ${(() => { const c = [...new Set(m.items.flatMap(x => aiConflicts(x.name)))]; return c.length ? `<div class="mt-1.5 text-[13px] font-semibold text-amber-700 flex items-center gap-1">${icon('alert', 'w-4 h-4')}Ada ${c.map(t => TAG_LABEL[t]).join(', ')} — tak sesuai dengan pilihan anda</div>` : ''; })()}
               </div>
-              <div class="text-right shrink-0"><div class="font-extrabold text-[16px]">~${fmt(m.kcal)}</div><div class="text-[12px] text-slate-500">kcal</div></div>
+              <div class="text-right shrink-0"><div class="font-extrabold text-[16px]">~${fmt(m.kcal)}</div>
+                <div class="text-[12px] ${m.offTarget ? 'text-amber-700 font-semibold' : r.range ? 'text-green-700 font-semibold' : 'text-slate-500'}">${m.offTarget === 'low' ? 'bawah sasaran' : m.offTarget === 'high' ? 'atas sasaran' : r.range ? 'sesuai' : 'kcal'}</div></div>
             </div>
             ${m.tip ? `<div class="text-[13px] text-slate-600 mt-2"><b class="font-semibold">Tip:</b> ${esc(m.tip)}</div>` : ''}
             ${UI.ai.logged[i]

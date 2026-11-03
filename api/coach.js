@@ -23,7 +23,7 @@ CARA MENJAWAB
    - Soalan boleh/tidak ("boleh makan X?") → jawab ya/tidak/boleh dengan syarat, dan sebab ringkas.
    - Soalan cara ("macam mana nak…") → beri 1–2 langkah paling penting.
    - Minta cadangan makan ("nak makan apa", "apa sesuai", "nak masak apa", "pilihan terbaik") → reply ringkas + menus.
-2. "reply" maksimum 2 ayat pendek. JANGAN ulang senarai item menu dalam reply.
+2. "reply" maksimum 2 ayat pendek. JANGAN sebut nama hidangan, item atau jumlah kcal menu dalam reply — semua itu sudah dipaparkan dalam kad menu.
 3. Bahasa Melayu Malaysia yang mudah dan santai (bukan Bahasa Indonesia). Istilah Inggeris biasa boleh.
 
 MENU
@@ -31,16 +31,17 @@ MENU
 5. Menu mesti realistik untuk lokasi yang diberi. Utamakan hidangan dalam "Hidangan lazim di tempat ini" dan item dalam "Rujukan makanan". Jangan cadang hidangan yang jarang dijual di tempat itu.
 6. Untuk item yang ada dalam "Rujukan makanan", guna NAMA, SUKATAN dan KCAL yang sama tepat. Item lain: anggarkan dengan munasabah.
 7. Setiap item = satu komponen makanan atau minuman (cth: "Nasi putih", "Ikan bakar / kukus", "Teh O kosong"). Nama dalam huruf biasa (cth: "Sayur campur goreng", bukan "Sayur Campur Goreng").
-8. Jumlah kcal setiap menu hampir dengan sasaran waktu makan (±20%). Ikut Pinggan Sihat Malaysia (KKM): ½ sayur & buah, ¼ protein, ¼ karbohidrat — setiap menu ada sayur atau buah.
-9. Jika pengguna sebut bahan atau hidangan tertentu (cth: "ada telur & kobis", "ada nasi minyak & dalca"), gunakan bahan/hidangan itu.
+8. WAJIB: jumlah kcal setiap menu berada dalam "Julat kcal setiap menu" yang diberi. Kira jumlah sebelum menjawab. Jika kurang, tambah sukatan (cth: "1½ senduk" nasi, "2 biji" telur) atau tambah item seperti buah, sup atau minuman susu rendah lemak. Ikut Pinggan Sihat Malaysia (KKM): ½ sayur & buah, ¼ protein, ¼ karbohidrat — setiap menu ada sayur atau buah.
+9. Jika pengguna sebut bahan atau hidangan tertentu (cth: "ada telur, kobis & ayam"), SETIAP bahan itu mesti muncul sebagai item dengan namanya sendiri dalam menu (cth: "Kobis goreng", "Telur dadar", "Ayam grill"). Bahan pengguna lebih penting daripada "Rujukan makanan".
+10. "tip" mesti selari dengan item dalam menu yang sama (jangan sebut cara masak atau bahan lain).
 
 KESELAMATAN (WAJIB)
-10. Jangan cadang skip makan, puasa untuk turun berat, atau makan bawah had kalori minimum harian.
-11. Jangan suruh potong nasi/karbohidrat atau garam sepenuhnya. Kurangkan sikit-sikit sahaja.
-12. Patuhi SEMUA pantang & alahan — termasuk dalam sos, kuah, sambal dan minuman.
-13. Nota kesihatan: kencing manis → elak manis; darah tinggi → kurangkan garam, kicap & makanan proses; gastrik → elak pedas, kopi & perut kosong lama.
-14. Tiada diagnosis, nasihat ubat atau dos. Simptom serius (sakit dada, sesak nafas, pengsan, dll.) → nasihat jumpa doktor / hubungi 999 dalam "safety_note", "menus" kosong.
-15. Soalan bukan tentang makanan/pemakanan/gaya hidup sihat → jawab sopan bahawa anda hanya bantu tentang makanan; "menus" kosong.
+11. Jangan cadang skip makan, puasa untuk turun berat, atau makan bawah had kalori minimum harian.
+12. Jangan suruh potong nasi/karbohidrat atau garam sepenuhnya. Kurangkan sikit-sikit sahaja.
+13. Patuhi SEMUA pantang & alahan — termasuk dalam sos, kuah, sambal dan minuman.
+14. Nota kesihatan: kencing manis → elak manis; darah tinggi → kurangkan garam, kicap & makanan proses; gastrik → elak pedas, kopi & perut kosong lama.
+15. Tiada diagnosis, nasihat ubat atau dos. Simptom serius (sakit dada, sesak nafas, pengsan, dll.) → nasihat jumpa doktor / hubungi 999 dalam "safety_note", "menus" kosong.
+16. Soalan bukan tentang makanan/pemakanan/gaya hidup sihat → jawab sopan bahawa anda hanya bantu tentang makanan; "menus" kosong.
 
 "tip": satu ayat praktikal untuk menu itu (cara memesan atau memasak). "safety_note": "" jika tiada.`;
 
@@ -118,7 +119,8 @@ function buildUserMessage(body) {
   }
   const target = general ? null : num(c.targetKcal, 60, 1500), remaining = num(c.remainingKcal, -3000, 5000);
   const floor = num(c.minDailyKcal, 1200, 1500) || 1500;
-  if (target) lines.push(`Sasaran kalori untuk waktu makan ini: ~${target} kcal.`);
+  if (target) { const [lo, hi] = targetRange(target, c.meal);
+    lines.push(`Sasaran kalori untuk waktu makan ini: ~${target} kcal. Julat kcal setiap menu: ${lo}–${hi} kcal.`); }
   if (remaining !== null) lines.push(`Baki kalori hari ini: ${remaining} kcal.`);
   lines.push(`Had kalori minimum harian: ${floor} kcal (jangan cadang kurang dari ini secara keseluruhan).`);
   const eaten = Array.isArray(c.eatenToday) ? c.eatenToday.slice(0, 20).map(x => `${str(x.name, 50)} (${num(x.kcal, 0, 3000) ?? '?'} kcal)`) : [];
@@ -136,6 +138,22 @@ function buildUserMessage(body) {
   lines.push('', `Soalan pengguna: ${str(body.question, MAX_QUESTION) || 'Apa yang sesuai saya makan sekarang?'}`);
   return lines.join('\n');
 }
+
+function targetRange(target, meal) {
+  const tol = meal === 'snek' ? 0.4 : 0.2;
+  return [Math.round(target * (1 - tol) / 10) * 10, Math.round(target * (1 + tol) / 10) * 10];
+}
+
+// Serious symptoms: answer deterministically (no AI call) so the emergency advice is always shown.
+const RED_FLAGS = [/sakit\s*dada|dada[^.,?!]{0,15}(sakit|sempit|ketat|berat|sesak|pedih)|chest\s*pain/i, /sesak\s*nafas|susah\s*(nak\s*)?bernafas|tak\s*boleh\s*bernafas/i,
+  /pengsan|tak\s*sedarkan\s*diri|hampir\s*pitam/i, /(lemah|kebas|lumpuh)\s*(sebelah|separuh)|muka\s*(senget|herot)|cakap\s*pelat/i,
+  /muntah\s*darah|berak\s*darah|najis\s*(hitam|berdarah)/i, /sawan|kejang\s*seluruh/i, /sakit\s*kepala\s*(paling|sangat|teramat)\s*teruk/i];
+function redFlag(q) { return RED_FLAGS.some(r => r.test(q || '')); }
+const EMERGENCY = {
+  reply: 'Simptom ini perlu diperiksa segera, bukan diurus dengan makanan.',
+  safety_note: 'Hubungi 999 atau pergi ke unit kecemasan terdekat sekarang. Jangan memandu sendiri jika rasa tidak sihat.',
+  menus: []
+};
 
 function cleanCatalog(list) {
   return Array.isArray(list) ? list.slice(0, 120).map(f => ({ name: str(f?.name, 50), unit: str(f?.unit, 30), kcal: num(f?.kcal, 0, 1500) }))
@@ -176,40 +194,71 @@ module.exports = async function handler(req, res) {
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'bad_request' });
   if (JSON.stringify(body).length > 16000) return res.status(413).json({ error: 'too_large' });
 
+  if (redFlag(body.question)) return res.status(200).json(EMERGENCY);
+
+  const catalog = cleanCatalog(body.context?.catalog);
+  const c = body.context || {};
+  const target = c.meal === 'umum' ? null : num(c.targetKcal, 60, 1500);
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(body) }];
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 25000);
+    let first = await callOpenAI(messages);
+    if (first.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', menus: [] });
+    let out = clean(first.parsed, catalog);
+
+    // One correction pass if any menu is outside the kcal range for this meal.
+    if (target && out.menus.length) {
+      const [lo, hi] = targetRange(target, c.meal);
+      const off = out.menus.filter(m => m.kcal < lo || m.kcal > hi);
+      if (off.length) {
+        const fix = off.map(m => `"${m.name}" jumlahnya ${m.kcal} kcal`).join('; ');
+        try {
+          const second = await callOpenAI([...messages, { role: 'assistant', content: first.raw },
+            { role: 'user', content: `Betulkan: ${fix}, sedangkan julat setiap menu ialah ${lo}–${hi} kcal. Laraskan sukatan atau tambah item supaya SETIAP menu dalam julat. Kekalkan bahan yang saya sebut dan format yang sama.` }]);
+          if (!second.refusal) {
+            const out2 = clean(second.parsed, catalog);
+            const inRange = x => x.menus.filter(m => m.kcal >= lo && m.kcal <= hi).length;
+            if (out2.menus.length && inRange(out2) >= inRange(out)) out = out2;
+          }
+        } catch (e) { console.error('Correction pass failed', e?.message); }
+      }
+      out.menus.forEach(m => { m.offTarget = m.kcal < lo ? 'low' : m.kcal > hi ? 'high' : ''; });
+      out.range = [lo, hi];
+    }
+    return res.status(200).json(out);
+  } catch (e) {
+    console.error('Coach error', e?.name, e?.message, e?.status);
+    if (e?.status) return res.status(502).json({ error: e.status === 429 ? 'upstream_busy' : 'upstream' });
+    return res.status(e?.message === 'bad_output' ? 502 : 504).json({ error: e?.name === 'AbortError' ? 'timeout' : (e?.message === 'bad_output' ? 'bad_output' : 'failed') });
+  }
+};
+
+async function callOpenAI(messages) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: MODEL,
-        max_completion_tokens: 900,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserMessage(body) }
-        ],
+        max_completion_tokens: 1000,
+        messages,
         response_format: { type: 'json_schema', json_schema: { name: 'coach_reply', strict: true, schema: SCHEMA } }
       })
     });
-    clearTimeout(timer);
     if (!r.ok) {
       const detail = await r.text().catch(() => '');
       console.error('OpenAI error', r.status, detail.slice(0, 500));
-      return res.status(502).json({ error: r.status === 429 ? 'upstream_busy' : 'upstream' });
+      const err = new Error('upstream'); err.status = r.status; throw err;
     }
     const data = await r.json();
     const msg = data?.choices?.[0]?.message;
-    if (msg?.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', menus: [] });
-    let parsed;
-    try { parsed = JSON.parse(msg?.content || '{}'); } catch { return res.status(502).json({ error: 'bad_output' }); }
-    return res.status(200).json(clean(parsed, cleanCatalog(body.context?.catalog)));
-  } catch (e) {
-    console.error('Coach error', e?.name, e?.message);
-    return res.status(504).json({ error: e?.name === 'AbortError' ? 'timeout' : 'failed' });
-  }
-};
+    if (msg?.refusal) return { refusal: true };
+    try { return { parsed: JSON.parse(msg?.content || '{}'), raw: msg.content }; }
+    catch { throw new Error('bad_output'); }
+  } finally { clearTimeout(timer); }
+}
 
 // exported for local tests
-module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, SCHEMA };
+module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, SCHEMA };
