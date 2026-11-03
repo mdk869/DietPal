@@ -1381,7 +1381,7 @@ async function aiAsk() {
   if (!navigator.onLine) { UI.ai.error = AI_ERRORS.offline; UI.ai.result = null; refreshSheet(); return; }
   UI.ai.loading = true; UI.ai.error = ''; UI.ai.result = null; UI.ai.logged = {}; refreshSheet();
   try {
-    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 30000);
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 55000);
     const r = await fetch(AI_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
       body: JSON.stringify({ question: UI.ai.q, context: buildAIContext({}, UI.ai.meal) }) });
     clearTimeout(timer);

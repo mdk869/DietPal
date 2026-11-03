@@ -3,6 +3,10 @@
 // The key never reaches the browser or the repo.
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+// Reasoning models (gpt-5.x, gpt-6.x, o-series) think before answering: keep effort low for speed & cost,
+// and leave room for the thinking tokens. Override with OPENAI_REASONING (none/low/medium/high).
+const REASONING = /^(gpt-[5-9]|o\d)/i.test(MODEL);
+const EFFORT = process.env.OPENAI_REASONING || 'low';
 const MAX_QUESTION = 300;
 const RATE_LIMIT = Number(process.env.COACH_RATE_LIMIT || 12);   // requests per IP per window
 const RATE_WINDOW_MS = 10 * 60 * 1000;                             // 10 minutes
@@ -248,7 +252,7 @@ function fitPortions(menu, lo, hi, catalog, meal) {
 
 async function callOpenAI(messages) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000);
+  const timer = setTimeout(() => ctrl.abort(), REASONING ? 45000 : 30000);
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -256,7 +260,8 @@ async function callOpenAI(messages) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: MODEL,
-        max_completion_tokens: 2000,
+        max_completion_tokens: REASONING ? 6000 : 2000,
+        ...(REASONING ? { reasoning_effort: EFFORT } : {}),
         messages,
         response_format: { type: 'json_schema', json_schema: { name: 'coach_reply', strict: true, schema: SCHEMA } }
       })

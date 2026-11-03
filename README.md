@@ -42,7 +42,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v11)
+sw.js           Service worker (cache dietpal-v12)
 vercel.json     Tetapan fungsi Vercel (maxDuration 60 s)
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
@@ -58,7 +58,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v11` → `dietpal-v12`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v12` → `dietpal-v13`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
@@ -85,6 +85,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
 | `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
+| `OPENAI_REASONING` | Tidak | Tahap berfikir untuk model reasoning (`gpt-5.x`, `gpt-6.x`, siri `o`): `none`, `low`, `medium`, `high` (lalai: `low`). Diabaikan untuk model lain. |
 | `COACH_RATE_LIMIT` | Tidak | Had permintaan setiap IP dalam 10 minit (lalai: 12). |
 | `ALLOWED_ORIGINS` | Tidak | Domain tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). |
 
@@ -101,7 +102,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 - Had kalori minimum harian, tiada skip makan atau potong nasi/garam terus, patuhi pantang & alahan, tiada diagnosis/ubat/dos.
 - Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
 - Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
-- Had kadar setiap IP, semakan origin, had saiz permintaan, tamat masa 30 saat.
+- Had kadar setiap IP, semakan origin, had saiz permintaan, tamat masa 30 saat (45 saat untuk model reasoning).
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
 - Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, nota kesihatan. **Nama dan berat tidak dihantar.**
 - Tanpa internet atau jika AI gagal, app terus guna cadangan menu Enjin A.
