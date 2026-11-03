@@ -422,6 +422,13 @@ function render() {
     return;
   }
   const ready = S.profile.setupDone;
+  if (ready && !notifReady()) {   // reminders are required to use DietPal
+    document.querySelector('nav').classList.add('hidden');
+    document.getElementById('avatarBtn').classList.add('hidden');
+    document.getElementById('hdrDate').textContent = 'Coach diet anda';
+    document.getElementById('view').innerHTML = `<div class="fade pt-4 pb-10">${notifBody(false)}</div>`;
+    return;
+  }
   document.querySelector('nav').classList.toggle('hidden', !ready);
   const av = document.getElementById('avatarBtn'); av.classList.toggle('hidden', !ready); av.textContent = initials();
   if (!ready) {
@@ -447,7 +454,6 @@ const card = (inner, cls = '') => `<section class="bg-white rounded-2xl shadow-c
 function viewHome() {
   const p = S.profile, d = peekDay(todayKey()), k = kcalOf(d), c = coach(), st = streak();
   return `
-  ${pushCard()}
   ${remindersBlock()}
   ${card(`
     <div class="flex gap-3">
@@ -1619,23 +1625,7 @@ function viewOnboard() {
     </div>
     ${nav()}`;
   }
-  if (o.step === 6) body = pushSupported() ? `
-    <div class="text-center pt-4">
-      <div class="w-16 h-16 rounded-2xl bg-brand-50 text-brand-700 grid place-items-center mx-auto">${icon('bell', 'w-8 h-8')}</div>
-      <h2 class="text-xl font-extrabold mt-4">Biar DietPal ingatkan anda</h2>
-      <p class="text-[14px] text-slate-500 mt-1">Supaya anda tak terlupa, walaupun app ditutup.</p>
-    </div>
-    <div class="bg-white rounded-2xl shadow-card p-4 mt-5 space-y-3 text-[14px] text-slate-700">
-      <div class="flex gap-3">${icon('utensils', 'w-5 h-5 text-slate-500 shrink-0')}<span>Log makan ikut waktu makan anda — tak dihantar jika dah log</span></div>
-      <div class="flex gap-3">${icon('droplet', 'w-5 h-5 text-slate-500 shrink-0')}<span>Minum air setiap 2 jam, bila air masih kurang</span></div>
-      <div class="flex gap-3">${icon('scale', 'w-5 h-5 text-slate-500 shrink-0')}<span>Timbang berat seminggu sekali</span></div>
-      <div class="flex gap-3">${icon('moon', 'w-5 h-5 text-slate-500 shrink-0')}<span>Ringkasan kalori setiap malam</span></div>
-    </div>
-    <p class="text-[12px] text-slate-500 mt-3">Boleh ubah atau matikan di Tetapan.</p>
-    <button data-act="obNotif" class="tap mt-5 w-full btn btn-primary py-3.5">${icon('bell', 'w-5 h-5')}Hidupkan peringatan</button>` : `
-    <h2 class="text-xl font-extrabold">Semua sedia</h2>
-    <p class="text-[14px] text-slate-500 mt-1">Telefon ini belum menyokong notifikasi. Peringatan akan dipaparkan bila app dibuka.</p>
-    <button data-act="obSkip" class="tap mt-6 w-full btn btn-primary py-3.5">Mula guna DietPal</button>`;
+  if (o.step === 6) body = notifBody(true);
   return `<div class="pt-4 pb-10">${dots}${body}</div>`;
 }
 
@@ -1837,8 +1827,7 @@ function handleProfileAction(a, el) {
       render(); return true;
     }
     case 'obBack': obCollect(); UI.ob.step--; render(); window.scrollTo({ top: 0 }); return true;
-    case 'obSkip': S.push = { ...S.push, asked: true }; obFinish(); return true;
-    case 'obNotif': obFinish(); enablePush(true).then(ok => { if (ok) toast('Peringatan dihidupkan'); render(); }); return true;
+    case 'obNotif': UI.notifTried = true; enablePush(true).then(ok => { if (ok) { obFinish(); toast('Peringatan dihidupkan'); } else render(); }); return true;
     case 'obNext': {
       obCollect(); const err = obValidate(); if (err) { toast(err); return true; }
       if (UI.ob.step === 6) { obFinish(); return true; }
@@ -1978,10 +1967,12 @@ document.addEventListener('click', (e) => {
     case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) { localStorage.removeItem(KEY); S = load(); UI.tab = 'home'; UI.ob.step = 0; render(); toast('Data dipadam'); } break;
     case 'install': installApp(); break;
     case 'pushOn': enablePush(true).then(ok => { if (ok) toast('Peringatan dihidupkan'); render(); }); break;
-    case 'pushOff': disablePush().then(() => { toast('Notifikasi dimatikan'); render(); }); break;
     case 'pushTest': pushPost({ action: 'test', endpoint: S.push.endpoint }).then(r => toast(r.result === 'ok' ? 'Notifikasi ujian dihantar' : 'Tak dapat hantar — cuba hidupkan semula')).catch(() => toast('Tiada sambungan')); break;
-    case 'pushCardOn': S.push = { ...S.push, cardDone: true }; save(); enablePush(true).then(ok => { if (ok) toast('Peringatan dihidupkan'); render(); }); break;
-    case 'pushCardNo': S.push = { ...S.push, cardDone: true }; save(); render(); break;
+    case 'notifOn': UI.notifTried = true; enablePush(true).then(ok => { if (ok) toast('Peringatan dihidupkan'); render(); }); break;
+    case 'notifRecheck':
+      if (Notification.permission !== 'granted') { toast('Notifikasi masih belum dibenarkan'); render(); break; }
+      if (!S.profile.setupDone) { subscribePush(true).catch(() => {}); obFinish(); } else { pushCheck(); render(); }
+      break;
     case 'copyLink': navigator.clipboard?.writeText(location.origin + location.pathname).then(() => toast('Link disalin'), () => toast(location.origin)); break;
     case 'sugMeal': UI.sug.meal = el.dataset.meal; UI.sug.seed = 0; refreshSheet(); render(); break;
     case 'sugLoc': UI.sug.loc = el.dataset.loc; UI.sug.seed = 0; S.sugPrefs = { loc: UI.sug.loc, venue: UI.sug.venue }; save(); refreshSheet(); render(); break;
@@ -2028,7 +2019,7 @@ document.addEventListener('change', (e) => {
   }
 });
 // Re-render when returning to the app (e.g. new day)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheetFn) render(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!sheetFn) render(); if (typeof pushCheck === 'function') pushCheck(); });
 
 /* ============================================================
    ICONS
@@ -2127,7 +2118,7 @@ async function enablePush(welcome = false) {
   if (!pushSupported()) { toast('Telefon ini tak menyokong notifikasi'); return false; }
   const perm = await Notification.requestPermission();
   S.push = { ...S.push, asked: true }; save();
-  if (perm !== 'granted') { toast(perm === 'denied' ? 'Notifikasi disekat — boleh dihidupkan di tetapan telefon' : 'Notifikasi belum dihidupkan'); return false; }
+  if (perm !== 'granted') return false;   // the screen explains what to do next
   try { await subscribePush(welcome); return true; }
   catch (e) { console.warn('push subscribe failed', e); toast('Tak dapat hidupkan notifikasi. Cuba lagi bila ada internet.'); return false; }
 }
@@ -2150,37 +2141,56 @@ function syncPush(now = false) {
 }
 // On launch: keep the server in step if the browser rotated the subscription or permission changed.
 async function pushCheck() {
-  if (!appAllowed() || !pushSupported() || !S.push?.on) return;
+  if (!appAllowed() || !pushSupported() || Notification.permission !== 'granted' || !S.profile.setupDone) return;
   try {
-    if (Notification.permission !== 'granted') { S.push = { ...S.push, on: false }; save(); return; }
+    if (!S.push?.on) { await subscribePush(false); render(); return; }
     const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
     if (!sub || sub.endpoint !== S.push.endpoint) await subscribePush(false); else syncPush(true);
   } catch (e) { console.warn('push check', e); }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) syncPush(true); });
 
-function pushCard() {
-  if (!pushSupported() || S.push?.on || S.push?.cardDone || pushDenied()) return '';
-  if (!Object.values(S.days).some(d => d.meals?.length)) return '';   // ask again only after the first meal is logged
-  return card(`<div class="flex gap-3">
-      <div class="w-10 h-10 shrink-0 rounded-xl bg-brand-50 text-brand-700 grid place-items-center">${icon('bell')}</div>
-      <div class="flex-1"><div class="font-bold text-[14px]">Nak DietPal ingatkan masa makan seterusnya?</div>
-        <div class="text-[13px] text-slate-500 mt-0.5">Peringatan log makan, minum air dan ringkasan malam — walaupun app ditutup.</div></div></div>
-    <div class="grid grid-cols-2 gap-2 mt-3">
-      <button data-act="pushCardNo" class="tap btn btn-secondary py-2.5 text-[14px]">Tak perlu</button>
-      <button data-act="pushCardOn" class="tap btn btn-primary py-2.5 text-[14px]">Hidupkan</button></div>`);
+// Notifications are required: the app opens only once the browser permission is granted.
+const notifReady = () => pushSupported() && Notification.permission === 'granted';
+function notifBody(onboarding) {
+  const p = platform(), state = !pushSupported() ? 'unsupported' : Notification.permission;
+  const head = (title, sub, ic = 'bell') => `<div class="text-center pt-4">
+      <div class="w-16 h-16 rounded-2xl bg-brand-50 text-brand-700 grid place-items-center mx-auto">${icon(ic, 'w-8 h-8')}</div>
+      <h2 class="text-xl font-extrabold mt-4">${title}</h2>
+      <p class="text-[14px] text-slate-500 mt-1">${sub}</p></div>`;
+  if (state === 'unsupported') return head('Telefon ini belum menyokong notifikasi',
+    p === 'ios' ? 'DietPal perlukan iOS 16.4 atau lebih baru. Kemas kini iPhone anda di Settings → General → Software Update, kemudian buka DietPal semula.'
+      : 'DietPal perlukan browser yang menyokong notifikasi. Pasang semula DietPal menggunakan Chrome terkini.', 'alert');
+  if (state === 'denied') {
+    const how = p === 'ios'
+      ? ['Buka <b>Settings</b> iPhone', 'Pilih <b>Notifications</b>, kemudian <b>DietPal</b>', 'Hidupkan <b>Allow Notifications</b>', 'Kembali ke DietPal dan tekan butang di bawah']
+      : p === 'android'
+      ? ['Tekan lama ikon <b>DietPal</b> di home screen, pilih <b>App info</b> (ⓘ)', 'Pilih <b>Notifications</b> dan hidupkan', 'Kembali ke DietPal dan tekan butang di bawah']
+      : ['Klik ikon kunci di bar alamat tetingkap DietPal', 'Tukar <b>Notifications</b> kepada <b>Allow</b>', 'Tekan butang di bawah'];
+    return `${head('Notifikasi disekat', 'DietPal perlukan notifikasi untuk ingatkan anda. Hidupkan semula di tetapan telefon:', 'alert')}
+      <ol class="bg-white rounded-2xl shadow-card p-4 mt-5 space-y-3">${how.map((h, i) => `<li class="flex gap-3 items-start"><span class="shrink-0 w-7 h-7 rounded-full bg-brand-50 text-brand-700 font-bold text-[14px] grid place-items-center">${i + 1}</span><span class="text-[14px] text-slate-700 pt-1 leading-snug">${h}</span></li>`).join('')}</ol>
+      <button data-act="notifRecheck" class="tap mt-5 w-full btn btn-primary py-3.5">Saya dah hidupkan — teruskan</button>`;
+  }
+  return `${head(onboarding ? 'Biar DietPal ingatkan anda' : 'Hidupkan peringatan untuk teruskan', 'Supaya anda tak terlupa, walaupun app ditutup.')}
+    <div class="bg-white rounded-2xl shadow-card p-4 mt-5 space-y-3 text-[14px] text-slate-700">
+      <div class="flex gap-3">${icon('utensils', 'w-5 h-5 text-slate-500 shrink-0')}<span>Log makan ikut waktu makan anda — tak dihantar jika dah log</span></div>
+      <div class="flex gap-3">${icon('droplet', 'w-5 h-5 text-slate-500 shrink-0')}<span>Minum air setiap 2 jam, bila air masih kurang</span></div>
+      <div class="flex gap-3">${icon('scale', 'w-5 h-5 text-slate-500 shrink-0')}<span>Timbang berat seminggu sekali</span></div>
+      <div class="flex gap-3">${icon('moon', 'w-5 h-5 text-slate-500 shrink-0')}<span>Ringkasan kalori setiap malam</span></div>
+    </div>
+    ${UI.notifTried ? `<div class="mt-3 text-[13px] bg-amber-50 text-amber-800 rounded-xl px-3 py-2">Tekan <b>Allow</b> bila telefon bertanya — DietPal perlukan notifikasi untuk digunakan.</div>`
+      : `<p class="text-[12px] text-slate-500 mt-3">Jenis peringatan boleh diubah di Tetapan.</p>`}
+    <button data-act="${onboarding ? 'obNotif' : 'notifOn'}" class="tap mt-5 w-full btn btn-primary py-3.5">${icon('bell', 'w-5 h-5')}Hidupkan peringatan</button>`;
 }
 function pushSettingsBlock() {
   if (!pushSupported()) return `<p class="text-[12px] text-slate-500 mt-3">Telefon ini belum menyokong notifikasi. Peringatan dipaparkan bila app dibuka.</p>`;
   if (pushDenied()) return `<div class="mt-3 text-[13px] bg-amber-50 text-amber-800 rounded-xl px-3 py-2">Notifikasi disekat untuk DietPal. Hidupkan semula di <b>Tetapan telefon → Notifikasi → DietPal</b>, kemudian buka app semula.</div>`;
   if (!S.push?.on) return `<div class="mt-3 rounded-xl bg-slate-50 px-3 py-3">
-      <div class="text-[13px] text-slate-600">Notifikasi belum dihidupkan. Peringatan hanya muncul bila app dibuka.</div>
+      <div class="text-[13px] text-slate-600">Notifikasi belum disambung ke server — biasanya kerana tiada internet semasa setup.</div>
       <button data-act="pushOn" class="tap mt-2 w-full btn btn-primary py-2.5 text-[14px]">${icon('bell', 'w-4 h-4')}Hidupkan notifikasi</button></div>`;
   return `<div class="mt-3 rounded-xl bg-green-50 px-3 py-3">
       <div class="text-[13px] text-green-800 flex items-center gap-1.5">${icon('check', 'w-4 h-4', 2.5)}Notifikasi hidup di telefon ini.</div>
-      <div class="grid grid-cols-2 gap-2 mt-2">
-        <button data-act="pushTest" class="tap btn btn-secondary py-2 text-[13px]">Hantar ujian</button>
-        <button data-act="pushOff" class="tap btn btn-secondary py-2 text-[13px]">Matikan</button></div></div>
+      <button data-act="pushTest" class="tap mt-2 w-full btn btn-secondary py-2 text-[13px]">Hantar notifikasi ujian</button></div>
     <p class="text-[12px] text-slate-500 mt-2">Untuk hantar peringatan yang tepat, status ringkas hari ini (dah log atau belum, air, jumlah kalori) dihantar ke server. Nama, berat dan senarai makanan tidak dihantar.</p>`;
 }
 
