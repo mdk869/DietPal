@@ -45,6 +45,35 @@
   @keyframes pr { 0%{box-shadow:0 0 0 0 rgba(244,63,94,.45)} 70%{box-shadow:0 0 0 12px rgba(244,63,94,0)} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0)} }
   .tap:active { transform: scale(.97); }
   input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  /* Text size */
+  html.big #view, html.big #sheet { zoom: 1.1; }
+  /* Dark theme (overrides for the utility classes used in the app) */
+  html.dark { color-scheme: dark; }
+  html.dark body { background: #0b1514; color: #e2e8f0; }
+  html.dark header { background-color: rgba(11,21,20,.9) !important; }
+  html.dark nav { background-color: rgba(18,29,28,.96) !important; border-color: #233432 !important; }
+  html.dark .bg-white, html.dark #sheet { background-color: #142120 !important; }
+  html.dark .bg-slate-50 { background-color: #1b2a29 !important; }
+  html.dark .bg-slate-100 { background-color: #213230 !important; }
+  html.dark .bg-slate-200, html.dark .bg-slate-300 { background-color: #334644 !important; }
+  html.dark .text-slate-800, html.dark .text-slate-700 { color: #e2e8f0 !important; }
+  html.dark .text-slate-600 { color: #cbd5e1 !important; }
+  html.dark .text-slate-500 { color: #9fb0ae !important; }
+  html.dark .text-slate-400 { color: #7d908e !important; }
+  html.dark .text-slate-300 { color: #5b6e6c !important; }
+  html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-slate-300, html.dark .border-brand-100, html.dark .border-brand-200 { border-color: #2a3c3a !important; }
+  html.dark .divide-slate-100 > * + *, html.dark .divide-slate-50 > * + *, html.dark .border-slate-50 { border-color: #233432 !important; }
+  html.dark .bg-brand-50, html.dark .bg-brand-50\/40, html.dark .bg-brand-100 { background-color: #0f2f2b !important; }
+  html.dark .text-brand-900, html.dark .text-brand-800 { color: #99e9dc !important; }
+  html.dark .text-brand-700 { color: #5fd3c0 !important; }
+  html.dark .bg-brand-700 .text-brand-700, html.dark .bg-brand-700.text-white { color: #fff !important; }
+  html.dark .bg-sky-50 { background-color: #0d2532 !important; } html.dark .text-sky-900, html.dark .text-sky-700 { color: #7dd3fc !important; }
+  html.dark .bg-green-50 { background-color: #0e2a1b !important; } html.dark .text-green-800, html.dark .text-green-700 { color: #86efac !important; }
+  html.dark .bg-amber-50, html.dark .bg-yellow-50 { background-color: #2c220b !important; } html.dark .text-amber-800, html.dark .text-amber-900, html.dark .text-amber-700, html.dark .text-yellow-800 { color: #fcd34d !important; }
+  html.dark .border-amber-200 { border-color: #5a4512 !important; }
+  html.dark .bg-rose-50, html.dark .bg-red-50 { background-color: #2e1216 !important; } html.dark .text-red-800 { color: #fca5a5 !important; } html.dark .border-red-200, html.dark .border-rose-400 { border-color: #6b2530 !important; }
+  html.dark input, html.dark select { color: #e2e8f0; }
+  html.dark .shadow-card { box-shadow: 0 1px 2px rgba(0,0,0,.3); }
 </style>
 </head>
 <body class="bg-[#f6f8f7] text-slate-800 font-sans antialiased">
@@ -59,7 +88,10 @@
         <div id="hdrDate" class="text-xs text-slate-500"></div>
       </div>
     </div>
-    <button id="installBtn" data-act="install" class="hidden text-xs font-semibold bg-brand-700 text-white px-3 py-1.5 rounded-full tap">Pasang app</button>
+    <div class="flex items-center gap-2">
+      <button id="installBtn" data-act="install" class="hidden text-xs font-semibold bg-brand-700 text-white px-3 py-1.5 rounded-full tap">Pasang app</button>
+      <button id="avatarBtn" data-act="tab" data-tab="profile" class="hidden tap w-9 h-9 rounded-full bg-brand-700 text-white font-extrabold text-[15px] grid place-items-center" aria-label="Profil & tetapan"></button>
+    </div>
   </div>
 </header>
 
@@ -88,11 +120,20 @@ const OLD_KEY = 'sukuSeparuh.v1';   // pre-rename key: migrated once on load
 
 const DEFAULTS = {
   profile: {
-    name: '', height: 170, startWeight: 98,
-    kcalMin: 1500, kcalMax: 1700,
-    waterGoal: 2500, waterIdeal: 3000,
-    milestones: [ { name: 'Fasa 1', kg: 87 }, { name: 'Fasa 2', kg: 77 }, { name: 'Berat ideal', kg: 65 } ]
+    setupDone: false,
+    name: '', sex: '', age: null, height: null, startWeight: null, targetWeight: null,
+    activity: 'rendah', pace: '0.5',
+    kcalMode: 'auto', waterMode: 'auto',               // 'auto' = dikira dari profil, 'manual' = pengguna tetapkan
+    kcalMin: 1500, kcalMax: 1700, waterGoal: 2500, waterIdeal: 3000,
+    milestones: [],
+    avoid: [], allergies: [], noSpicy: false, health: []
   },
+  settings: {
+    theme: 'light', textSize: 'normal',
+    mealTimes: { sarapan: '07:30', tengahari: '13:00', malam: '20:00' },
+    reminders: { water: true, meals: true, weigh: true, weighDay: 1 }
+  },
+  dismissed: { date: '', ids: [] },
   days: {},          // { 'YYYY-MM-DD': { meals: [...], water: ml } }
   weights: [],       // [{ date, kg }]
   rescues: [],       // [{ t, symptoms, kcal, water }]
@@ -191,7 +232,8 @@ const PLATE = {
 };
 
 let S = load();
-const UI = { tab: 'home', cat: 'Semua', q: '', meal: guessMeal(), sym: new Set(),
+const UI = { tab: 'home', cat: 'Semua', q: '', meal: guessMeal(), sym: new Set(), pTab: 'profil',
+  ob: { step: 0, d: { sex: '', activity: 'rendah', pace: '0.5', avoid: [], allergies: [], noSpicy: false, health: [] } },
   sug: { meal: guessMeal(), loc: S.sugPrefs?.loc || 'rumah', venue: S.sugPrefs?.venue || 'mamak', seed: 0 } };
 
 function load() {
@@ -199,13 +241,23 @@ function load() {
     let raw = localStorage.getItem(KEY);
     if (!raw && (raw = localStorage.getItem(OLD_KEY))) { localStorage.setItem(KEY, raw); localStorage.removeItem(OLD_KEY); }
     if (raw) {
-      const d = JSON.parse(raw);
-      return { ...structuredClone(DEFAULTS), ...d, profile: { ...DEFAULTS.profile, ...(d.profile || {}) } };
+      const d = JSON.parse(raw), base = structuredClone(DEFAULTS);
+      const st = d.settings || {};
+      const out = { ...base, ...d,
+        profile: { ...base.profile, ...(d.profile || {}) },
+        settings: { ...base.settings, ...st, mealTimes: { ...base.settings.mealTimes, ...(st.mealTimes || {}) }, reminders: { ...base.settings.reminders, ...(st.reminders || {}) } } };
+      // v1.0 data (before profiles existed): keep the user's numbers exactly as they were
+      if (d.profile && d.profile.setupDone === undefined) {
+        const op = out.profile;
+        op.setupDone = true; op.kcalMode = 'manual'; op.waterMode = 'manual';
+        op.height = op.height || 170; op.startWeight = op.startWeight || 98;
+        if (!op.milestones?.length) op.milestones = [ { name: 'Fasa 1', kg: 87 }, { name: 'Fasa 2', kg: 77 }, { name: 'Berat ideal', kg: 65 } ];
+        op.targetWeight = op.targetWeight || op.milestones[op.milestones.length - 1].kg;
+      }
+      return out;
     }
   } catch (e) { console.warn('load failed', e); }
-  const fresh = structuredClone(DEFAULTS);
-  fresh.weights.push({ date: todayKey(), kg: 97 });   // current weight from profile
-  return fresh;
+  return structuredClone(DEFAULTS);   // new user → onboarding
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -222,15 +274,19 @@ function parseKey(k) { const [y, m, d] = k.split('-').map(Number); return new Da
 function day(k = todayKey()) { if (!S.days[k]) S.days[k] = { meals: [], water: 0 }; return S.days[k]; }
 function peekDay(k) { return S.days[k] || { meals: [], water: 0 }; }
 function kcalOf(d) { return Math.round(d.meals.reduce((a, m) => a + m.kcal, 0)); }
-function guessMeal() { const h = new Date().getHours(); return h < 11 ? 'sarapan' : h < 15 ? 'tengahari' : h < 18 ? 'snek' : 'malam'; }
+function guessMeal() {
+  const mt = mealTimes(), n = new Date(), now = n.getHours() * 60 + n.getMinutes();
+  const s = mins(mt.sarapan), t = mins(mt.tengahari), m = mins(mt.malam);
+  return now < (s + t) / 2 ? 'sarapan' : now < t + 120 ? 'tengahari' : now < m - 60 ? 'snek' : 'malam';
+}
 function fmt(n) { return Math.round(n).toLocaleString('ms-MY'); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function allFoods() { return [...FOODS, ...S.customFoods.map(f => ({ ...f, cat: 'Sendiri' }))]; }
 function findFood(id) { return allFoods().find(f => f.id === id); }
 function sortedWeights() { return [...S.weights].sort((a, b) => a.date.localeCompare(b.date)); }
-function currentWeight() { const w = sortedWeights(); return w.length ? w[w.length - 1].kg : S.profile.startWeight; }
-function bmi(kg) { const h = S.profile.height / 100; return kg / (h * h); }
+function currentWeight() { const w = sortedWeights(); return w.length ? w[w.length - 1].kg : (S.profile.startWeight || 0); }
+function bmi(kg) { const h = (S.profile.height || 170) / 100; return kg / (h * h); }
 const BULAN = ['Jan','Feb','Mac','Apr','Mei','Jun','Jul','Ogo','Sep','Okt','Nov','Dis'];
 const HARI = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
 function niceDate(k) { const d = parseKey(k); return d.getDate() + ' ' + BULAN[d.getMonth()]; }
@@ -265,7 +321,7 @@ function coach() {
   if (k > p.kcalMax) { mood = '🤗'; msg = `Hari ini lebih ${fmt(k - p.kcalMax)} kcal dari sasaran. Tak apa — ini bahagian "20" dalam 80/20. Esok sambung macam biasa, tak perlu ganti dengan makan terlalu sikit.`; }
   else if (h >= 19 && k > 0 && k < 1200) { mood = '⚠️'; msg = `Kalori hari ini baru ${fmt(k)} kcal — terlalu rendah boleh buat pening. Makan malam yang cukup ya: nasi 1 senduk + lauk + sayur.`; }
   else if (!d.meals.length && h < 11) { mood = '🌅'; msg = 'Mulakan hari dengan sarapan berprotein — contoh 2 biji telur rebus + 2 keping roti gandum. Jangan skip sarapan, nanti lapar teruk waktu tengah hari.'; }
-  else if (d.water < expectedWater - 500) { mood = '💧'; msg = `Air baru ${fmt(d.water)} ml. Minum segelas sekarang — kurang air antara punca pening dan rasa lapar palsu.`; }
+  else if (!S.settings.reminders.water && d.water < expectedWater - 500) { mood = '💧'; msg = `Air baru ${fmt(d.water)} ml. Minum segelas sekarang — kurang air antara punca pening dan rasa lapar palsu.`; }
   else if (k >= p.kcalMin && k <= p.kcalMax) { mood = '🎉'; msg = `Mantap! ${fmt(k)} kcal — tepat dalam sasaran. Konsisten macam ni yang bawa hasil.`; }
   else if (pc.karbo + pc.protein >= 2 && pc.serat < 1) { mood = '🥬'; msg = 'Hari ini belum ada sayur lagi. Ingat suku-suku separuh: separuh pinggan sayur — ulam pun dikira!'; }
   else { msg = `Baki ${fmt(Math.max(0, p.kcalMax - k))} kcal untuk hari ini. Makan perlahan, dahulukan sayur dan protein.`; }
@@ -277,13 +333,22 @@ function coach() {
    ============================================================ */
 function render() {
   const now = new Date();
+  const ready = S.profile.setupDone;
+  document.querySelector('nav').classList.toggle('hidden', !ready);
+  const av = document.getElementById('avatarBtn'); av.classList.toggle('hidden', !ready); av.textContent = initials();
+  if (!ready) {
+    document.getElementById('hdrDate').textContent = 'Coach diet anda';
+    const obAnim = UI._obLast !== UI.ob.step ? 'fade' : ''; UI._obLast = UI.ob.step;
+    document.getElementById('view').innerHTML = `<div class="${obAnim}">${viewOnboard()}</div>`;
+    return;
+  }
   document.getElementById('hdrDate').textContent = `${HARI[now.getDay()]}, ${now.getDate()} ${BULAN[now.getMonth()]} ${now.getFullYear()}`;
   const tabs = [ ['home','Utama',iconHome], ['food','Makan',iconFood], ['weight','Berat',iconScale], ['guide','Panduan',iconBook] ];
   document.getElementById('nav').innerHTML = tabs.map(([id, l, ic]) => `
     <button data-act="tab" data-tab="${id}" class="flex flex-col items-center gap-0.5 py-1 tap ${UI.tab === id ? 'text-brand-700' : 'text-slate-400'}">
       ${ic(UI.tab === id)}<span class="text-[11px] font-semibold">${l}</span>
     </button>`).join('');
-  const v = { home: viewHome, food: viewFood, weight: viewWeight, guide: viewGuide }[UI.tab]();
+  const v = { home: viewHome, food: viewFood, weight: viewWeight, guide: viewGuide, profile: viewProfile }[UI.tab]();
   const anim = UI._last !== UI.tab ? 'fade ' : ''; UI._last = UI.tab;
   document.getElementById('view').innerHTML = `<div class="${anim}space-y-4 pt-2 pb-6">${v}</div>`;
 }
@@ -294,6 +359,7 @@ const card = (inner, cls = '') => `<section class="bg-white rounded-3xl shadow-c
 function viewHome() {
   const p = S.profile, d = peekDay(todayKey()), k = kcalOf(d), c = coach(), st = streak();
   return `
+  ${remindersBlock()}
   ${card(`
     <div class="flex gap-3">
       <div class="w-11 h-11 shrink-0 rounded-2xl bg-brand-50 grid place-items-center text-2xl">${c.mood}</div>
@@ -366,12 +432,12 @@ function ring(k, min, max) {
   const a0 = (min / scale) * 360, a1 = (max / scale) * 360;
   const band = arcPath(60, 60, 50, a0, a1);
   return `
-  <svg viewBox="0 0 120 120" class="w-[120px] h-[120px] shrink-0">
+  <svg viewBox="0 0 120 120" class="w-[120px] h-[120px] shrink-0 text-slate-800">
     <circle cx="60" cy="60" r="${r}" fill="none" stroke="#eef2f1" stroke-width="11"/>
     <path d="${band}" fill="none" stroke="#bbf7d0" stroke-width="11"/>
     <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round"
       stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" transform="rotate(-90 60 60)" class="ring-anim"/>
-    <text x="60" y="58" text-anchor="middle" font-size="22" font-weight="800" fill="#0f172a">${fmt(k)}</text>
+    <text x="60" y="58" text-anchor="middle" font-size="22" font-weight="800" fill="currentColor">${fmt(k)}</text>
     <text x="60" y="75" text-anchor="middle" font-size="10" fill="#64748b">kcal dimakan</text>
   </svg>`;
 }
@@ -504,7 +570,7 @@ function viewFood() {
       ${list.length ? list.map(f => `
         <button data-act="pickFood" data-id="${f.id}" class="tap w-full flex items-center gap-3 py-2.5 text-left">
           <div class="w-10 h-10 rounded-xl ${PLATE[f.plate || 'lain'].bg} grid place-items-center text-xl shrink-0">${f.e || '🍽️'}</div>
-          <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold truncate">${esc(f.name)}</div><div class="text-[12px] text-slate-400">${esc(f.unit)}</div></div>
+          <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold truncate">${esc(f.name)}</div><div class="text-[12px] text-slate-400">${esc(f.unit)}${(() => { const c = foodConflicts(f); return c.length ? ` · <span class="text-amber-600 font-semibold">⚠ ada ${c.map(t => TAG_LABEL[t]).join(', ')}</span>` : ''; })()}</div></div>
           <div class="text-[14px] font-bold text-slate-700">${f.kcal}<span class="text-[11px] text-slate-400 font-medium"> kcal</span></div>
           <div class="w-7 h-7 rounded-full bg-brand-50 text-brand-700 grid place-items-center font-bold">+</div>
         </button>`).join('') : `<div class="py-6 text-center text-sm text-slate-400">Tiada padanan. Tambah makanan sendiri di bawah.</div>`}
@@ -708,7 +774,7 @@ function viewGuide() {
     <ul class="space-y-2 text-[13.5px] text-slate-600">
       <li class="flex gap-2"><span>❌</span><span>Jangan potong <b>garam & nasi terus</b> (cold turkey). Badan boleh hilang elektrolit — pening, sakit kepala, masuk angin.</span></li>
       <li class="flex gap-2"><span>✅</span><span>Kurangkan <b>sikit-sikit</b>: 1 pinggan → 1½ senduk → 1 senduk dalam 2–3 minggu.</span></li>
-      <li class="flex gap-2"><span>✅</span><span>Garam secukup rasa masih perlu. Kurangkan makanan proses & kuah pekat, bukan buang garam sepenuhnya.</span></li>
+      <li class="flex gap-2"><span>✅</span><span>Garam secukup rasa masih perlu. Kurangkan makanan proses & kuah pekat, bukan buang garam sepenuhnya.${hasHealth('bp') ? ' <b>Ada darah tinggi? Ikut had garam yang doktor tetapkan.</b>' : ''}</span></li>
       <li class="flex gap-2"><span>✅</span><span>Jangan makan bawah <b>${fmt(p.kcalMin)} kcal</b> selalu — defisit terlalu besar buat badan lemah & cepat give up.</span></li>
       <li class="flex gap-2"><span>💧</span><span>Minum ${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L air sehari. Kadang-kadang "lapar" sebenarnya dahaga.</span></li>
     </ul>`)}
@@ -725,24 +791,11 @@ function viewGuide() {
 
   ${rescueHistory()}
 
-  ${card(`
-    <div class="font-bold text-[15px] mb-3">⚙️ Tetapan</div>
-    <div class="grid grid-cols-2 gap-3">
-      ${field('stName', 'Nama panggilan', p.name, 'text')}
-      ${field('stHeight', 'Tinggi (cm)', p.height)}
-      ${field('stStart', 'Berat mula (kg)', p.startWeight)}
-      ${field('stWater', 'Sasaran air (ml)', p.waterGoal)}
-      ${field('stMin', 'Kalori min', p.kcalMin)}
-      ${field('stMax', 'Kalori maks', p.kcalMax)}
-      ${p.milestones.map((m, i) => field('stM' + i, m.name + ' (kg)', m.kg)).join('')}
-    </div>
-    <button data-act="saveSettings" class="tap mt-4 w-full bg-brand-700 text-white font-bold py-3 rounded-xl">Simpan tetapan</button>
-    <div class="grid grid-cols-2 gap-2 mt-3">
-      <button data-act="export" class="tap bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl">⬇ Backup data</button>
-      <label class="tap bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl text-center cursor-pointer">⬆ Restore<input id="importFile" type="file" accept="application/json" class="hidden"></label>
-    </div>
-    <button data-act="reset" class="tap mt-2 w-full text-rose-500 font-semibold text-sm py-2.5">Padam semua data</button>
-    <p class="text-[11px] text-slate-400 mt-2">Semua data disimpan dalam telefon anda sahaja (localStorage). Buat backup sekali-sekala.</p>`)}
+  <button data-act="tab" data-tab="profile" class="tap w-full bg-white rounded-3xl shadow-card p-4 flex items-center gap-3 text-left">
+    <div class="w-10 h-10 rounded-xl bg-brand-50 grid place-items-center text-xl">⚙️</div>
+    <div class="flex-1"><div class="font-bold text-[14px]">Profil & Tetapan</div><div class="text-[12px] text-slate-500">Sasaran, milestone, pilihan makanan, peringatan, backup data</div></div>
+    <span class="text-slate-300">›</span>
+  </button>
 
   <p class="text-[11px] text-slate-400 text-center px-6 pb-2">App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.</p>`;
 }
@@ -809,14 +862,19 @@ function rescueResult() {
   if (h >= 13 && carbsToday === 0) insights.push('Belum ada karbo hari ini. Potong nasi terus boleh cetuskan "keto flu".');
 
   const steps = [
-    ['🪑', 'Berhenti & duduk', 'Duduk atau baring dalam tempat sejuk. Jangan memandu atau buat kerja berat sekarang.'],
-    ['🥤', 'Ganti elektrolit', s.has('angin')
+    ['🪑', 'Berhenti & duduk', 'Duduk atau baring dalam tempat sejuk. Jangan memandu atau buat kerja berat sekarang.']];
+  if (hasHealth('diabetes')) steps.push(['🩸', 'Semak gula darah dulu', 'Anda ada kencing manis. Jika ada glucometer, semak sekarang. Bacaan <b>bawah 4.0 mmol/L</b> = gula rendah: ambil 3 biji kurma atau ½ gelas jus buah, semak semula selepas 15 minit.']);
+  steps.push(
+    ['🥤', 'Ganti elektrolit', hasHealth('bp')
+      ? 'Minum air kosong atau <b>100Plus Zero Sugar</b> perlahan-lahan. Anda ada darah tinggi — jangan tambah garam tanpa nasihat doktor. Semak tekanan darah jika ada alat.'
+      : s.has('angin')
       ? 'Minum segelas air suam dengan secubit garam, perlahan-lahan. Perut kembung? Elak minuman bergas buat masa ini.'
       : 'Minum <b>100Plus Zero Sugar</b> atau segelas air suam + secubit garam. Hirup perlahan-lahan.'],
     ['🍘', 'Makan sesuatu ringan', (s.has('lemah') || lowFood)
       ? 'Makan <b>1 biji pisang</b> atau <b>3 biji kurma</b> untuk naikkan gula darah, diikuti 2–3 keping biskut kraker.'
       : 'Makan <b>2–3 keping biskut kraker</b> atau <b>1 biji pisang</b>. Kraker ada sedikit garam yang membantu.']
-  ];
+  );
+  if (hasHealth('gastrik') && (s.has('angin') || s.has('loya') || lowFood)) steps.push(['🫃', 'Jaga gastrik', 'Jangan biar perut kosong lama — makan sedikit sekarang. Elak kopi, minuman bergas dan makanan pedas buat sementara.']);
   if (s.has('kepala') || s.has('pening')) steps.push(['😮‍💨', 'Rehatkan mata & kepala', 'Tutup mata 10–15 minit, jauhkan skrin. Kalau biasa ambil panadol dan sesuai dengan anda, boleh ikut dos pada label.']);
   if (s.has('angin')) steps.push(['🫚', 'Lega perut', 'Minum air halia suam (tanpa gula), sapu minyak angin di perut, dan jalan perlahan 5–10 minit. Elak baring terus lepas makan.']);
   if (s.has('loya')) steps.push(['🫖', 'Hirup sikit-sikit', 'Ambil air dalam teguk kecil. Kraker kering lebih senang diterima perut berbanding makanan berminyak.']);
@@ -848,7 +906,9 @@ function rescueResult() {
     <div class="mt-4 bg-brand-50 rounded-2xl p-3 text-[12.5px] text-brand-900 leading-snug">
       <b>Ingat pengajaran lepas:</b> potong garam & nasi secara mendadak buat badan "terkejut". Kurangkan sikit-sikit — progres lambat tapi selamat lebih baik dari pening hari-hari.
     </div>
-    <p class="text-[11px] text-slate-400 mt-3">Ada kencing manis atau ambil ubat darah tinggi? Simptom ini mungkin berkaitan ubat atau gula rendah — semak bacaan dan rujuk doktor.</p>
+    <p class="text-[11px] text-slate-400 mt-3">${(S.profile.health || []).length
+      ? `Langkah di atas mengambil kira nota kesihatan anda (${S.profile.health.map(h => HEALTH[h]).join(', ')}). Ikut nasihat doktor jika berbeza.`
+      : 'Ada kencing manis atau ambil ubat darah tinggi? Simptom ini mungkin berkaitan ubat atau gula rendah — semak bacaan dan rujuk doktor. Boleh tambah nota kesihatan di Profil.'}</p>
     <button data-act="closeSheet" class="tap mt-4 w-full bg-slate-800 text-white font-bold py-3.5 rounded-2xl">Saya dah rasa okay</button>
   </div>`;
 }
@@ -982,7 +1042,9 @@ function suggestMenus(venue) {
   const d = peekDay(todayKey()), pc = plateCounts(d);
   const eatenToday = new Set(d.meals.map(x => x.foodId));
   const needVeg = pc.serat < Math.max(1, (pc.protein + pc.karbo) / 2);
-  let pool = MENUS.filter(m => m.meals.includes(code) && m.loc === s.loc && (s.loc === 'rumah' || m.venue === venue));
+  const avoid = avoidSet();
+  let pool = MENUS.filter(m => m.meals.includes(code) && m.loc === s.loc && (s.loc === 'rumah' || m.venue === venue)
+    && !menuItems(m).some(x => foodTags(x.f).some(t => avoid.has(t))));
   const scored = pool.map(m => {
     const kc = menuKcal(m), its = menuItems(m);
     let score = -Math.abs(kc - t.ideal) / t.ideal * 100;
@@ -990,6 +1052,8 @@ function suggestMenus(venue) {
     if (needVeg && its.some(x => x.f.plate === 'serat')) score += 15;
     if (s.meal !== 'snek' && its.some(x => x.f.plate === 'protein')) score += 6;
     its.forEach(x => { if (eatenToday.has(x.f.id) && x.f.plate !== 'serat' && x.f.id !== 'kopio') score -= 8; });
+    if (hasHealth('diabetes')) its.forEach(x => { if (['kurma', 'tehtarik', 'milo', 'sirap', 'rotibakar'].includes(x.f.id)) score -= 40; if (x.f.id === 'nasib') score += 6; });
+    if (hasHealth('gastrik')) its.forEach(x => { if (foodTags(x.f).includes('pedas')) score -= 10; });
     score += seeded(todayKey() + s.meal + s.loc + venue + s.seed + m.id) * 22; // variety + "Cadangan lain"
     return { m, kc, score };
   }).sort((a, b) => b.score - a.score);
@@ -1048,7 +1112,7 @@ function suggestBlock() {
         </div>
         <div class="text-[12px] text-slate-600 mt-2">💡 ${esc(m.tip)}</div>
         <button data-act="logMenu" data-id="${m.id}" class="tap mt-2.5 w-full text-[13px] font-semibold rounded-xl py-2 ${i === 0 ? 'bg-brand-700 text-white' : 'bg-white border border-slate-200 text-brand-700'}">+ Log menu ini</button>
-      </div>`; }).join('') || `<div class="text-center text-sm text-slate-400 py-4">Tiada cadangan untuk pilihan ini.</div>`}
+      </div>`; }).join('') || `<div class="text-center text-sm text-slate-400 py-4">Tiada menu yang sesuai dengan pilihan makanan anda di sini. Cuba tempat lain atau ubah pilihan di Profil.</div>`}
   </div>
 
   <div class="grid ${AI_ENDPOINT ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-3">
@@ -1073,6 +1137,465 @@ function sheetSuggest() {
 }
 
 /* ============================================================
+   PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
+   ============================================================ */
+const APP_VERSION = '1.1.0';
+const ACTIVITY = {
+  rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
+  sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
+  aktif:     { label: 'Aktif', d: 'Kerja fizikal / bersenam 4+ kali seminggu', f: 1.55 }
+};
+const PACE = {
+  '0.25': { label: 'Perlahan', d: '0.25 kg seminggu' },
+  '0.5':  { label: 'Sederhana', d: '0.5 kg seminggu · disyorkan' },
+  '0.75': { label: 'Laju', d: '0.75 kg seminggu' }
+};
+const AVOID = { daging: 'Daging lembu / kambing', ayam: 'Ayam', ikan: 'Ikan', laut: 'Makanan laut & belacan' };
+const ALLERGY = { kacang: 'Kacang', telur: 'Telur', susu: 'Susu / laktosa' };
+const HEALTH = { diabetes: 'Kencing manis', bp: 'Darah tinggi', gastrik: 'Gastrik' };
+const TAG_LABEL = { daging: 'daging', ayam: 'ayam', ikan: 'ikan', laut: 'makanan laut', kacang: 'kacang', telur: 'telur', susu: 'susu', pedas: 'pedas' };
+const HARI_PENUH = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
+
+// Ingredients/allergens per food id (used for filtering menus and flagging foods)
+const FOOD_TAGS = {
+  agrill: 'ayam', agoreng: 'ayam', nayam: 'ayam', ayamsup: 'ayam', ayammerah: 'ayam,pedas', tandoori: 'ayam', sate: 'ayam',
+  chickenchop: 'ayam', burger: 'ayam', dagingm: 'daging', rendang: 'daging,pedas',
+  ikanb: 'ikan', ikang: 'ikan', asampedas: 'ikan,pedas', tunatin: 'ikan', yongtau: 'ikan,laut',
+  kangkung: 'laut,pedas', ulam: 'laut,pedas', nlemak: 'ikan,telur,kacang,pedas', mgoreng: 'telur,laut,pedas', ktgoreng: 'telur,laut',
+  telurr: 'telur', telurg: 'telur', telurdadar: 'telur', rtelur: 'telur', rotibakar: 'telur,susu', coleslaw: 'telur',
+  susu: 'susu', yogurt: 'susu', oat: 'susu', tehtarik: 'susu', kopisusu: 'susu', milo: 'susu', sirap: 'susu', mashed: 'susu',
+  kacang: 'kacang', kuahkacang: 'kacang', kuahkari: 'pedas'
+};
+function foodTags(f) { return (FOOD_TAGS[f.id] || f.tags || '').split(',').filter(Boolean); }
+function avoidSet() {
+  const p = S.profile;
+  return new Set([...(p.avoid || []), ...(p.allergies || []), ...(p.noSpicy ? ['pedas'] : [])]);
+}
+function foodConflicts(f) { const a = avoidSet(); return foodTags(f).filter(t => a.has(t)); }
+function hasHealth(k) { return (S.profile.health || []).includes(k); }
+
+// ---------- targets ----------
+function kcalFloor(p = S.profile) { return p.sex === 'P' ? 1200 : 1500; }
+function canAuto(p = S.profile) { return !!(p.sex && p.age > 0 && p.height > 0 && p.activity); }
+function autoWater(kg) { return Math.round(Math.min(3500, Math.max(2000, kg * 30)) / 100) * 100; }
+function calcTargets(p = S.profile, kg = currentWeight()) {
+  const bmr = 10 * kg + 6.25 * p.height - 5 * p.age + (p.sex === 'L' ? 5 : -161);   // Mifflin-St Jeor
+  const tdee = bmr * ACTIVITY[p.activity || 'rendah'].f;
+  const deficit = Math.round(parseFloat(p.pace || '0.5') * 7700 / 7);
+  const floor = kcalFloor(p), center = tdee - deficit;
+  let min = Math.round((center - 100) / 50) * 50, max = Math.round((center + 100) / 50) * 50;
+  const floorHit = min < floor;
+  min = Math.max(floor, min); max = Math.max(min + 200, max);
+  return { bmr: Math.round(bmr), tdee: Math.round(tdee), deficit, min, max, water: autoWater(kg), floorHit };
+}
+function recalcTargets() {
+  const p = S.profile;
+  if (p.kcalMode === 'auto' && canAuto(p)) { const t = calcTargets(p); p.kcalMin = t.min; p.kcalMax = t.max; }
+  if (p.waterMode === 'auto' && currentWeight()) { p.waterGoal = autoWater(currentWeight()); p.waterIdeal = Math.min(4000, p.waterGoal + 500); }
+  p.kcalMin = Math.max(kcalFloor(p), p.kcalMin || 0);   // safety floor applies in manual mode too
+  p.kcalMax = Math.max(p.kcalMin, p.kcalMax || 0);
+}
+function minHealthyWeight(p = S.profile) { const h = p.height / 100; return Math.ceil(18.5 * h * h * 10) / 10; }
+function healthyRange(p = S.profile) { const h = p.height / 100; return [Math.ceil(18.5 * h * h), Math.floor(22.9 * h * h)]; }
+function autoMilestones(cur, target) {
+  const out = []; let m = Math.floor(cur - 10), i = 1;
+  while (m > target + 3) { out.push({ name: 'Fasa ' + i, kg: m }); i++; m -= 10; }
+  out.push({ name: 'Berat sasaran', kg: target });
+  return out;
+}
+function initials() { const n = (S.profile.name || '').trim(); return n ? n[0].toUpperCase() : '👤'; }
+
+// ---------- meal times ----------
+function mins(t) { const [h, m] = String(t || '00:00').split(':').map(Number); return h * 60 + (m || 0); }
+function mealTimes() { return (typeof S !== 'undefined' && S.settings?.mealTimes) || DEFAULTS.settings.mealTimes; }
+
+// ---------- theme ----------
+function applyTheme() {
+  const st = S.settings, mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const dark = st.theme === 'dark' || (st.theme === 'auto' && mq.matches);
+  document.documentElement.classList.toggle('dark', dark);
+  document.documentElement.classList.toggle('big', st.textSize === 'big');
+  document.querySelector('meta[name=theme-color]').setAttribute('content', dark ? '#0b1514' : '#0f766e');
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (S.settings.theme === 'auto') applyTheme(); });
+
+// ---------- in-app reminders ----------
+function dismissedToday() { if (S.dismissed?.date !== todayKey()) S.dismissed = { date: todayKey(), ids: [] }; return S.dismissed.ids; }
+function reminders() {
+  if (!S.profile.setupDone) return [];
+  const r = S.settings.reminders, out = [], now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
+  const d = peekDay(todayKey()), mt = mealTimes(), dis = dismissedToday();
+  if (r.weigh && now.getDay() === Number(r.weighDay) && !S.weights.some(w => w.date === todayKey()))
+    out.push({ id: 'weigh', icon: '⚖️', text: 'Hari timbang berat! Timbang pagi, lepas ke tandas, sebelum makan.', btn: 'Log berat', act: 'data-act="tab" data-tab="weight"' });
+  if (r.meals) {
+    const sa = S.profile.setupAt ? new Date(S.profile.setupAt) : null;
+    const setupM = sa && todayKey(sa) === todayKey() ? sa.getHours() * 60 + sa.getMinutes() : -1;
+    const missed = ['malam', 'tengahari', 'sarapan'].find(m => nowM >= mins(mt[m]) + 90 && mins(mt[m]) + 90 > setupM && !d.meals.some(x => x.meal === m));
+    if (missed) { const lbl = MEALS.find(x => x.id === missed).label.toLowerCase();
+      out.push({ id: 'meal-' + missed, icon: '🍽️', text: `Dah makan ${lbl}? Jangan lupa log — atau tengok cadangan menu.`, btn: 'Log', act: `data-act="quickMeal" data-meal="${missed}"` }); }
+  }
+  const h = now.getHours();
+  if (r.water && h >= 9 && h < 22) {
+    const expected = Math.max(0, Math.min(1, (h - 7) / 14)) * S.profile.waterGoal;
+    if (d.water < expected - 500) out.push({ id: 'water-' + Math.floor(h / 2), icon: '💧', text: `Air baru ${fmt(d.water)} ml. Minum segelas sekarang.`, btn: '+250 ml', act: 'data-act="water" data-ml="250"' });
+  }
+  return out.filter(x => !dis.includes(x.id));
+}
+function remindersBlock() {
+  const list = reminders(); if (!list.length) return '';
+  return list.map(x => `
+    <div class="flex items-center gap-2.5 bg-white border border-amber-200 rounded-2xl px-3 py-2.5 shadow-card">
+      <div class="text-xl">${x.icon}</div>
+      <div class="flex-1 text-[13px] text-slate-700 leading-snug">${x.text}</div>
+      <button ${x.act} class="tap shrink-0 text-[12px] font-semibold bg-brand-700 text-white px-2.5 py-1.5 rounded-lg">${x.btn}</button>
+      <button data-act="dismissRem" data-id="${x.id}" class="tap shrink-0 w-7 h-7 grid place-items-center text-slate-300" aria-label="Tutup">✕</button>
+    </div>`).join('');
+}
+const remShown = new Set();
+function checkReminders() {
+  if (document.hidden || sheetFn) return;
+  const fresh = reminders().filter(x => !remShown.has(x.id));
+  fresh.forEach(x => remShown.add(x.id));
+  if (fresh.length) { toast(fresh[0].icon + ' ' + fresh[0].text.split(/[.!—]/)[0]); if (UI.tab === 'home') render(); }
+}
+setInterval(checkReminders, 60000);
+
+// ---------- shared UI bits ----------
+const chip = (act, k, v, on, label, extra = '') => `<button data-act="${act}" data-k="${k}" data-v="${v}" ${extra} class="tap px-3.5 py-2 rounded-xl text-[13px] font-semibold border ${on ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-600 border-slate-200'}">${label}</button>`;
+const selectField = (id, label, val, opts) => `<div><label class="block text-[11px] font-semibold text-slate-500">${label}</label>
+  <select id="${id}" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 outline-none">${Object.entries(opts).map(([k, v]) => `<option value="${k}" ${String(val) === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
+const toggleRow = (act, k, on, label, sub = '') => `
+  <button data-act="${act}" data-k="${k}" class="tap w-full flex items-center gap-3 py-2.5 text-left">
+    <div class="flex-1"><div class="text-[14px] font-semibold">${label}</div>${sub ? `<div class="text-[12px] text-slate-500">${sub}</div>` : ''}</div>
+    <div class="w-11 h-6 rounded-full p-0.5 transition-colors ${on ? 'bg-brand-600' : 'bg-slate-300'}"><div class="w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}"></div></div>
+  </button>`;
+const val = (id) => document.getElementById(id)?.value;
+const numVal = (id) => { const v = parseFloat(val(id)); return isFinite(v) ? v : null; };
+
+/* ---------- ONBOARDING ---------- */
+function viewOnboard() {
+  const o = UI.ob, d = o.d, steps = 6;
+  const dots = `<div class="flex gap-1.5 justify-center mb-5">${Array.from({ length: steps }, (_, i) => `<div class="h-1.5 rounded-full ${i <= o.step ? 'bg-brand-600 w-6' : 'bg-slate-200 w-3'}"></div>`).join('')}</div>`;
+  const nav = (next = 'Seterusnya') => `
+    <div class="flex gap-2 mt-6">
+      ${o.step > 0 ? `<button data-act="obBack" class="tap px-5 py-3.5 rounded-2xl bg-slate-100 text-slate-600 font-semibold">Kembali</button>` : ''}
+      <button data-act="obNext" class="tap flex-1 py-3.5 rounded-2xl bg-brand-700 text-white font-bold">${next}</button>
+    </div>`;
+  let body = '';
+  if (o.step === 0) body = `
+    <div class="text-center"><img src="icons/icon-192.png" class="w-20 h-20 rounded-3xl mx-auto" alt="">
+      <h1 class="text-2xl font-extrabold mt-4 text-brand-900">Selamat datang ke DietPal</h1>
+      <p class="text-[14px] text-slate-500 mt-1">Jom kenal diri anda dulu, supaya Coach boleh kira sasaran yang sesuai untuk anda.</p></div>
+    <div class="mt-6">${field('obName', 'Nama panggilan', d.name || '', 'text')}</div>
+    <p class="text-[12px] text-slate-400 mt-3">🔒 Semua maklumat disimpan dalam telefon ini sahaja.</p>${nav('Mula')}`;
+  if (o.step === 1) body = `
+    <h2 class="text-xl font-extrabold">Tentang diri anda</h2>
+    <div class="text-[11px] font-semibold text-slate-500 mt-4 mb-1.5">Jantina</div>
+    <div class="grid grid-cols-2 gap-2">${chip('obSet', 'sex', 'L', d.sex === 'L', '👨 Lelaki')}${chip('obSet', 'sex', 'P', d.sex === 'P', '👩 Perempuan')}</div>
+    <div class="grid grid-cols-2 gap-3 mt-4">${field('obAge', 'Umur (tahun)', d.age ?? '')}${field('obHeight', 'Tinggi (cm)', d.height ?? '')}</div>
+    <p class="text-[12px] text-slate-400 mt-3">Jantina, umur dan tinggi digunakan untuk kira keperluan tenaga harian (TDEE).</p>${nav()}`;
+  if (o.step === 2) {
+    const [lo, hi] = d.height ? healthyRange(d) : [null, null];
+    body = `
+    <h2 class="text-xl font-extrabold">Berat & matlamat</h2>
+    <div class="grid grid-cols-2 gap-3 mt-4">${field('obWeight', 'Berat semasa (kg)', d.weight ?? '')}${field('obTarget', 'Berat sasaran (kg)', d.target ?? '')}</div>
+    ${lo ? `<p class="text-[12px] text-slate-500 mt-2">Julat berat sihat untuk tinggi ${d.height} cm: <b>${lo}–${hi} kg</b> (BMI 18.5–22.9).</p>` : ''}
+    <div class="text-[11px] font-semibold text-slate-500 mt-5 mb-1.5">Kadar turun berat</div>
+    <div class="space-y-2">${Object.entries(PACE).map(([k, v]) => `<button data-act="obSet" data-k="pace" data-v="${k}" class="tap w-full text-left rounded-2xl border-2 px-4 py-3 ${d.pace === k ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white'}"><div class="font-semibold text-[14px]">${v.label}</div><div class="text-[12px] text-slate-500">${v.d}</div></button>`).join('')}</div>
+    ${nav()}`;
+  }
+  if (o.step === 3) body = `
+    <h2 class="text-xl font-extrabold">Tahap aktiviti harian</h2>
+    <p class="text-[13px] text-slate-500 mt-1">Pilih yang paling dekat dengan rutin biasa anda.</p>
+    <div class="space-y-2 mt-4">${Object.entries(ACTIVITY).map(([k, v]) => `<button data-act="obSet" data-k="activity" data-v="${k}" class="tap w-full text-left rounded-2xl border-2 px-4 py-3 ${d.activity === k ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white'}"><div class="font-semibold text-[14px]">${v.label}</div><div class="text-[12px] text-slate-500">${v.d}</div></button>`).join('')}</div>
+    ${nav()}`;
+  if (o.step === 4) body = `
+    <h2 class="text-xl font-extrabold">Pilihan makanan & kesihatan</h2>
+    <p class="text-[13px] text-slate-500 mt-1">Pilihan ini menapis cadangan menu. Boleh langkau dan ubah kemudian.</p>
+    ${prefsBlock('obToggle', d)}
+    ${nav()}`;
+  if (o.step === 5) {
+    const t = calcTargets(d, d.weight), ms = autoMilestones(d.weight, d.target);
+    body = `
+    <h2 class="text-xl font-extrabold">Sasaran anda 🎯</h2>
+    <p class="text-[13px] text-slate-500 mt-1">Dikira oleh Coach berdasarkan maklumat anda. Boleh ubah bila-bila masa di Profil.</p>
+    <div class="grid grid-cols-2 gap-2 mt-4">
+      <div class="bg-white rounded-2xl shadow-card p-3"><div class="text-[11px] text-slate-500">Kalori sehari</div><div class="text-lg font-extrabold">${fmt(t.min)}–${fmt(t.max)}</div><div class="text-[11px] text-slate-400">TDEE ~${fmt(t.tdee)} kcal</div></div>
+      <div class="bg-white rounded-2xl shadow-card p-3"><div class="text-[11px] text-slate-500">Air sehari</div><div class="text-lg font-extrabold">${(t.water / 1000).toFixed(1)} L</div><div class="text-[11px] text-slate-400">~30 ml setiap kg</div></div>
+    </div>
+    ${t.floorHit ? `<div class="mt-3 text-[12.5px] bg-amber-50 text-amber-800 rounded-xl px-3 py-2">Sasaran dinaikkan ke had minimum selamat ${fmt(kcalFloor(d))} kcal. Jangan makan lebih rendah dari ini tanpa nasihat doktor.</div>` : ''}
+    <div class="bg-white rounded-2xl shadow-card p-3 mt-2">
+      <div class="text-[11px] text-slate-500 mb-1">Milestone</div>
+      ${ms.map((m, i) => `<div class="flex justify-between text-[14px] py-1"><span>${i + 1}. ${m.name}</span><b>${m.kg} kg</b></div>`).join('')}
+      <div class="text-[11px] text-slate-400 mt-1">Anggaran ${Math.ceil((d.weight - d.target) / parseFloat(d.pace))} minggu pada kadar ${PACE[d.pace].d.split(' ·')[0]}.</div>
+    </div>
+    ${nav('Mula guna DietPal')}`;
+  }
+  return `<div class="pt-4 pb-10">${dots}${body}</div>`;
+}
+
+function prefsBlock(act, d) {
+  const has = (arr, k) => (d[arr] || []).includes(k);
+  return `
+    <div class="text-[11px] font-semibold text-slate-500 mt-4 mb-1.5">Saya tak makan…</div>
+    <div class="flex flex-wrap gap-2">${Object.entries(AVOID).map(([k, l]) => chip(act, 'avoid', k, has('avoid', k), l)).join('')}</div>
+    <div class="text-[11px] font-semibold text-slate-500 mt-4 mb-1.5">Alahan</div>
+    <div class="flex flex-wrap gap-2">${Object.entries(ALLERGY).map(([k, l]) => chip(act, 'allergies', k, has('allergies', k), l)).join('')}</div>
+    <div class="text-[11px] font-semibold text-slate-500 mt-4 mb-1.5">Rasa</div>
+    <div class="flex flex-wrap gap-2">${chip(act, 'noSpicy', '1', !!d.noSpicy, '🌶️ Tak gemar pedas')}</div>
+    <div class="text-[11px] font-semibold text-slate-500 mt-5 mb-1.5">Nota kesihatan (pilihan)</div>
+    <div class="flex flex-wrap gap-2">${Object.entries(HEALTH).map(([k, l]) => chip(act, 'health', k, has('health', k), l)).join('')}</div>
+    <p class="text-[11.5px] text-slate-400 mt-2">Digunakan untuk sesuaikan nasihat Bantuan Pening & cadangan menu. Disimpan dalam telefon sahaja, dan bukan pengganti nasihat doktor.</p>`;
+}
+
+function obCollect() {
+  const d = UI.ob.d;
+  if (document.getElementById('obName')) d.name = val('obName').trim();
+  if (document.getElementById('obAge')) { d.age = numVal('obAge'); d.height = numVal('obHeight'); }
+  if (document.getElementById('obWeight')) { d.weight = numVal('obWeight'); d.target = numVal('obTarget'); }
+}
+function obValidate() {
+  const d = UI.ob.d, s = UI.ob.step;
+  if (s === 1) {
+    if (!d.sex) return 'Pilih jantina dulu';
+    if (!(d.age >= 18 && d.age <= 90)) return 'DietPal direka untuk dewasa berumur 18–90 tahun';
+    if (!(d.height >= 120 && d.height <= 230)) return 'Masukkan tinggi dalam cm (cth: 170)';
+  }
+  if (s === 2) {
+    if (!(d.weight >= 35 && d.weight <= 300)) return 'Masukkan berat semasa yang betul';
+    if (!(d.target > 0)) return 'Masukkan berat sasaran';
+    if (d.target >= d.weight) return 'Berat sasaran mesti lebih rendah dari berat semasa';
+    if (d.target < minHealthyWeight(d)) return `Berat sasaran terlalu rendah — minimum sihat ${minHealthyWeight(d)} kg (BMI 18.5)`;
+  }
+  return '';
+}
+function obFinish() {
+  const d = UI.ob.d, p = S.profile;
+  Object.assign(p, {
+    name: d.name || '', sex: d.sex, age: d.age, height: d.height, startWeight: d.weight, targetWeight: d.target,
+    activity: d.activity, pace: d.pace, kcalMode: 'auto', waterMode: 'auto',
+    avoid: d.avoid, allergies: d.allergies, noSpicy: !!d.noSpicy, health: d.health,
+    milestones: autoMilestones(d.weight, d.target), setupDone: true, setupAt: Date.now()
+  });
+  S.weights = S.weights.filter(w => w.date !== todayKey()); S.weights.push({ date: todayKey(), kg: d.weight });
+  recalcTargets(); save();
+  UI.tab = 'home'; render(); window.scrollTo({ top: 0 });
+  toast(`Selamat datang${p.name ? ', ' + p.name : ''}! 🎉`);
+}
+
+/* ---------- PROFILE & SETTINGS PAGE ---------- */
+function viewProfile() {
+  const seg = `
+    <div class="flex items-center gap-2">
+      <button data-act="tab" data-tab="home" class="tap w-9 h-9 rounded-xl bg-white shadow-card grid place-items-center" aria-label="Kembali"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl flex-1">
+        <button data-act="pTab" data-v="profil" class="tap rounded-lg py-2 text-[13px] font-semibold ${UI.pTab === 'profil' ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">👤 Profil</button>
+        <button data-act="pTab" data-v="tetapan" class="tap rounded-lg py-2 text-[13px] font-semibold ${UI.pTab === 'tetapan' ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">⚙️ Tetapan</button>
+      </div>
+    </div>`;
+  return seg + (UI.pTab === 'tetapan' ? viewSettings() : viewProfileTab());
+}
+
+function viewProfileTab() {
+  const p = S.profile, cur = currentWeight(), auto = p.kcalMode === 'auto';
+  const t = canAuto(p) ? calcTargets(p) : null;
+  const ms = p.milestones || [];
+  return `
+  ${!canAuto(p) ? `<div class="text-[13px] bg-amber-50 text-amber-800 rounded-2xl px-4 py-3">Lengkapkan <b>jantina, umur & tahap aktiviti</b> supaya Coach boleh kira sasaran kalori secara automatik.</div>` : ''}
+
+  ${card(`
+    <div class="flex items-center gap-3 mb-3">
+      <div class="w-12 h-12 rounded-2xl bg-brand-700 text-white grid place-items-center text-xl font-extrabold">${initials()}</div>
+      <div><div class="font-bold text-[16px]">${esc(p.name || 'Profil saya')}</div><div class="text-[12px] text-slate-500">${cur ? cur.toFixed(1) + ' kg · BMI ' + bmi(cur).toFixed(1) : ''}</div></div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="col-span-2">${field('pName', 'Nama panggilan', p.name, 'text')}</div>
+      ${selectField('pSex', 'Jantina', p.sex || '', { '': '— Pilih —', L: 'Lelaki', P: 'Perempuan' })}
+      ${field('pAge', 'Umur (tahun)', p.age ?? '')}
+      ${field('pHeight', 'Tinggi (cm)', p.height ?? '')}
+      ${field('pStart', 'Berat mula (kg)', p.startWeight ?? '')}
+      ${field('pTarget', 'Berat sasaran (kg)', p.targetWeight ?? '')}
+      ${selectField('pPace', 'Kadar turun', p.pace || '0.5', Object.fromEntries(Object.entries(PACE).map(([k, v]) => [k, v.d.split(' ·')[0]])))}
+      <div class="col-span-2">${selectField('pActivity', 'Tahap aktiviti', p.activity || 'rendah', Object.fromEntries(Object.entries(ACTIVITY).map(([k, v]) => [k, v.label + ' — ' + v.d])))}</div>
+    </div>
+    <p class="text-[11.5px] text-slate-400 mt-2">Berat semasa diambil dari log berat terkini.</p>
+    <button data-act="saveProfile" class="tap mt-3 w-full bg-brand-700 text-white font-bold py-3 rounded-xl">Simpan profil</button>`)}
+
+  ${card(`
+    <div class="flex items-center justify-between mb-3"><div class="font-bold text-[15px]">🎯 Sasaran harian</div></div>
+    <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+      <button data-act="setMode" data-v="auto" class="tap rounded-lg py-2 text-[13px] font-semibold ${auto ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">Automatik</button>
+      <button data-act="setMode" data-v="manual" class="tap rounded-lg py-2 text-[13px] font-semibold ${!auto ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">Manual</button>
+    </div>
+    ${auto ? (t ? `
+      <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+        <div class="bg-slate-50 rounded-xl py-2"><div class="text-[10.5px] text-slate-500">BMR</div><div class="font-bold">${fmt(t.bmr)}</div></div>
+        <div class="bg-slate-50 rounded-xl py-2"><div class="text-[10.5px] text-slate-500">TDEE</div><div class="font-bold">${fmt(t.tdee)}</div></div>
+        <div class="bg-slate-50 rounded-xl py-2"><div class="text-[10.5px] text-slate-500">Defisit</div><div class="font-bold">−${fmt(t.deficit)}</div></div>
+      </div>
+      <div class="mt-3 flex justify-between items-center bg-brand-50 rounded-xl px-3 py-2.5"><span class="text-[13px] text-brand-900">Kalori sehari</span><b class="text-brand-900">${fmt(p.kcalMin)}–${fmt(p.kcalMax)} kcal</b></div>
+      <div class="mt-2 flex justify-between items-center bg-sky-50 rounded-xl px-3 py-2.5"><span class="text-[13px] text-sky-900">Air sehari</span><b class="text-sky-900">${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L</b></div>
+      ${t.floorHit ? `<p class="text-[12px] text-amber-700 mt-2">Dinaikkan ke had minimum selamat ${fmt(kcalFloor())} kcal.</p>` : ''}
+      <p class="text-[11.5px] text-slate-400 mt-2">Dikira semula setiap kali berat baru dilog (formula Mifflin-St Jeor).</p>`
+      : `<p class="text-[13px] text-slate-500 mt-3">Lengkapkan profil di atas untuk guna kiraan automatik.</p>`) : `
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        ${field('mMin', 'Kalori min', p.kcalMin)}${field('mMax', 'Kalori maks', p.kcalMax)}
+        ${field('mWater', 'Air minimum (ml)', p.waterGoal)}${field('mWaterIdeal', 'Air ideal (ml)', p.waterIdeal)}
+      </div>
+      <p class="text-[11.5px] text-slate-400 mt-2">Had minimum selamat: ${fmt(kcalFloor())} kcal sehari. Nilai lebih rendah akan dinaikkan secara automatik.</p>
+      <button data-act="saveManual" class="tap mt-3 w-full bg-brand-700 text-white font-bold py-3 rounded-xl">Simpan sasaran</button>`}`)}
+
+  ${card(`
+    <div class="flex items-center justify-between mb-2"><div class="font-bold text-[15px]">🏁 Milestone</div>
+      <button data-act="msAuto" class="tap text-[12px] font-semibold text-brand-700">Jana automatik</button></div>
+    <div class="space-y-2">
+      ${ms.map((m, i) => `<div class="flex gap-2 items-center">
+        <input id="msName${i}" value="${esc(m.name)}" class="flex-1 min-w-0 bg-slate-50 rounded-xl px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-brand-500">
+        <div class="relative w-24"><input id="msKg${i}" type="number" step="0.1" inputmode="decimal" value="${m.kg}" class="w-full bg-slate-50 rounded-xl px-3 py-2.5 pr-8 text-[14px] font-bold outline-none focus:ring-2 focus:ring-brand-500"><span class="absolute right-2.5 top-3 text-[11px] text-slate-400">kg</span></div>
+        <button data-act="msDel" data-i="${i}" class="tap w-8 h-8 text-slate-300" aria-label="Padam">✕</button></div>`).join('') || '<p class="text-[13px] text-slate-400">Tiada milestone.</p>'}
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button data-act="msAdd" class="tap bg-slate-100 text-slate-700 font-semibold text-[13px] py-2.5 rounded-xl">+ Tambah</button>
+      <button data-act="msSave" class="tap bg-brand-700 text-white font-semibold text-[13px] py-2.5 rounded-xl">Simpan milestone</button>
+    </div>`)}
+
+  ${card(`<div class="font-bold text-[15px]">🍽️ Pilihan makanan & kesihatan</div>
+    <p class="text-[12px] text-slate-500">Disimpan terus bila ditekan.</p>
+    ${prefsBlock('prefToggle', p)}`)}`;
+}
+
+function viewSettings() {
+  const st = S.settings, r = st.reminders, mt = st.mealTimes;
+  const seg3 = (act, cur, opts) => `<div class="grid grid-cols-${Object.keys(opts).length} gap-1 bg-slate-100 p-1 rounded-xl">${Object.entries(opts).map(([k, l]) => `<button data-act="${act}" data-v="${k}" class="tap rounded-lg py-2 text-[13px] font-semibold ${cur === k ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">${l}</button>`).join('')}</div>`;
+  return `
+  ${card(`<div class="font-bold text-[15px] mb-3">🎨 Paparan</div>
+    <div class="text-[11px] font-semibold text-slate-500 mb-1.5">Tema</div>
+    ${seg3('setTheme', st.theme, { light: '☀️ Cerah', dark: '🌙 Gelap', auto: 'Ikut telefon' })}
+    <div class="text-[11px] font-semibold text-slate-500 mt-4 mb-1.5">Saiz teks</div>
+    ${seg3('setText', st.textSize, { normal: 'Biasa', big: 'Besar' })}`)}
+
+  ${card(`<div class="font-bold text-[15px] mb-1">🕐 Waktu makan biasa</div>
+    <p class="text-[12px] text-slate-500 mb-3">Untuk kesan waktu makan secara automatik & peringatan log.</p>
+    <div class="grid grid-cols-3 gap-2">
+      ${['sarapan', 'tengahari', 'malam'].map(m => `<div><label class="block text-[11px] font-semibold text-slate-500">${MEALS.find(x => x.id === m).label}</label>
+        <input type="time" data-time="${m}" value="${mt[m]}" class="w-full mt-1 bg-slate-50 rounded-xl px-2 py-2.5 text-[14px] outline-none"></div>`).join('')}
+    </div>`)}
+
+  ${card(`<div class="font-bold text-[15px]">🔔 Peringatan</div>
+    <div class="divide-y divide-slate-100">
+      ${toggleRow('remToggle', 'water', r.water, 'Minum air', 'Bila air kurang dari jangkaan ikut jam')}
+      ${toggleRow('remToggle', 'meals', r.meals, 'Log makan', '90 minit selepas waktu makan, jika belum log')}
+      ${toggleRow('remToggle', 'weigh', r.weigh, 'Timbang berat mingguan', 'Sekali seminggu pada hari pilihan')}
+    </div>
+    ${r.weigh ? `<div class="mt-2">${selectField('weighDay', 'Hari timbang', String(r.weighDay), Object.fromEntries(HARI_PENUH.map((h, i) => [String(i), h])))}</div>` : ''}
+    <p class="text-[11.5px] text-slate-400 mt-3">Peringatan dipaparkan bila app dibuka. Notifikasi semasa app ditutup akan ditambah kemudian.</p>`)}
+
+  ${card(`<div class="font-bold text-[15px] mb-3">💾 Data</div>
+    <div class="grid grid-cols-2 gap-2">
+      <button data-act="export" class="tap bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl">⬇ Backup (JSON)</button>
+      <label class="tap bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl text-center cursor-pointer">⬆ Restore<input id="importFile" type="file" accept="application/json" class="hidden"></label>
+      <button data-act="exportCsv" class="tap col-span-2 bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl">📊 Export CSV (makanan, air, berat)</button>
+    </div>
+    <button data-act="reset" class="tap mt-2 w-full text-rose-500 font-semibold text-sm py-2.5">Padam semua data</button>
+    <p class="text-[11px] text-slate-400 mt-1">Semua data disimpan dalam telefon ini sahaja. Buat backup sekali-sekala.</p>`)}
+
+  ${card(`<div class="font-bold text-[15px] mb-1">ℹ️ Tentang DietPal</div>
+    <div class="text-[13px] text-slate-600">Versi ${APP_VERSION}</div>
+    <a href="https://github.com/mdk869/DietPal" target="_blank" rel="noopener" class="text-[13px] font-semibold text-brand-700">github.com/mdk869/DietPal</a>
+    <p class="text-[11.5px] text-slate-400 mt-2">App ini panduan gaya hidup, bukan nasihat perubatan. Nilai kalori adalah anggaran purata. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.</p>`)}`;
+}
+
+function toggleIn(arr, v) { const i = arr.indexOf(v); i >= 0 ? arr.splice(i, 1) : arr.push(v); }
+function exportCsv() {
+  const rows = [['tarikh', 'jenis', 'waktu_makan', 'item', 'kuantiti', 'kcal', 'air_ml', 'berat_kg']];
+  Object.keys(S.days).sort().forEach(k => {
+    const d = S.days[k];
+    d.meals.forEach(m => rows.push([k, 'makanan', m.meal, m.name, m.qty, m.kcal, '', '']));
+    if (d.water) rows.push([k, 'air', '', '', '', '', d.water, '']);
+  });
+  sortedWeights().forEach(w => rows.push([w.date, 'berat', '', '', '', '', '', w.kg]));
+  const csv = rows.map(r => r.map(c => /[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : c).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = `dietpal-${todayKey()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function handleProfileAction(a, el) {
+  const p = S.profile, st = S.settings;
+  switch (a) {
+    case 'obSet': obCollect(); UI.ob.d[el.dataset.k] = el.dataset.v; render(); return true;
+    case 'obToggle': {
+      obCollect(); const d = UI.ob.d, k = el.dataset.k;
+      if (k === 'noSpicy') d.noSpicy = !d.noSpicy; else toggleIn(d[k], el.dataset.v);
+      render(); return true;
+    }
+    case 'obBack': obCollect(); UI.ob.step--; render(); window.scrollTo({ top: 0 }); return true;
+    case 'obNext': {
+      obCollect(); const err = obValidate(); if (err) { toast(err); return true; }
+      if (UI.ob.step === 5) { obFinish(); return true; }
+      UI.ob.step++; render(); window.scrollTo({ top: 0 }); return true;
+    }
+    case 'pTab': UI.pTab = el.dataset.v; render(); return true;
+    case 'saveProfile': {
+      const age = numVal('pAge'), height = numVal('pHeight'), start = numVal('pStart'), target = numVal('pTarget');
+      if (age !== null && !(age >= 18 && age <= 90)) { toast('Umur mesti 18–90 tahun'); return true; }
+      if (!(height >= 120 && height <= 230)) { toast('Masukkan tinggi yang betul (cm)'); return true; }
+      const minW = minHealthyWeight({ height });
+      if (target !== null && target < minW) { toast(`Berat sasaran minimum sihat ialah ${minW} kg`); return true; }
+      Object.assign(p, { name: val('pName').trim(), sex: val('pSex'), age, height, startWeight: start ?? p.startWeight,
+        targetWeight: target ?? p.targetWeight, pace: val('pPace'), activity: val('pActivity') });
+      if (!p.startWeight && currentWeight()) p.startWeight = currentWeight();
+      recalcTargets(); save(); render(); toast('✓ Profil disimpan'); return true;
+    }
+    case 'setMode': {
+      p.kcalMode = p.waterMode = el.dataset.v;
+      if (p.kcalMode === 'auto' && !canAuto(p)) toast('Lengkapkan jantina, umur & aktiviti dulu');
+      recalcTargets(); save(); render(); return true;
+    }
+    case 'saveManual': {
+      const mn = numVal('mMin'), mx = numVal('mMax'), w = numVal('mWater'), wi = numVal('mWaterIdeal');
+      if (mn && mn < kcalFloor()) toast(`Dinaikkan ke had minimum ${fmt(kcalFloor())} kcal`);
+      p.kcalMin = mn || p.kcalMin; p.kcalMax = mx || p.kcalMax;
+      p.waterGoal = Math.max(1000, w || p.waterGoal); p.waterIdeal = Math.max(p.waterGoal, wi || p.waterIdeal);
+      recalcTargets(); save(); render(); toast('✓ Sasaran disimpan'); return true;
+    }
+    case 'msAuto': {
+      const cur = currentWeight(), tg = p.targetWeight;
+      if (!cur || !tg || tg >= cur) { toast('Isi berat sasaran (lebih rendah dari berat semasa) dulu'); return true; }
+      p.milestones = autoMilestones(cur, tg); save(); render(); toast('✓ Milestone dijana'); return true;
+    }
+    case 'msAdd': msCollect(); p.milestones.push({ name: 'Milestone ' + (p.milestones.length + 1), kg: Math.round((p.targetWeight || currentWeight() - 5)) }); render(); return true;
+    case 'msDel': msCollect(); p.milestones.splice(Number(el.dataset.i), 1); save(); render(); return true;
+    case 'msSave': {
+      msCollect(); const minW = minHealthyWeight();
+      if (p.milestones.some(m => !(m.kg >= minW))) { toast(`Setiap milestone mesti ${minW} kg ke atas`); return true; }
+      p.milestones.sort((a, b) => b.kg - a.kg); save(); render(); toast('✓ Milestone disimpan'); return true;
+    }
+    case 'prefToggle': {
+      const k = el.dataset.k;
+      if (k === 'noSpicy') p.noSpicy = !p.noSpicy; else { p[k] = p[k] || []; toggleIn(p[k], el.dataset.v); }
+      save(); render(); return true;
+    }
+    case 'setTheme': st.theme = el.dataset.v; save(); applyTheme(); render(); return true;
+    case 'setText': st.textSize = el.dataset.v; save(); applyTheme(); render(); return true;
+    case 'remToggle': st.reminders[el.dataset.k] = !st.reminders[el.dataset.k]; save(); render(); return true;
+    case 'dismissRem': dismissedToday().push(el.dataset.id); save(); render(); return true;
+    case 'exportCsv': exportCsv(); return true;
+  }
+  return false;
+}
+function msCollect() {
+  S.profile.milestones.forEach((m, i) => {
+    const n = document.getElementById('msName' + i), k = document.getElementById('msKg' + i);
+    if (n) m.name = n.value.trim() || m.name; if (k && isFinite(parseFloat(k.value))) m.kg = Math.round(parseFloat(k.value) * 10) / 10;
+  });
+}
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset?.time) { S.settings.mealTimes[t.dataset.time] = t.value; save(); toast('✓ Waktu makan disimpan'); }
+  if (t.id === 'weighDay') { S.settings.reminders.weighDay = Number(t.value); save(); toast('✓ Hari timbang disimpan'); }
+});
+
+/* ============================================================
    SHEET
    ============================================================ */
 let sheetFn = null;
@@ -1093,6 +1616,7 @@ function addMeal(f, qty, meal) {
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   const a = el.dataset.act;
+  if (handleProfileAction(a, el)) return;
   switch (a) {
     case 'tab': UI.tab = el.dataset.tab; if (UI.tab !== 'food') UI.q = ''; render(); window.scrollTo({ top: 0 }); break;
     case 'quickMeal': UI.meal = el.dataset.meal; UI.tab = 'food'; render(); window.scrollTo({ top: 0 }); break;
@@ -1123,7 +1647,7 @@ document.addEventListener('click', (e) => {
       const kg = parseFloat(document.getElementById('wKg').value), date = document.getElementById('wDate').value || todayKey();
       if (!(kg > 30 && kg < 300)) { toast('Masukkan berat yang betul'); return; }
       const before = currentWeight();
-      S.weights = S.weights.filter(w => w.date !== date); S.weights.push({ date, kg: Math.round(kg * 10) / 10 }); save();
+      S.weights = S.weights.filter(w => w.date !== date); S.weights.push({ date, kg: Math.round(kg * 10) / 10 }); recalcTargets(); save();
       const hit = S.profile.milestones.find(m => before > m.kg && currentWeight() <= m.kg);
       render(); toast(hit ? `🏆 Tahniah! ${hit.name} (${hit.kg} kg) tercapai!` : '✓ Berat disimpan'); break;
     }
@@ -1137,22 +1661,12 @@ document.addEventListener('click', (e) => {
     }
     case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`✓ ${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
     case 'closeSheet': closeSheet(); render(); break;
-    case 'saveSettings': {
-      const num = (id, fb) => { const v = parseFloat(document.getElementById(id).value); return isFinite(v) && v > 0 ? v : fb; };
-      const p = S.profile;
-      p.name = document.getElementById('stName').value.trim();
-      p.height = num('stHeight', p.height); p.startWeight = num('stStart', p.startWeight);
-      p.waterGoal = num('stWater', p.waterGoal); p.waterIdeal = Math.max(p.waterIdeal, p.waterGoal);
-      p.kcalMin = num('stMin', p.kcalMin); p.kcalMax = Math.max(p.kcalMin, num('stMax', p.kcalMax));
-      p.milestones.forEach((m, i) => m.kg = num('stM' + i, m.kg));
-      save(); render(); toast('✓ Tetapan disimpan'); break;
-    }
     case 'export': {
       const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob); const link = document.createElement('a');
       link.href = url; link.download = `dietpal-backup-${todayKey()}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); break;
     }
-    case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) { localStorage.removeItem(KEY); S = load(); render(); toast('Data dipadam'); } break;
+    case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) { localStorage.removeItem(KEY); S = load(); UI.tab = 'home'; UI.ob.step = 0; render(); toast('Data dipadam'); } break;
     case 'install': installApp(); break;
     case 'openSuggest': UI.sug.meal = UI.meal; sheetSuggest(); break;
     case 'sugMeal': UI.sug.meal = el.dataset.meal; UI.sug.seed = 0; refreshSheet(); render(); break;
@@ -1218,7 +1732,9 @@ if ('serviceWorker' in navigator) {
 }
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 
+applyTheme();
 render();
+setTimeout(checkReminders, 1500);
 </script>
 </body>
 </html>

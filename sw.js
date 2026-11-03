@@ -1,5 +1,5 @@
 // DietPal – service worker
-const CACHE = 'dietpal-v3';
+const CACHE = 'dietpal-v4';
 const SHELL = [
   './',
   './index.html',
