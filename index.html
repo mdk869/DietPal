@@ -181,15 +181,17 @@ const FOODS = [
   { id:'kopio', name:'Kopi O / teh O kosong', unit:'1 cawan', kcal:5, cat:'Minuman', plate:'lain', e:'☕' },
   { id:'tehtarik',name:'Teh tarik', unit:'1 cawan', kcal:150, cat:'Minuman', plate:'lain', e:'🧋' },
   { id:'kopisusu',name:'Kopi / teh susu kurang manis', unit:'1 cawan', kcal:90, cat:'Minuman', plate:'lain', e:'☕' },
-  { id:'milo',  name:'Milo ais', unit:'1 gelas', kcal:190, cat:'Minuman', plate:'lain', e:'🥤' },
+  { id:'milo',  name:'Minuman coklat malt ais', unit:'1 gelas', kcal:190, cat:'Minuman', plate:'lain', e:'🥤' },
   { id:'sirap', name:'Air sirap / sirap bandung', unit:'1 gelas', kcal:180, cat:'Minuman', plate:'lain', e:'🥤' },
-  { id:'p100z', name:'100Plus Zero Sugar', unit:'1 tin', kcal:0, cat:'Minuman', plate:'lain', e:'🥫', water:325 },
+  { id:'p100z', name:'Minuman isotonik tanpa gula', unit:'1 tin / botol kecil', kcal:0, cat:'Minuman', plate:'lain', e:'🥤', water:325 },
+  { id:'airkosong', name:'Air kosong', unit:'1 gelas', kcal:0, cat:'Minuman', plate:'lain', e:'💧', water:250 },
   { id:'susu',  name:'Susu rendah lemak', unit:'1 gelas', kcal:110, cat:'Minuman', plate:'protein', e:'🥛' },
   // Snek
   { id:'pisang',name:'Pisang', unit:'1 biji', kcal:100, cat:'Snek', plate:'lain', e:'🍌' },
   { id:'epal',  name:'Epal / oren', unit:'1 biji', kcal:80, cat:'Snek', plate:'serat', e:'🍎' },
+  { id:'buah',  name:'Buah-buahan', unit:'1 hidangan', kcal:80, cat:'Snek', plate:'serat', e:'🍉' },
   { id:'betik', name:'Betik / tembikai', unit:'1 piring', kcal:60, cat:'Snek', plate:'serat', e:'🍉' },
-  { id:'kraker',name:'Biskut kraker', unit:'2 keping', kcal:70, cat:'Snek', plate:'karbo', e:'🍘' },
+  { id:'kraker',name:'Biskut kosong / kraker', unit:'2 keping', kcal:70, cat:'Snek', plate:'karbo', e:'🍘' },
   { id:'kurma', name:'Kurma', unit:'3 biji', kcal:70, cat:'Snek', plate:'lain', e:'🌴' },
   { id:'kacang',name:'Kacang badam / tanah', unit:'1 genggam', kcal:160, cat:'Snek', plate:'lain', e:'🥜' },
   { id:'karipap',name:'Karipap / kuih goreng', unit:'1 biji', kcal:130, cat:'Snek', plate:'lain', e:'🥟' },
@@ -770,10 +772,10 @@ function viewGuide() {
     <p class="text-[13.5px] text-slate-600 mt-1 leading-relaxed">80% masa ikut pinggan sihat, 20% boleh santai — nasi lemak hujung minggu atau kenduri. Yang penting <b>konsisten</b>, bukan sempurna. Satu hari terlebih tak rosakkan progres.</p>`)}
 
   ${card(`
-    <div class="font-bold text-[15px] mb-2">Pengajaran penting 🧂🍚</div>
+    <div class="font-bold text-[15px] mb-2">Elak diet ekstrem 🧂🍚</div>
     <ul class="space-y-2 text-[13.5px] text-slate-600">
-      <li class="flex gap-2"><span>❌</span><span>Jangan potong <b>garam & nasi terus</b> (cold turkey). Badan boleh hilang elektrolit — pening, sakit kepala, masuk angin.</span></li>
-      <li class="flex gap-2"><span>✅</span><span>Kurangkan <b>sikit-sikit</b>: 1 pinggan → 1½ senduk → 1 senduk dalam 2–3 minggu.</span></li>
+      <li class="flex gap-2"><span>❌</span><span>Jangan potong <b>garam atau karbohidrat sepenuhnya</b> secara mendadak (cold turkey). Badan boleh hilang elektrolit — pening, sakit kepala, perut kembung.</span></li>
+      <li class="flex gap-2"><span>✅</span><span>Kurangkan <b>sikit-sikit</b> dalam 2–3 minggu — contohnya nasi: 1 pinggan → 1½ senduk → 1 senduk.</span></li>
       <li class="flex gap-2"><span>✅</span><span>Garam secukup rasa masih perlu. Kurangkan makanan proses & kuah pekat, bukan buang garam sepenuhnya.${hasHealth('bp') ? ' <b>Ada darah tinggi? Ikut had garam yang doktor tetapkan.</b>' : ''}</span></li>
       <li class="flex gap-2"><span>✅</span><span>Jangan makan bawah <b>${fmt(p.kcalMin)} kcal</b> selalu — defisit terlalu besar buat badan lemah & cepat give up.</span></li>
       <li class="flex gap-2"><span>💧</span><span>Minum ${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L air sehari. Kadang-kadang "lapar" sebenarnya dahaga.</span></li>
@@ -859,26 +861,26 @@ function rescueResult() {
   const insights = [];
   if (lowFood) insights.push(`Hari ini anda baru makan <b>${fmt(k)} kcal</b>. Ini mungkin terlalu sikit — badan kekurangan tenaga.`);
   if (lowWater) insights.push(`Air hari ini baru <b>${fmt(d.water)} ml</b>. Kurang air ialah punca biasa pening & sakit kepala.`);
-  if (h >= 13 && carbsToday === 0) insights.push('Belum ada karbo hari ini. Potong nasi terus boleh cetuskan "keto flu".');
+  if (h >= 13 && carbsToday === 0) insights.push('Belum ada karbohidrat hari ini. Potong karbo terlalu banyak secara mendadak boleh cetuskan "keto flu".');
 
   const steps = [
     ['🪑', 'Berhenti & duduk', 'Duduk atau baring dalam tempat sejuk. Jangan memandu atau buat kerja berat sekarang.']];
-  if (hasHealth('diabetes')) steps.push(['🩸', 'Semak gula darah dulu', 'Anda ada kencing manis. Jika ada glucometer, semak sekarang. Bacaan <b>bawah 4.0 mmol/L</b> = gula rendah: ambil 3 biji kurma atau ½ gelas jus buah, semak semula selepas 15 minit.']);
+  if (hasHealth('diabetes')) steps.push(['🩸', 'Semak gula darah dulu', 'Anda ada kencing manis. Jika ada glucometer, semak sekarang. Bacaan <b>bawah 4.0 mmol/L</b> = gula rendah: ambil sumber gula cepat (cth: ½ gelas jus buah atau 3 sudu teh gula dalam air), semak semula selepas 15 minit.']);
   steps.push(
     ['🥤', 'Ganti elektrolit', hasHealth('bp')
-      ? 'Minum air kosong atau <b>100Plus Zero Sugar</b> perlahan-lahan. Anda ada darah tinggi — jangan tambah garam tanpa nasihat doktor. Semak tekanan darah jika ada alat.'
+      ? 'Minum <b>air kosong</b> perlahan-lahan. Anda ada darah tinggi — elak tambah garam atau minuman tinggi natrium tanpa nasihat doktor. Semak tekanan darah jika ada alat.'
       : s.has('angin')
       ? 'Minum segelas air suam dengan secubit garam, perlahan-lahan. Perut kembung? Elak minuman bergas buat masa ini.'
-      : 'Minum <b>100Plus Zero Sugar</b> atau segelas air suam + secubit garam. Hirup perlahan-lahan.'],
+      : 'Minum <b>minuman elektrolit tanpa gula</b> (minuman isotonik atau garam rehidrasi oral), atau segelas air suam dengan secubit garam. Hirup perlahan-lahan.'],
     ['🍘', 'Makan sesuatu ringan', (s.has('lemah') || lowFood)
-      ? 'Makan <b>1 biji pisang</b> atau <b>3 biji kurma</b> untuk naikkan gula darah, diikuti 2–3 keping biskut kraker.'
-      : 'Makan <b>2–3 keping biskut kraker</b> atau <b>1 biji pisang</b>. Kraker ada sedikit garam yang membantu.']
+      ? 'Makan sesuatu yang cepat beri tenaga — contohnya <b>buah-buahan</b> atau <b>sekeping roti</b> — kemudian makanan ringan yang lain.'
+      : 'Makan <b>snek ringan</b> yang ada sedikit karbohidrat — contohnya biskut kosong, sekeping roti atau buah-buahan.']
   );
   if (hasHealth('gastrik') && (s.has('angin') || s.has('loya') || lowFood)) steps.push(['🫃', 'Jaga gastrik', 'Jangan biar perut kosong lama — makan sedikit sekarang. Elak kopi, minuman bergas dan makanan pedas buat sementara.']);
-  if (s.has('kepala') || s.has('pening')) steps.push(['😮‍💨', 'Rehatkan mata & kepala', 'Tutup mata 10–15 minit, jauhkan skrin. Kalau biasa ambil panadol dan sesuai dengan anda, boleh ikut dos pada label.']);
+  if (s.has('kepala') || s.has('pening')) steps.push(['😮‍💨', 'Rehatkan mata & kepala', 'Tutup mata 10–15 minit, jauhkan skrin. Kalau biasa ambil ubat tahan sakit (cth: paracetamol) dan sesuai dengan anda, ikut dos pada label.']);
   if (s.has('angin')) steps.push(['🫚', 'Lega perut', 'Minum air halia suam (tanpa gula), sapu minyak angin di perut, dan jalan perlahan 5–10 minit. Elak baring terus lepas makan.']);
-  if (s.has('loya')) steps.push(['🫖', 'Hirup sikit-sikit', 'Ambil air dalam teguk kecil. Kraker kering lebih senang diterima perut berbanding makanan berminyak.']);
-  if (s.has('kejang')) steps.push(['🍌', 'Kalium & magnesium', 'Pisang dan sedikit garam membantu kejang otot. Regangkan otot perlahan-lahan.']);
+  if (s.has('loya')) steps.push(['🫖', 'Hirup sikit-sikit', 'Ambil air dalam teguk kecil. Makanan kering yang ringan (cth: biskut kosong atau roti) lebih senang diterima perut berbanding makanan berminyak.']);
+  if (s.has('kejang')) steps.push(['🍌', 'Kalium & magnesium', 'Makanan tinggi kalium (cth: buah-buahan, sayur hijau) dan sedikit garam membantu kejang otot. Regangkan otot perlahan-lahan.']);
   if (lowFood) steps.push(['🍚', 'Waktu makan seterusnya', 'Makan hidangan penuh: <b>nasi 1 senduk</b> + lauk protein + sayur. Jangan skip — nasi dalam kadar betul OK.']);
   steps.push(['⏱️', 'Tunggu 15–20 minit', 'Kebanyakan simptom keto flu lega selepas ini. Kalau tak lega dalam sejam atau makin teruk, jumpa doktor.']);
 
@@ -896,15 +898,16 @@ function rescueResult() {
         <div><div class="font-semibold text-[14px]">${i + 1}. ${t}</div><div class="text-[13px] text-slate-600 leading-snug">${dsc}</div></div></li>`).join('')}
     </ol>
 
-    <div class="mt-4 text-xs font-semibold text-slate-500 mb-2">Dah ambil? Tekan untuk log terus:</div>
-    <div class="grid grid-cols-3 gap-2">
-      <button data-act="rescueLog" data-id="p100z" class="tap bg-sky-50 text-sky-700 rounded-xl py-2.5 text-[12px] font-semibold">🥫 100Plus Zero</button>
-      <button data-act="rescueLog" data-id="kraker" class="tap bg-amber-50 text-amber-800 rounded-xl py-2.5 text-[12px] font-semibold">🍘 Kraker</button>
-      <button data-act="rescueLog" data-id="pisang" class="tap bg-yellow-50 text-yellow-800 rounded-xl py-2.5 text-[12px] font-semibold">🍌 Pisang</button>
+    <div class="mt-4 text-xs font-semibold text-slate-500 mb-2">Dah ambil sesuatu? Tekan untuk log terus:</div>
+    <div class="grid grid-cols-2 gap-2">
+      <button data-act="rescueLog" data-id="${hasHealth('bp') ? 'airkosong' : 'p100z'}" class="tap bg-sky-50 text-sky-700 rounded-xl py-2.5 text-[12px] font-semibold">${hasHealth('bp') ? '💧 Air kosong' : '🥤 Minuman elektrolit'}</button>
+      <button data-act="rescueLog" data-id="kraker" class="tap bg-amber-50 text-amber-800 rounded-xl py-2.5 text-[12px] font-semibold">🍘 Biskut kosong</button>
+      <button data-act="rescueLog" data-id="buah" class="tap bg-green-50 text-green-800 rounded-xl py-2.5 text-[12px] font-semibold">🍉 Buah-buahan</button>
+      <button data-act="rescueOther" class="tap bg-slate-100 text-slate-700 rounded-xl py-2.5 text-[12px] font-semibold">🔎 Lain-lain…</button>
     </div>
 
     <div class="mt-4 bg-brand-50 rounded-2xl p-3 text-[12.5px] text-brand-900 leading-snug">
-      <b>Ingat pengajaran lepas:</b> potong garam & nasi secara mendadak buat badan "terkejut". Kurangkan sikit-sikit — progres lambat tapi selamat lebih baik dari pening hari-hari.
+      <b>Tip:</b> Gejala ini biasa berlaku bila kalori, karbohidrat atau garam dikurangkan terlalu banyak secara mendadak. Kurangkan sikit-sikit — progres perlahan tapi selamat lebih baik dari pening hari-hari.
     </div>
     <p class="text-[11px] text-slate-400 mt-3">${(S.profile.health || []).length
       ? `Langkah di atas mengambil kira nota kesihatan anda (${S.profile.health.map(h => HEALTH[h]).join(', ')}). Ikut nasihat doktor jika berbeza.`
@@ -954,7 +957,7 @@ const MENUS = [
   { id:'n1', loc:'rumah', meals:'n', e:'🍌', name:'Pisang', items:[['pisang',1]], tip:'Kalium dalam pisang bantu elak kejang & pening.' },
   { id:'n2', loc:'rumah', meals:'n', e:'🍎', name:'Epal / oren', items:[['epal',1]], tip:'Makan buah, bukan jus — seratnya buat kenyang.' },
   { id:'n3', loc:'rumah', meals:'n', e:'🥛', name:'Yogurt + betik', items:[['yogurt',1],['betik',0.5]], tip:'Yogurt plain bagus untuk perut yang selalu kembung.' },
-  { id:'n4', loc:'rumah', meals:'n', e:'🍘', name:'Biskut kraker + kopi O', items:[['kraker',1],['kopio',1]], tip:'Snek petang klasik yang ringan.' },
+  { id:'n4', loc:'rumah', meals:'n', e:'🍘', name:'Biskut kosong + kopi O', items:[['kraker',1],['kopio',1]], tip:'Snek petang klasik yang ringan.' },
   { id:'n5', loc:'rumah', meals:'n', e:'🥚', name:'Telur rebus + timun', items:[['telurr',1],['salad',0.5]], tip:'Snek protein — tahan lapar sampai makan malam.' },
   { id:'n6', loc:'rumah', meals:'n', e:'🌴', name:'Kurma + susu rendah lemak', items:[['kurma',1],['susu',1]], tip:'Sesuai bila rasa lemah atau sebelum aktiviti.' },
   { id:'n7', loc:'rumah', meals:'n', e:'🥜', name:'Kacang separuh genggam', items:[['kacang',0.5]], tip:'Kacang tinggi kalori — separuh genggam cukup.' },
@@ -986,8 +989,8 @@ const MENUS = [
   { id:'k4', loc:'luar', venue:'kopitiam', meals:'t', e:'🍗', name:'Nasi ayam panggang (nasi sikit)', items:[['nasi1',1],['agrill',1],['salad',1]], tip:'Minta nasi sikit & ayam panggang, tambah timun.' },
   { id:'k5', loc:'luar', venue:'kopitiam', meals:'m', e:'🍽️', name:'Chicken chop grill', items:[['chickenchop',1]], tip:'Sos asing, tukar fries ke salad.' },
   // ---------- LUAR: makanan segera ----------
-  { id:'f1', loc:'luar', venue:'segera', meals:'tm', e:'🍗', name:'Ayam panggang + coleslaw', items:[['agrill',1],['coleslaw',1],['p100z',1]], tip:'Pilih menu panggang/grill, minum air kosong atau zero sugar.' },
-  { id:'f2', loc:'luar', venue:'segera', meals:'tm', e:'🍔', name:'Burger ayam grill tanpa fries', items:[['burger',1],['p100z',1]], tip:'Skip fries & air manis — jimat ~450 kcal.' },
+  { id:'f1', loc:'luar', venue:'segera', meals:'tm', e:'🍗', name:'Ayam panggang + coleslaw', items:[['agrill',1],['coleslaw',1],['airkosong',1]], tip:'Pilih menu panggang/grill, minum air kosong atau minuman tanpa gula.' },
+  { id:'f2', loc:'luar', venue:'segera', meals:'tm', e:'🍔', name:'Burger ayam grill tanpa fries', items:[['burger',1],['airkosong',1]], tip:'Skip fries & air manis — jimat ~450 kcal.' },
   { id:'f3', loc:'luar', venue:'segera', meals:'tm', e:'🍗', name:'1 ketul ayam goreng + kentang lenyek', items:[['agoreng',1],['mashed',1]], tip:'Buang kulit ayam — jimat ~90 kcal.' },
   // ---------- LUAR: kenduri ----------
   { id:'e1', loc:'luar', venue:'kenduri', meals:'tm', e:'🎉', name:'Nasi minyak 1 senduk + ayam merah + acar', items:[['nasiminyak',1],['ayammerah',1],['acar',1],['dal',1]], tip:'Guna pinggan kecil, isi acar & sayur dulu.' },
@@ -997,8 +1000,8 @@ const MENUS = [
   { id:'s1', loc:'luar', venue:'kedai', meals:'n', e:'🍌', name:'Pisang', items:[['pisang',1]], tip:'Ada di kebanyakan kedai serbaneka.' },
   { id:'s2', loc:'luar', venue:'kedai', meals:'n', e:'🥚', name:'Telur rebus 2 biji', items:[['telurr',2]], tip:'Snek protein paling mudah dibeli.' },
   { id:'s3', loc:'luar', venue:'kedai', meals:'n', e:'🥛', name:'Yogurt / susu rendah lemak', items:[['yogurt',1]], tip:'Semak label — pilih kurang gula.' },
-  { id:'s4', loc:'luar', venue:'kedai', meals:'n', e:'🥜', name:'Kacang + 100Plus Zero', items:[['kacang',0.5],['p100z',1]], tip:'Beli paket kecil, jangan paket besar.' },
-  { id:'s5', loc:'luar', venue:'kedai', meals:'n', e:'🍘', name:'Biskut kraker', items:[['kraker',1]], tip:'Pilih kraker biasa, bukan yang berkrim.' },
+  { id:'s4', loc:'luar', venue:'kedai', meals:'n', e:'🥜', name:'Kacang + air kosong', items:[['kacang',0.5],['airkosong',1]], tip:'Beli paket kecil, jangan paket besar.' },
+  { id:'s5', loc:'luar', venue:'kedai', meals:'n', e:'🍘', name:'Biskut kosong', items:[['kraker',1]], tip:'Pilih biskut biasa, bukan yang berkrim atau bersalut.' },
   { id:'s6', loc:'luar', venue:'gerai', meals:'n', e:'🌽', name:'Jagung rebus', items:[['jagung',1]], tip:'Minta tanpa mentega & susu pekat.' }
 ];
 
@@ -1139,7 +1142,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1659,6 +1662,7 @@ document.addEventListener('click', (e) => {
       S.rescues.push({ t: Date.now(), symptoms: [...UI.sym], kcal: kcalOf(d), water: d.water }); save();
       UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
     }
+    case 'rescueOther': closeSheet(); UI.meal = 'snek'; UI.tab = 'food'; UI.q = ''; UI.cat = 'Semua'; render(); window.scrollTo({ top: 0 }); break;
     case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`✓ ${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
     case 'closeSheet': closeSheet(); render(); break;
     case 'export': {

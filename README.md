@@ -23,7 +23,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu, mobile-first, berjala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v4)
+sw.js           Service worker (cache dietpal-v5)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
 
