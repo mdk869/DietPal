@@ -156,7 +156,6 @@ const DEFAULTS = {
   dismissed: { date: '', ids: [] },
   days: {},          // { 'YYYY-MM-DD': { meals: [...], water: ml } }
   weights: [],       // [{ date, kg }]
-  rescues: [],       // [{ t, symptoms, kcal, water }]
   customFoods: []
 };
 
@@ -276,6 +275,7 @@ function load() {
         if (!op.milestones?.length) op.milestones = [ { name: 'Fasa 1', kg: 87 }, { name: 'Fasa 2', kg: 77 }, { name: 'Berat ideal', kg: 65 } ];
         op.targetWeight = op.targetWeight || op.milestones[op.milestones.length - 1].kg;
       }
+      delete out.rescues;   // "Rasa tak selesa" no longer keeps a history
       return out;
     }
   } catch (e) { console.warn('load failed', e); }
@@ -877,7 +877,6 @@ function viewGuide() {
 
   ${sourcesCard()}
 
-  ${rescueHistory()}
 
   <button data-act="tab" data-tab="profile" class="tap w-full bg-white rounded-2xl shadow-card p-4 flex items-center gap-3 text-left">
     <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 grid place-items-center">${icon('sliders')}</div>
@@ -969,18 +968,6 @@ function eatOutCard() {
 }
 const field = (id, label, val, type = 'number') => `<div><label class="block text-[12px] font-semibold text-slate-500">${label}</label><input id="${id}" type="${type}" ${type === 'number' ? 'inputmode="decimal" step="any"' : ''} value="${esc(val ?? '')}" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-500"></div>`;
 
-function rescueHistory() {
-  if (!S.rescues.length) return '';
-  const r = [...S.rescues].reverse().slice(0, 6);
-  return card(`
-    <div class="font-bold text-[16px] mb-1">Rekod rasa tak selesa</div>
-    <p class="text-[12px] text-slate-500 mb-2">Tengok corak — selalunya berlaku bila makan terlalu sikit atau kurang air.</p>
-    <div class="divide-y divide-slate-100">
-      ${r.map(x => { const d = new Date(x.t); return `<div class="py-2 flex items-start gap-2"><div class="flex-1 min-w-0 text-[13px]"><div class="flex justify-between gap-2"><span class="font-semibold">${x.symptoms.map(s => SYMPTOMS[s]?.label || s).join(', ')}</span><span class="text-slate-500 shrink-0">${d.getDate()} ${BULAN[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span></div>
-      <div class="text-[12px] text-slate-500">Masa itu: ${fmt(x.kcal)} kcal · air ${fmt(x.water)} ml</div></div>
-      <button data-act="delRescue" data-t="${x.t}" class="tap w-8 h-8 shrink-0 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Padam rekod">${icon('x', 'w-4 h-4')}</button></div>`; }).join('')}
-    </div>`);
-}
 
 /* ============================================================
    RESCUE ASSISTANT
@@ -1077,15 +1064,7 @@ function rescueResult() {
     <p class="text-[12px] text-slate-500 mt-3">${(S.profile.health || []).length
       ? `Langkah di atas mengambil kira nota kesihatan anda (${S.profile.health.map(h => HEALTH[h]).join(', ')}). Ikut nasihat doktor jika berbeza.`
       : 'Ada kencing manis atau ambil ubat darah tinggi? Simptom ini mungkin berkaitan ubat atau gula rendah — semak bacaan dan rujuk doktor. Boleh tambah nota kesihatan di Profil.'}</p>
-    <div class="mt-4 rounded-xl border border-slate-200 p-3">
-      ${UI.rescueSaved
-        ? `<div class="flex items-center gap-2 text-[14px] font-semibold text-green-700">${icon('check', 'w-4 h-4', 2.5)}Disimpan dalam rekod</div>
-           <p class="text-[12px] text-slate-500 mt-1">Boleh dilihat atau dipadam di tab Panduan.</p>`
-        : `<div class="text-[14px] font-semibold text-slate-800">Simpan dalam rekod?</div>
-           <p class="text-[13px] text-slate-500 mt-0.5">Rekod membantu anda nampak corak, contohnya bila ia berlaku selepas makan terlalu sikit. Tak perlu simpan kalau sekadar mencuba.</p>
-           <button data-act="rescueSave" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">Simpan ke rekod</button>`}
-    </div>
-    <button data-act="closeSheet" class="tap mt-3 w-full btn btn-primary py-3.5">Dah rasa lebih baik</button>
+    <button data-act="closeSheet" class="tap mt-4 w-full btn btn-primary py-3.5">Dah rasa lebih baik</button>
   </div>`;
 }
 
@@ -1832,20 +1811,7 @@ document.addEventListener('click', (e) => {
     case 'delWeight': if (confirm('Padam catatan berat ini?')) { S.weights = S.weights.filter(w => w.date !== el.dataset.date); save(); render(); } break;
     case 'rescue': sheetRescue(); break;
     case 'sym': { const k = el.dataset.s; UI.sym.has(k) ? UI.sym.delete(k) : UI.sym.add(k); refreshSheet(); break; }
-    case 'rescueGo': {
-      const d = peekDay(todayKey());
-      // snapshot now, but only saved if the user taps "Simpan ke rekod"
-      UI.rescueSnap = { t: Date.now(), symptoms: [...UI.sym], kcal: kcalOf(d), water: d.water };
-      UI.rescueSaved = false; UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
-    }
-    case 'rescueSave': {
-      if (!UI.rescueSnap || UI.rescueSaved) break;
-      S.rescues.push(UI.rescueSnap); save(); UI.rescueSaved = true; refreshSheet(); toast('Disimpan dalam rekod'); break;
-    }
-    case 'delRescue': {
-      if (!confirm('Padam rekod ini?')) break;
-      S.rescues = S.rescues.filter(x => String(x.t) !== el.dataset.t); save(); render(); toast('Rekod dipadam'); break;
-    }
+    case 'rescueGo': UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
     case 'rescueOther': closeSheet(); UI.meal = 'snek'; UI.tab = 'food'; UI.q = ''; UI.cat = 'Semua'; render(); window.scrollTo({ top: 0 }); break;
     case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
     case 'closeSheet': closeSheet(); render(); break;
