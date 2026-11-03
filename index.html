@@ -1631,9 +1631,8 @@ function viewOnboard() {
       <div class="flex gap-3">${icon('scale', 'w-5 h-5 text-slate-500 shrink-0')}<span>Timbang berat seminggu sekali</span></div>
       <div class="flex gap-3">${icon('moon', 'w-5 h-5 text-slate-500 shrink-0')}<span>Ringkasan kalori setiap malam</span></div>
     </div>
-    <p class="text-[12px] text-slate-500 mt-3">Tiada notifikasi antara 10 malam hingga 7 pagi. Boleh ubah atau matikan di Tetapan.</p>
-    <button data-act="obNotif" class="tap mt-5 w-full btn btn-primary py-3.5">${icon('bell', 'w-5 h-5')}Hidupkan peringatan</button>
-    <button data-act="obSkip" class="tap mt-2 w-full btn btn-text py-3">Nanti dulu</button>` : `
+    <p class="text-[12px] text-slate-500 mt-3">Boleh ubah atau matikan di Tetapan.</p>
+    <button data-act="obNotif" class="tap mt-5 w-full btn btn-primary py-3.5">${icon('bell', 'w-5 h-5')}Hidupkan peringatan</button>` : `
     <h2 class="text-xl font-extrabold">Semua sedia</h2>
     <p class="text-[14px] text-slate-500 mt-1">Telefon ini belum menyokong notifikasi. Peringatan akan dipaparkan bila app dibuka.</p>
     <button data-act="obSkip" class="tap mt-6 w-full btn btn-primary py-3.5">Mula guna DietPal</button>`;
@@ -2178,7 +2177,7 @@ function pushSettingsBlock() {
       <div class="text-[13px] text-slate-600">Notifikasi belum dihidupkan. Peringatan hanya muncul bila app dibuka.</div>
       <button data-act="pushOn" class="tap mt-2 w-full btn btn-primary py-2.5 text-[14px]">${icon('bell', 'w-4 h-4')}Hidupkan notifikasi</button></div>`;
   return `<div class="mt-3 rounded-xl bg-green-50 px-3 py-3">
-      <div class="text-[13px] text-green-800 flex items-center gap-1.5">${icon('check', 'w-4 h-4', 2.5)}Notifikasi hidup di telefon ini. Tiada notifikasi 10 malam – 7 pagi.</div>
+      <div class="text-[13px] text-green-800 flex items-center gap-1.5">${icon('check', 'w-4 h-4', 2.5)}Notifikasi hidup di telefon ini.</div>
       <div class="grid grid-cols-2 gap-2 mt-2">
         <button data-act="pushTest" class="tap btn btn-secondary py-2 text-[13px]">Hantar ujian</button>
         <button data-act="pushOff" class="tap btn btn-secondary py-2 text-[13px]">Matikan</button></div></div>
