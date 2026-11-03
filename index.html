@@ -156,7 +156,6 @@ const DEFAULTS = {
   dismissed: { date: '', ids: [] },
   days: {},          // { 'YYYY-MM-DD': { meals: [...], water: ml } }
   weights: [],       // [{ date, kg }]
-  rescues: [],       // [{ t, symptoms, kcal, water }]
   customFoods: []
 };
 
@@ -276,6 +275,7 @@ function load() {
         if (!op.milestones?.length) op.milestones = [ { name: 'Fasa 1', kg: 87 }, { name: 'Fasa 2', kg: 77 }, { name: 'Berat ideal', kg: 65 } ];
         op.targetWeight = op.targetWeight || op.milestones[op.milestones.length - 1].kg;
       }
+      delete out.rescues;   // "Rasa tak selesa" no longer keeps a history
       return out;
     }
   } catch (e) { console.warn('load failed', e); }
@@ -875,7 +875,8 @@ function viewGuide() {
 
   ${eatOutCard()}
 
-  ${rescueHistory()}
+  ${sourcesCard()}
+
 
   <button data-act="tab" data-tab="profile" class="tap w-full bg-white rounded-2xl shadow-card p-4 flex items-center gap-3 text-left">
     <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 grid place-items-center">${icon('sliders')}</div>
@@ -886,6 +887,41 @@ function viewGuide() {
   <p class="text-[12px] text-slate-500 text-center px-6 pb-2">App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.</p>`;
 }
 const guideRow = (c, t, d) => `<div class="flex gap-3 items-start"><span class="w-3 h-3 rounded-full mt-1 shrink-0" style="background:${c}"></span><div><div class="font-semibold text-[14px]">${t}</div><div class="text-[13px] text-slate-500 leading-snug">${d}</div></div></div>`;
+// Only what the app actually uses. Estimates without a specific source are stated as such.
+const SOURCES = [
+  { use: 'Pinggan Suku-Suku Separuh (½ sayur & buah, ¼ protein, ¼ karbohidrat)',
+    title: 'Pinggan Sihat Malaysia — Kementerian Kesihatan Malaysia',
+    note: 'Rujukan: Album Makanan Malaysia Edisi Kedua (2024), KKM',
+    url: 'https://iku.moh.gov.my/images/teknikal-report/album-makanan-malaysia-edisi-kedua-2024-1.pdf' },
+  { use: 'Kategori BMI: normal 18.5–22.9, berlebihan 23–27.4, obes ≥ 27.5',
+    title: 'Clinical Practice Guidelines: Management of Obesity (Edisi Ke-2, 2023)',
+    note: 'KKM bersama MEMS, Persatuan Dietitian Malaysia (MDA) & lain-lain',
+    url: 'https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf' },
+  { use: 'Kiraan keperluan tenaga harian (BMR → TDEE) untuk sasaran kalori automatik',
+    title: 'Persamaan Mifflin-St Jeor',
+    note: 'Mifflin MD, St Jeor ST et al. Am J Clin Nutr 1990;51:241–247',
+    url: 'https://agris.fao.org/search/ar/records/65de26fe7c7033e84be9ee76' },
+  { use: 'Ambang gula darah rendah dalam nota kencing manis (bawah 4.0 mmol/L)',
+    title: 'Garis panduan hipoglisemia antarabangsa (ambang 3.9–4.0 mmol/L)',
+    note: 'Rujukan: kajian sistematik, BMC Endocrine Disorders (2026)',
+    url: 'https://ruor.uottawa.ca/bitstreams/25132578-f3be-4701-96d9-702abc7eb43b/download' }
+];
+function sourcesCard() {
+  return card(`
+    <div class="font-bold text-[16px]">Sumber rujukan</div>
+    <p class="text-[13px] text-slate-500 mt-0.5">Panduan dan kiraan dalam app ini merujuk kepada sumber berikut.</p>
+    <div class="divide-y divide-slate-100 mt-2">
+      ${SOURCES.map(x => `
+        <div class="py-3">
+          <div class="text-[12px] font-semibold text-slate-500">${x.use}</div>
+          <a href="${x.url}" target="_blank" rel="noopener" class="mt-0.5 inline-flex items-start gap-1 text-[14px] font-semibold text-brand-700 leading-snug">${x.title}<span class="mt-0.5">${icon('chevR', 'w-4 h-4')}</span></a>
+          <div class="text-[12px] text-slate-500">${x.note}</div>
+        </div>`).join('')}
+    </div>
+    <div class="mt-2 bg-slate-50 rounded-xl p-3 text-[12px] text-slate-600 leading-relaxed">
+      <b>Anggaran umum (tiada sumber khusus):</b> nilai kalori makanan & menu, sasaran air (~30 ml setiap kg), dan kadar turun berat (~7,700 kcal ≈ 1 kg). Saiz hidangan sebenar berbeza-beza.
+    </div>`);
+}
 // "Makan di luar dengan bijak": kcal saved is computed from the food presets so it always matches the log
 const EAT_OUT_RULES = [
   'Pilih bakar, kukus atau sup berbanding goreng',
@@ -932,17 +968,6 @@ function eatOutCard() {
 }
 const field = (id, label, val, type = 'number') => `<div><label class="block text-[12px] font-semibold text-slate-500">${label}</label><input id="${id}" type="${type}" ${type === 'number' ? 'inputmode="decimal" step="any"' : ''} value="${esc(val ?? '')}" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-500"></div>`;
 
-function rescueHistory() {
-  if (!S.rescues.length) return '';
-  const r = [...S.rescues].reverse().slice(0, 6);
-  return card(`
-    <div class="font-bold text-[16px] mb-1">Rekod rasa tak selesa</div>
-    <p class="text-[12px] text-slate-500 mb-2">Tengok corak — selalunya berlaku bila makan terlalu sikit atau kurang air.</p>
-    <div class="divide-y divide-slate-100">
-      ${r.map(x => { const d = new Date(x.t); return `<div class="py-2 text-[13px]"><div class="flex justify-between"><span class="font-semibold">${x.symptoms.map(s => SYMPTOMS[s]?.label || s).join(', ')}</span><span class="text-slate-500">${d.getDate()} ${BULAN[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span></div>
-      <div class="text-[12px] text-slate-500">Masa itu: ${fmt(x.kcal)} kcal · air ${fmt(x.water)} ml</div></div>`; }).join('')}
-    </div>`);
-}
 
 /* ============================================================
    RESCUE ASSISTANT
@@ -1267,7 +1292,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1786,11 +1811,7 @@ document.addEventListener('click', (e) => {
     case 'delWeight': if (confirm('Padam catatan berat ini?')) { S.weights = S.weights.filter(w => w.date !== el.dataset.date); save(); render(); } break;
     case 'rescue': sheetRescue(); break;
     case 'sym': { const k = el.dataset.s; UI.sym.has(k) ? UI.sym.delete(k) : UI.sym.add(k); refreshSheet(); break; }
-    case 'rescueGo': {
-      const d = peekDay(todayKey());
-      S.rescues.push({ t: Date.now(), symptoms: [...UI.sym], kcal: kcalOf(d), water: d.water }); save();
-      UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
-    }
+    case 'rescueGo': UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
     case 'rescueOther': closeSheet(); UI.meal = 'snek'; UI.tab = 'food'; UI.q = ''; UI.cat = 'Semua'; render(); window.scrollTo({ top: 0 }); break;
     case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
     case 'closeSheet': closeSheet(); render(); break;
