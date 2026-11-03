@@ -1,27 +1,44 @@
 # DietPal – Coach Diet Anda
 
-PWA pembantu diet & turun berat badan dalam Bahasa Melayu, mobile-first, berjalan terus dalam browser telefon dan boleh dipasang ke home screen.
+PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, berjalan terus dalam browser telefon, boleh dipasang ke home screen dan berfungsi offline. Semua data disimpan dalam telefon pengguna — tiada akaun atau server.
+
+**Versi semasa:** 1.2.0
 
 ## Ciri utama
-- **Dashboard kalori** – ring progress untuk sasaran 1,500–1,700 kcal, log ikut waktu makan (Sarapan, Tengah hari, Makan malam, Snek).
-- **Preset makanan Malaysia** – 67 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, dll.) + makanan sendiri.
-- **Cadangan Menu Coach (Enjin A)** – 58 gabungan menu di rumah atau di luar (mamak, gerai, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dikira ikut baki kalori. Berfungsi offline.
-- **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot (elektrolit, snek ringan, rehat), semakan data hari ini, amaran bila perlu hubungi 999.
-- **Berat & milestone** – graf trend, BMI (had Asia), milestone 87 / 77 / 65 kg.
-- **Penjejak air** – sasaran 2.5–3 L.
-- **Panduan pinggan Suku-Suku Separuh** – ½ sayur, ¼ protein, ¼ karbo kompleks; prinsip 80/20.
-- **Setup kali pertama & Profil** – pengguna isi maklumat sendiri; sasaran kalori (Mifflin-St Jeor, had minimum 1,500/1,200 kcal), air (~30 ml/kg) dan milestone dikira automatik, dengan mod manual.
-- **Pilihan makanan & kesihatan** – tak makan daging/ayam/ikan/makanan laut, alahan kacang/telur/susu, tak gemar pedas; nota kencing manis, darah tinggi, gastrik untuk sesuaikan nasihat & cadangan menu.
-- **Tetapan** – tema cerah/gelap/ikut telefon, saiz teks, waktu makan biasa, peringatan dalam app (air, log makan, timbang mingguan), backup/restore JSON, export CSV.
+
+**Setup & profil**
+- **Setup kali pertama** – 6 langkah ringkas: nama, jantina/umur/tinggi, berat semasa & sasaran, kadar turun, tahap aktiviti, pilihan makanan & kesihatan.
+- **Sasaran automatik** – kalori dikira dengan formula Mifflin-St Jeor (BMR → TDEE → defisit ikut kadar 0.25/0.5/0.75 kg seminggu), air ~30 ml setiap kg, milestone setiap 10 kg hingga berat sasaran. Mod manual tersedia.
+- **Had keselamatan** – minimum 1,500 kcal (lelaki) / 1,200 kcal (perempuan) dalam semua mod; berat sasaran tidak bawah BMI 18.5; umur 18–90 tahun.
+- **Pilihan makanan & alahan** – tak makan daging lembu/kambing, ayam, ikan, makanan laut & belacan; alahan kacang, telur, susu; tak gemar pedas. Menu yang bercanggah tidak dicadangkan.
+- **Nota kesihatan (pilihan)** – kencing manis, darah tinggi, gastrik; menyesuaikan panduan "Rasa tak selesa" dan cadangan menu.
+
+**Harian**
+- **Dashboard kalori** – ring progress ikut sasaran pengguna, log ikut waktu makan (Sarapan, Tengah hari, Makan malam, Snek).
+- **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.), dikumpul ikut kategori, + makanan sendiri.
+- **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Berfungsi offline.
+- **Penjejak air** – tekan untuk tambah gelas/botol, sasaran ikut berat badan.
+- **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot: langkah bernombor, semakan data hari ini, log segera, dan amaran bila perlu hubungi 999.
+- **Peringatan dalam app** – minum air, log makan, timbang berat mingguan.
+
+**Kemajuan & panduan**
+- **Berat & milestone** – graf trend, BMI (had Asia), perubahan 7 hari, milestone yang boleh diedit.
+- **Panduan pinggan Suku-Suku Separuh** – ½ sayur, ¼ protein, ¼ karbo kompleks; prinsip 80/20; elak diet ekstrem.
+- **Makan di luar dengan bijak** – 3 cara mudah memesan dan tukaran kecil dengan anggaran kalori dijimat.
+
+**Tetapan**
+- Tema cerah / gelap / ikut telefon, saiz teks, waktu makan biasa, peringatan.
+- Backup / restore (JSON), export CSV (makanan, air, berat), padam semua data.
 
 ## Teknologi
 - HTML5 + Vanilla JS + Tailwind CSS (CDN) – tiada build step.
-- `localStorage` (kunci `dietpal.v1`) – semua data kekal dalam telefon pengguna.
+- Ikon garis SVG terbina dalam kod (tiada emoji, tiada pustaka ikon luaran).
+- `localStorage` (kunci `dietpal.v1`) – data v1.0 di bawah kunci lama dipindahkan secara automatik.
 - `manifest.json` + `sw.js` – boleh dipasang (Android/iOS) dan berfungsi offline selepas buka kali pertama.
 
 ## Struktur
 ```
-index.html      UI, data makanan & menu, enjin cadangan, logik app
+index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
 sw.js           Service worker (cache dietpal-v6)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
@@ -35,9 +52,16 @@ python3 -m http.server 8000
 Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
 
 ## Deploy
-Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root).
+Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
+
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v6` → `dietpal-v7`) supaya telefon yang dah pasang app mendapat versi baru.
+
+## Had semasa
+- Nilai kalori dan TDEE adalah anggaran purata.
+- Data tidak diselaraskan antara peranti — guna Backup secara berkala.
+- Peringatan hanya dipaparkan bila app dibuka (push notification belum disokong).
 
 ## Seterusnya: Coach AI (Enjin B)
-Slot sudah ada dalam kod: isi `AI_ENDPOINT` (cth: `/api/coach`) selepas fungsi Vercel `api/coach.js` dan API key Anthropic disediakan (simpan key sebagai environment variable, bukan dalam kod).
+Slot sudah ada dalam kod: isi `AI_ENDPOINT` (cth: `/api/coach`) selepas fungsi Vercel `api/coach.js` dan API key Anthropic disediakan (simpan key sebagai environment variable, bukan dalam kod). Data yang dihantar disediakan oleh `buildAIContext()` — tanpa nama atau sejarah berat.
 
-> Nilai kalori adalah anggaran purata. App ini panduan gaya hidup, bukan nasihat perubatan.
+> Nilai kalori adalah anggaran purata. App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.
