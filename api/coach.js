@@ -22,20 +22,25 @@ UTAMAKAN SOALAN PENGGUNA
 - Faham betul-betul apa yang ditanya, dan jawab soalan itu. Jika soalan menyebut waktu makan (cth: "tengah hari", "esok pagi") atau tempat (cth: "mamak", "kenduri", "rumah"), IKUT soalan — walaupun berbeza dengan tetapan app.
 - Isi "meal" dengan waktu makan yang menu anda maksudkan (sarapan / tengahari / malam / snek), atau "tiada" jika tiada menu.
 - "reply": jawapan yang berguna dan spesifik dalam 1–3 ayat. Boleh sebut cadangan utama dan sebabnya. Elak ayat umum yang kosong.
+- Jangan ulang nota kesihatan atau pantang pengguna dalam setiap jawapan — patuhi secara senyap. Sebut hanya jika ia memang berkait dengan soalan.
+- Jangan sebut "di luar" atau "di rumah" melainkan soalan atau tetapan app menyatakannya. Tetapan "di rumah" → cadang masakan rumah, bukan kedai.
+- Soalan tentang data hari ini (cth: "berapa kalori saya makan hari ini?") → guna angka dari konteks app sahaja, jangan kira semula.
 
 CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
 - Beri 2–3 hidangan SEBENAR yang memang biasa dipesan atau dimasak di tempat itu di Malaysia (cth di mamak: "Nasi kandar ikan bakar", "Roti telur + dal", "Mee hoon sup"). Nama menu = nama hidangan yang orang kenal.
-- "items" ialah komponen hidangan itu dengan sukatan rumah (senduk, ketul, keping, mangkuk, cawan) dan anggaran kcal yang munasabah. Jangan cantum makanan yang tak masuk akal dalam satu menu.
+- Untuk sarapan, tengah hari dan malam, setiap menu ialah HIDANGAN LENGKAP yang mengenyangkan: ada protein, karbohidrat (nasi, mee, roti, ubi, oat) dan sayur. Jangan jadikan sayur sahaja atau sup sahaja sebagai satu menu.
+- "items" ialah komponen hidangan itu dengan sukatan rumah (senduk, ketul, keping, mangkuk, cawan) dan anggaran kcal yang munasabah. Jangan cantum makanan yang tak masuk akal dalam satu menu. Jika satu item sudah mewakili hidangan penuh (cth "Mee hoon sup 1 mangkuk"), jangan tambah item lain yang sudah ada di dalamnya.
 - Ikut Pinggan Sihat Malaysia (KKM): ½ sayur & buah, ¼ protein, ¼ karbohidrat. Utamakan bakar, kukus, rebus atau sup. Minuman: air kosong, teh O / kopi O kosong, atau kurang manis.
 - Sasarkan jumlah kcal setiap menu dalam julat waktu makan yang diberi.
 - Jika pengguna sebut bahan yang ada (cth: "telur, kobis & ayam"), gunakan bahan-bahan itu.
-- Untuk soalan fakta (kalori, boleh/tidak, cara), jawab terus dalam "reply"; "menus" kosong kecuali pengguna minta cadangan.
+- Untuk soalan fakta (kalori, waktu makan, boleh/tidak, cara), jawab terus dalam "reply" dan biarkan "menus" KOSONG — jangan tambah menu kecuali pengguna minta cadangan makan.
 - "tip": satu ayat praktikal untuk hidangan itu.
 
 KESELAMATAN (WAJIB)
 - Patuhi SEMUA pantang & alahan pengguna, termasuk dalam kuah, sambal dan minuman.
 - Jangan cadang skip makan, puasa untuk kurus, atau makan bawah had kalori minimum harian. Jangan suruh buang nasi atau garam sepenuhnya — kurangkan sikit-sikit.
 - Nota kesihatan: kencing manis → elak manis; darah tinggi → kurangkan garam & kicap; gastrik → elak pedas, kopi & perut kosong lama.
+- "safety_note" HANYA untuk risiko keselamatan sebenar (simptom, alahan dalam soalan, bahaya). Untuk soalan makanan biasa, biarkan kosong — jangan isi dengan peringatan umum.
 - Tiada diagnosis, ubat atau dos. Simptom serius → nasihat jumpa doktor / hubungi 999 dalam "safety_note", "menus" kosong.
 - Soalan bukan tentang makanan atau pemakanan → jawab dengan sopan bahawa anda hanya bantu tentang makanan; "menus" kosong.
 
@@ -140,8 +145,12 @@ function buildUserMessage(body) {
   if (t.length) lines.push(`Julat kcal setiap menu ikut waktu makan: ${t.join('; ')} kcal.`);
   const remaining = num(c.remainingKcal, -3000, 5000), floor = num(c.minDailyKcal, 1200, 1500) || 1500;
   if (remaining !== null) lines.push(`Baki kalori hari ini: ${remaining} kcal. Had minimum harian: ${floor} kcal.`);
-  const eaten = Array.isArray(c.eatenToday) ? c.eatenToday.slice(0, 20).map(x => `${str(x.name, 50)} (${num(x.kcal, 0, 3000) ?? '?'} kcal)`) : [];
-  lines.push(`Sudah dimakan hari ini: ${eaten.length ? eaten.join(', ') : 'belum ada'}.`);
+  const list = Array.isArray(c.eatenToday) ? c.eatenToday.slice(0, 30) : [];
+  const eaten = list.map(x => `${str(x.name, 50)} (${num(x.kcal, 0, 3000) ?? '?'} kcal)`);
+  const total = list.reduce((a, x) => a + (num(x.kcal, 0, 3000) || 0), 0);
+  const range = Array.isArray(c.dailyRange) ? c.dailyRange.map(v => num(v, 800, 5000)) : [];
+  if (range[0] && range[1]) lines.push(`Sasaran kalori harian: ${range[0]}–${range[1]} kcal.`);
+  lines.push(`Sudah dimakan hari ini: ${eaten.length ? `${eaten.join(', ')}. JUMLAH: ${total} kcal` : 'belum ada'}.`);
   const avoid = [...pick(c.avoid, AVOID), ...pick(c.allergies, ALLERGY), ...(c.noSpicy ? ['makanan pedas'] : [])];
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
@@ -202,11 +211,14 @@ function clean(out, catalog = []) {
 
 // Light-touch portion fit: only when a menu is clearly outside the range, nudge portions
 // (protein → carbs while ≤ 40% of the menu → fruit → veg / one-dish meals; too high → carbs first).
-function fitPortions(menu, lo, hi, catalog) {
+function fitPortions(menu, lo, hi, catalog, meal) {
   const items = menu.items.map(i => ({ ...i }));
+  const rice = catalog.find(f => /^nasi putih$/i.test(f.name) && /senduk/.test(f.unit));
+  if (meal !== 'snek' && rice && !items.some(i => i.plate === 'karbo') && menuTotal(items) + rice.kcal <= hi + 40)
+    items.push({ name: rice.name, unit: rice.unit, qty: 1, kcal: rice.kcal, plate: 'karbo' });
   const fruit = catalog.find(f => /^buah/i.test(f.name));
-  let total = menuTotal(items), adjusted = false;
-  for (let step = 0; step < 6 && (total < lo || total > hi); step++) {
+  let total = menuTotal(items), adjusted = items.length !== menu.items.length;
+  for (let step = 0; step < 8 && (total < lo || total > hi); step++) {
     let changed = false;
     if (total < lo) {
       const fits = i => i && total + i.kcal * 0.5 <= hi + 40;
@@ -288,7 +300,7 @@ module.exports = async function handler(req, res) {
     if (meal && targets[meal] && out.menus.length) {
       const [lo, hi] = targetRange(targets[meal], meal);
       out.menus = out.menus.map(m => {
-        const f = (m.kcal < lo * 0.95 || m.kcal > hi * 1.05) ? fitPortions(m, lo, hi, catalog) : m;
+        const f = (m.kcal < lo * 0.95 || m.kcal > hi * 1.05) ? fitPortions(m, lo, hi, catalog, meal) : m;
         return { ...f, offTarget: f.kcal < lo ? 'low' : f.kcal > hi ? 'high' : '' };
       });
       out.range = [lo, hi];
