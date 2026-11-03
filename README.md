@@ -17,7 +17,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Dashboard kalori** – ring progress ikut sasaran pengguna, log ikut waktu makan (Sarapan, Tengah hari, Makan malam, Snek).
 - **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
 - **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
-- **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Berfungsi offline.
+- **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
 - **Penjejak air** – tekan untuk tambah gelas/botol, sasaran ikut berat badan.
 - **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot: langkah bernombor, semakan data hari ini, log segera, dan amaran bila perlu hubungi 999.
 - **Peringatan dalam app** – minum air, log makan, timbang berat mingguan.
@@ -42,7 +42,8 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v10)
+sw.js           Service worker (cache dietpal-v11)
+vercel.json     Tetapan fungsi Vercel (maxDuration 60 s)
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
@@ -57,7 +58,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v10` → `dietpal-v11`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v11` → `dietpal-v12`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
@@ -75,7 +76,9 @@ Anggaran umum tanpa sumber khusus: nilai kalori makanan & menu, sasaran air (~30
 - Peringatan hanya dipaparkan bila app dibuka (push notification belum disokong).
 
 ## Coach AI (Enjin B)
-Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna pilih waktu makan (Sarapan, Tengah hari, Malam, Snek) untuk cadangan menu ikut sasaran kalori waktu itu, atau **Umum** untuk soalan pemakanan biasa (cth: "Nasi lemak berapa kalori?"); menu dari mod Umum boleh dilog ke mana-mana waktu makan. Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat Completions dengan *Structured Outputs*.
+Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna boleh pilih waktu makan (Sarapan, Tengah hari, Malam, Snek) atau **Umum**, tetapi **soalan pengguna diutamakan**: jika soalan menyebut waktu makan atau tempat (cth: "mamak tengah hari"), AI ikut soalan dan memulangkan waktu makan yang difahami. Julat kalori dan butang *Log ke …* ikut waktu makan itu. Kotak soalan dikosongkan setiap kali Coach AI dibuka.
+
+Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat Completions dengan *Structured Outputs* (`reply`, `meal`, `menus`, `safety_note`).
 
 **Environment variables di Vercel**
 | Nama | Wajib | Keterangan |
@@ -85,13 +88,20 @@ Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna
 | `COACH_RATE_LIMIT` | Tidak | Had permintaan setiap IP dalam 10 minit (lalai: 12). |
 | `ALLOWED_ORIGINS` | Tidak | Domain tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). |
 
+**Cara AI menjawab**
+- Prompt berasaskan prinsip, bukan senarai peraturan panjang: jawab soalan yang ditanya, jawapan spesifik 1–3 ayat.
+- Menu ialah hidangan sebenar yang lazim di tempat itu (cth: "Nasi kandar ikan bakar"), dengan komponen dalam sukatan rumah. Untuk sarapan, tengah hari dan malam, setiap menu ialah hidangan lengkap (protein, karbohidrat, sayur) ikut Pinggan Sihat Malaysia.
+- Soalan fakta (kalori, waktu makan, boleh/tidak) dijawab terus tanpa menu.
+- Soalan tentang hari ini guna jumlah kalori yang dikira oleh app dan sasaran harian pengguna.
+- Nota kesihatan dan pantang dipatuhi secara senyap; kotak amaran merah hanya untuk risiko sebenar.
+- Preset makanan app dihantar sebagai rujukan kcal sahaja; kcal item diselaraskan dengan preset bila nama & sukatan sepadan.
+
 **Perlindungan**
-- Prompt sistem: Pinggan Sihat Malaysia, had kalori minimum, tiada skip makan atau potong karbo/garam terus, patuhi pantang & alahan, nasihat kesihatan asas, rujuk doktor untuk simptom serius.
-- Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
-- AI dirujukkan kepada preset makanan app & hidangan lazim tempat dipilih; kcal item diselaraskan dengan preset bila sepadan.
-- Julat kcal setiap menu (±20%, snek ±40%): server melaraskan sukatan secara automatik (karbo → protein → tambah buah; kurangkan karbo jika lebih) dan kcal dikira dari preset. Menu yang masih terkeluar ditanda "bawah/atas sasaran".
+- Julat kcal setiap menu (±20%, snek ±40%): jika menu jelas terkeluar, server melaraskan sukatan (tambah nasi jika tiada karbo, protein → karbo maks 40% → buah → sayur; kurangkan karbo jika lebih). Menu yang masih terkeluar ditanda "bawah/atas sasaran".
+- Had kalori minimum harian, tiada skip makan atau potong nasi/garam terus, patuhi pantang & alahan, tiada diagnosis/ubat/dos.
 - Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
-- Had kadar setiap IP, semakan origin, had panjang jawapan, tamat masa 25 saat.
+- Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
+- Had kadar setiap IP, semakan origin, had saiz permintaan, tamat masa 30 saat.
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
 - Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, nota kesihatan. **Nama dan berat tidak dihantar.**
 - Tanpa internet atau jika AI gagal, app terus guna cadangan menu Enjin A.
