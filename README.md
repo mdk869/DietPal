@@ -1,13 +1,14 @@
 # DietPal – Coach Diet Anda
 
-PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, berjalan terus dalam browser telefon, boleh dipasang ke home screen dan berfungsi offline. Semua data disimpan dalam telefon pengguna — tiada akaun atau server.
+PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.4.0
+**Versi semasa:** 1.5.0
 
 ## Ciri utama
 
 **Setup & profil**
-- **Setup kali pertama** – 6 langkah ringkas: nama, jantina/umur/tinggi, berat semasa & sasaran, kadar turun, tahap aktiviti, pilihan makanan & kesihatan.
+- **Pasang dulu** – jika dibuka dalam browser, app hanya papar skrin pasang dengan arahan ikut peranti: butang *Pasang DietPal* (Android / Chrome / Edge), langkah *Share → Add to Home Screen* (iPhone), atau minta buka dalam Chrome/Safari (browser dalam WhatsApp, Instagram, Facebook dll.). Jika ada data lama dalam browser, butang *Simpan data saya* muncul — di iPhone, app yang dipasang bermula kosong, jadi pulihkan backup semasa setup.
+- **Setup kali pertama** – 7 langkah ringkas: nama (atau *Pulihkan data* dari backup), jantina/umur/tinggi, berat semasa & sasaran, kadar turun, tahap aktiviti, pilihan makanan & kesihatan, sasaran, dan **Hidupkan peringatan**.
 - **Sasaran automatik** – kalori dikira dengan formula Mifflin-St Jeor (BMR → TDEE → defisit ikut kadar 0.25/0.5/0.75 kg seminggu), air ~30 ml setiap kg, milestone setiap 10 kg hingga berat sasaran. Mod manual tersedia.
 - **Had keselamatan** – minimum 1,500 kcal (lelaki) / 1,200 kcal (perempuan) dalam semua mod; berat sasaran tidak bawah BMI 18.5; umur 18–90 tahun.
 - **Pilihan makanan & alahan** – tak makan daging lembu/kambing, ayam, ikan, makanan laut & belacan; alahan kacang, telur, susu; tak gemar pedas. Menu yang bercanggah tidak dicadangkan.
@@ -20,7 +21,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
 - **Penjejak air** – tekan untuk tambah gelas/botol, sasaran ikut berat badan.
 - **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot: langkah bernombor, semakan data hari ini, log segera, dan amaran bila perlu hubungi 999.
-- **Peringatan dalam app** – minum air, log makan, timbang berat mingguan.
+- **Notifikasi peringatan** – sampai walaupun app ditutup: log makan (lepas waktu makan biasa, jika belum log), minum air (setiap 2 jam, 9 pagi–7 malam, jika kurang), timbang berat mingguan, dan ringkasan kalori malam (~9.30 malam). Waktu senyap 10 malam–7 pagi, jarak minimum 45 minit. **Wajib:** setup tidak selesai dan app tidak boleh digunakan selagi notifikasi tidak dibenarkan. Jika pengguna tekan *Block / Don't Allow*, app papar langkah untuk hidupkan semula di tetapan telefon (iPhone, Android, komputer) dan butang *Saya dah hidupkan — teruskan*. Jika kebenaran ditarik balik kemudian, app disekat semula sehingga dibenarkan. Peranti yang tidak menyokong notifikasi (cth. iOS bawah 16.4) diminta kemas kini. Peringatan dalam app masih dipaparkan bila app dibuka.
 
 **Kemajuan & panduan**
 - **Berat & milestone** – graf trend, BMI (had Asia), perubahan 7 hari, milestone yang boleh diedit.
@@ -42,8 +43,9 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v11)
+sw.js           Service worker (cache dietpal-v12, terima & buka notifikasi)
 vercel.json     Tetapan fungsi Vercel (maxDuration 60 s)
+supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
@@ -53,12 +55,12 @@ icons/          Ikon 192, 512, maskable, apple-touch-icon
 python3 -m http.server 8000
 # buka http://localhost:8000
 ```
-Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
+Service worker hanya berfungsi melalui `http://localhost` atau HTTPS. App disekat dalam browser biasa — tambah `?dev=1` untuk buka di localhost atau preview Vercel (`…-git-…vercel.app`). Pautan production tidak menerima `?dev=1`.
 
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v11` → `dietpal-v12`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v12` → `dietpal-v13`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
@@ -73,7 +75,7 @@ Anggaran umum tanpa sumber khusus: nilai kalori makanan & menu, sasaran air (~30
 ## Had semasa
 - Nilai kalori dan TDEE adalah anggaran purata.
 - Data tidak diselaraskan antara peranti — guna Backup secara berkala.
-- Peringatan hanya dipaparkan bila app dibuka (push notification belum disokong).
+- Notifikasi wajib, jadi DietPal perlukan iOS 16.4+ (app dipasang) atau browser Android/komputer yang menyokong Web Push.
 
 ## Coach AI (Enjin B)
 Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna boleh pilih waktu makan (Sarapan, Tengah hari, Malam, Snek) atau **Umum**, tetapi **soalan pengguna diutamakan**: jika soalan menyebut waktu makan atau tempat (cth: "mamak tengah hari"), AI ikut soalan dan memulangkan waktu makan yang difahami. Julat kalori dan butang *Log ke …* ikut waktu makan itu. Kotak soalan dikosongkan setiap kali Coach AI dibuka.
@@ -109,3 +111,16 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 Disyorkan: tetapkan had perbelanjaan bulanan di dashboard OpenAI.
 
 > Nilai kalori adalah anggaran purata. App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.
+
+## Notifikasi (Supabase)
+Notifikasi dihantar dengan *Web Push* dari projek Supabase **dietpal** (`jlbdtmzccrebjmlrjvgh`, Singapura). Tiada tetapan Vercel diperlukan.
+
+| Bahagian | Fungsi |
+| --- | --- |
+| Edge Function `push` | `subscribe`, `status`, `unsubscribe`, `test` dari app; `run` dari penjadual. Kunci VAPID dijana sekali di server dan disimpan dalam `push_config`. |
+| Jadual `push_subs` | Satu baris setiap telefon: alamat push, zon waktu, tetapan peringatan, status ringkas hari ini, peringatan yang sudah dihantar. RLS hidup tanpa policy — hanya fungsi server boleh baca/tulis. |
+| `pg_cron` `dietpal-push` | Setiap 15 minit memanggil `push` (`run`) dengan rahsia `cron_secret`. |
+
+**Data yang dihantar ke server:** alamat push, zon waktu, waktu makan & pilihan peringatan, dan status hari ini (waktu makan yang dah dilog — ya/tidak, jumlah air, jumlah kalori, tarikh timbang terakhir). **Nama, berat dan senarai makanan tidak dihantar.** Langganan yang tamat (404/410) dipadam secara automatik.
+
+Skema penuh: [`supabase/setup.sql`](supabase/setup.sql). Kod fungsi: [`supabase/functions/push/index.ts`](supabase/functions/push/index.ts).
