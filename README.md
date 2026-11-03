@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, berjalan terus dalam browser telefon, boleh dipasang ke home screen dan berfungsi offline. Semua data disimpan dalam telefon pengguna — tiada akaun atau server.
 
-**Versi semasa:** 1.3.0
+**Versi semasa:** 1.4.0
 
 ## Ciri utama
 
@@ -42,7 +42,8 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v9)
+sw.js           Service worker (cache dietpal-v10)
+api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
 
@@ -56,7 +57,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS.
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v9` → `dietpal-v10`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v10` → `dietpal-v11`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
@@ -73,7 +74,28 @@ Anggaran umum tanpa sumber khusus: nilai kalori makanan & menu, sasaran air (~30
 - Data tidak diselaraskan antara peranti — guna Backup secara berkala.
 - Peringatan hanya dipaparkan bila app dibuka (push notification belum disokong).
 
-## Seterusnya: Coach AI (Enjin B)
-Slot sudah ada dalam kod: isi `AI_ENDPOINT` (cth: `/api/coach`) selepas fungsi Vercel `api/coach.js` dan API key Anthropic disediakan (simpan key sebagai environment variable, bukan dalam kod). Data yang dihantar disediakan oleh `buildAIContext()` — tanpa nama atau sejarah berat.
+## Coach AI (Enjin B)
+Butang **Tanya Coach AI** dalam kad cadangan menu membuka soalan bebas. Pengguna pilih waktu makan (Sarapan, Tengah hari, Malam, Snek) untuk cadangan menu ikut sasaran kalori waktu itu, atau **Umum** untuk soalan pemakanan biasa (cth: "Nasi lemak berapa kalori?"); menu dari mod Umum boleh dilog ke mana-mana waktu makan. Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat Completions dengan *Structured Outputs*.
+
+**Environment variables di Vercel**
+| Nama | Wajib | Keterangan |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
+| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
+| `COACH_RATE_LIMIT` | Tidak | Had permintaan setiap IP dalam 10 minit (lalai: 12). |
+| `ALLOWED_ORIGINS` | Tidak | Domain tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). |
+
+**Perlindungan**
+- Prompt sistem: Pinggan Sihat Malaysia, had kalori minimum, tiada skip makan atau potong karbo/garam terus, patuhi pantang & alahan, nasihat kesihatan asas, rujuk doktor untuk simptom serius.
+- Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
+- AI dirujukkan kepada preset makanan app & hidangan lazim tempat dipilih; kcal item diselaraskan dengan preset bila sepadan.
+- Julat kcal setiap menu (±20%, snek ±40%): server melaraskan sukatan secara automatik (karbo → protein → tambah buah; kurangkan karbo jika lebih) dan kcal dikira dari preset. Menu yang masih terkeluar ditanda "bawah/atas sasaran".
+- Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
+- Had kadar setiap IP, semakan origin, had panjang jawapan, tamat masa 25 saat.
+- App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
+- Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, nota kesihatan. **Nama dan berat tidak dihantar.**
+- Tanpa internet atau jika AI gagal, app terus guna cadangan menu Enjin A.
+
+Disyorkan: tetapkan had perbelanjaan bulanan di dashboard OpenAI.
 
 > Nilai kalori adalah anggaran purata. App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.
