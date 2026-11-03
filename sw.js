@@ -1,5 +1,5 @@
 // DietPal – service worker
-const CACHE = 'dietpal-v11';
+const CACHE = 'dietpal-v12';
 const SHELL = [
   './',
   './index.html',
@@ -26,6 +26,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.hostname.endsWith('.supabase.co')) return;   // reminders API: never cache
 
   // Page navigations: network first, fall back to cached app shell (offline)
   if (req.mode === 'navigate') {
@@ -52,4 +53,29 @@ self.addEventListener('fetch', (e) => {
       return hit || net;
     }))
   );
+});
+
+
+// ---------- Push reminders ----------
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'DietPal', {
+    body: d.body || '',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: d.tag || 'dietpal',
+    lang: 'ms-MY',
+    data: { url: new URL(d.url || './', self.registration.scope).href }
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || self.registration.scope;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    const open = list.find((c) => c.url.startsWith(self.registration.scope));
+    if (open) { open.postMessage({ type: 'open', url }); return open.focus(); }
+    return self.clients.openWindow(url);
+  }));
 });
