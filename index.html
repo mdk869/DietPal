@@ -1260,7 +1260,8 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
   const t = mealTarget(general ? 'snek' : meal);
   return {
     meal, location: general ? null : UI.sug.loc, venue: !general && UI.sug.loc === 'luar' ? UI.sug.venue : null,
-    targetKcal: general ? null : t.ideal, remainingKcal: (p.kcalMax || 0) - kcalOf(d), dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
+    targetKcal: general ? null : t.ideal, remainingKcal: (p.kcalMax || 0) - kcalOf(d),
+    nowMeal: general ? guessMeal() : undefined, nowTargetKcal: general ? mealTarget(guessMeal()).ideal : undefined, dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
     eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal })),
     plateToday: plateCounts(d),
     avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy, health: p.health || [],

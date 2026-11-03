@@ -30,10 +30,14 @@ MENU
 4. Beri 2–3 pilihan menu yang berbeza HANYA jika pengguna minta cadangan makanan atau soalan itu memerlukannya. Untuk soalan fakta/kalori/boleh-tidak, "menus" kosong kecuali pengguna minta cadangan.
 5. Menu mesti realistik untuk lokasi yang diberi. Utamakan hidangan dalam "Hidangan lazim di tempat ini" dan item dalam "Rujukan makanan". Jangan cadang hidangan yang jarang dijual di tempat itu.
 6. Untuk item yang ada dalam "Rujukan makanan", guna NAMA, SUKATAN dan KCAL yang sama tepat. Item lain: anggarkan dengan munasabah.
+6b. Utamakan pilihan lebih sihat: bakar, kukus, rebus, sup atau tumis sikit minyak, berbanding goreng & bersantan. Paling banyak SATU menu boleh jadi hidangan kegemaran yang kurang sihat (cth: nasi lemak, mee goreng), dengan portion kecil.
+6c. Minuman: air kosong, teh O / kopi O kosong, atau kurang manis sahaja. Jangan cadang teh tarik, Milo, sirap atau minuman manis kecuali pengguna minta.
+6d. Nasi: guna sukatan "1 senduk" (1 senduk ≈ ¼ pinggan), bukan "1 pinggan penuh".
 7. Setiap item = satu komponen makanan atau minuman (cth: "Nasi putih", "Ikan bakar / kukus", "Teh O kosong"). Nama dalam huruf biasa (cth: "Sayur campur goreng", bukan "Sayur Campur Goreng").
 8. WAJIB: jumlah kcal setiap menu berada dalam "Julat kcal setiap menu" yang diberi. Kira jumlah sebelum menjawab. Jika kurang, tambah sukatan (cth: "1½ senduk" nasi, "2 biji" telur) atau tambah item seperti buah, sup atau minuman susu rendah lemak. Ikut Pinggan Sihat Malaysia (KKM): ½ sayur & buah, ¼ protein, ¼ karbohidrat — setiap menu ada sayur atau buah.
 9. Jika pengguna sebut bahan atau hidangan tertentu (cth: "ada telur, kobis & ayam"), SETIAP bahan itu mesti muncul sebagai item dengan namanya sendiri dalam menu (cth: "Kobis goreng", "Telur dadar", "Ayam grill"). Bahan pengguna lebih penting daripada "Rujukan makanan".
 10. "tip" mesti selari dengan item dalam menu yang sama (jangan sebut cara masak atau bahan lain).
+10b. Jika waktu makan ialah "soalan umum": jawab soalan itu terus. Beri "menus" hanya jika pengguna minta cadangan makanan — dan jika ya, ikut julat kcal untuk waktu makan semasa yang diberi.
 
 KESELAMATAN (WAJIB)
 11. Jangan cadang skip makan, puasa untuk turun berat, atau makan bawah had kalori minimum harian.
@@ -50,8 +54,8 @@ const SCHEMA = {
   additionalProperties: false,
   required: ['reply', 'menus', 'safety_note'],
   properties: {
-    reply: { type: 'string' },
-    safety_note: { type: 'string' },
+    reply: { type: 'string', description: 'Jawapan terus kepada soalan, maksimum 2 ayat. JANGAN sebut nama hidangan, item atau kcal menu.' },
+    safety_note: { type: 'string', description: 'Amaran keselamatan jika perlu; jika tiada, string kosong.' },
     menus: {
       type: 'array',
       items: {
@@ -59,8 +63,8 @@ const SCHEMA = {
         additionalProperties: false,
         required: ['name', 'items', 'tip'],
         properties: {
-          name: { type: 'string' },
-          tip: { type: 'string' },
+          name: { type: 'string', description: 'Nama menu pendek, huruf biasa (cth: "Ikan bakar dengan nasi").' },
+          tip: { type: 'string', description: 'Satu ayat cara memesan/memasak yang selari dengan item menu ini.' },
           items: {
             type: 'array',
             items: {
@@ -121,6 +125,9 @@ function buildUserMessage(body) {
   const floor = num(c.minDailyKcal, 1200, 1500) || 1500;
   if (target) { const [lo, hi] = targetRange(target, c.meal);
     lines.push(`Sasaran kalori untuk waktu makan ini: ~${target} kcal. Julat kcal setiap menu: ${lo}–${hi} kcal.`); }
+  const nowMeal = MEALS[c.nowMeal], nowTarget = num(c.nowTargetKcal, 60, 1500);
+  if (general && nowMeal && nowTarget) { const [lo, hi] = targetRange(nowTarget, c.nowMeal);
+    lines.push(`Waktu makan semasa: ${nowMeal}. Jika pengguna minta cadangan menu, julat kcal setiap menu: ${lo}–${hi} kcal.`); }
   if (remaining !== null) lines.push(`Baki kalori hari ini: ${remaining} kcal.`);
   lines.push(`Had kalori minimum harian: ${floor} kcal (jangan cadang kurang dari ini secara keseluruhan).`);
   const eaten = Array.isArray(c.eatenToday) ? c.eatenToday.slice(0, 20).map(x => `${str(x.name, 50)} (${num(x.kcal, 0, 3000) ?? '?'} kcal)`) : [];
@@ -168,14 +175,17 @@ function fitPortions(menu, lo, hi, catalog) {
     let changed = false;
     if (total < lo) {
       const fits = i => i && total + i.kcal * 0.5 <= hi + 40;
-      const it = [items.find(i => i.plate === 'karbo' && i.qty < 2), items.find(i => i.plate === 'protein' && i.qty < 2)].find(fits);
+      const carbKcal = items.filter(i => i.plate === 'karbo').reduce((a, i) => a + i.kcal * i.qty, 0);
+      const carb = items.find(i => i.plate === 'karbo' && i.qty < 2);
+      const carbOk = carb && (carbKcal + carb.kcal * 0.5) <= 0.4 * hi;   // keep ~¼ plate carbs
       const hasFruit = items.some(i => FRUIT.test(i.name));
+      const it = [items.find(i => i.plate === 'protein' && i.qty < 1.5), carbOk ? carb : null].find(fits);
       if (it) { it.qty += 0.5; changed = true; }
       else if (fruit && !hasFruit && total + fruit.kcal <= hi + 40) {
         items.push({ name: fruit.name, unit: fruit.unit, qty: 1, kcal: fruit.kcal, plate: 'serat' }); changed = true;
       } else {
-        // a one-dish meal (e.g. mee sup): a bigger portion, then more vegetables (not fruit)
-        const more = [items.find(i => i.plate === 'lain' && i.qty < 1.5), items.find(i => i.plate === 'serat' && !FRUIT.test(i.name) && i.qty < 2)].find(fits);
+        const more = [items.find(i => i.plate === 'serat' && !FRUIT.test(i.name) && i.qty < 2),
+          items.find(i => i.plate === 'lain' && i.qty < 1.5), items.find(i => i.plate === 'protein' && i.qty < 2)].find(fits);
         const any = more || items.find(i => i.qty < 2 && fits(i));   // last resort, e.g. a fruit-only snack
         if (any) { any.qty += 0.5; changed = true; }
       }
@@ -196,19 +206,40 @@ function cleanCatalog(list) {
 }
 // "Sayur Campur Goreng" → "Sayur campur goreng" (keeps short all-caps words like "KFC")
 function sentenceCase(t) {
-  const w = t.split(' ');
-  if (w.length > 1 && w.every(x => /^[A-Z][a-z]/.test(x) || !/[a-z]/i.test(x))) return t.charAt(0) + t.slice(1).toLowerCase();
+  const w = t.split(' ').filter(x => /[a-z]/i.test(x));
+  const caps = w.filter(x => /^[A-Z][a-z]/.test(x)).length;
+  if (w.length > 1 && caps >= 2 && caps / w.length >= 0.6) return t.charAt(0) + t.slice(1).toLowerCase();
   return t;
 }
 const norm = t => t.toLowerCase().replace(/\s+/g, ' ').trim();
 
+const MEASURES = ['senduk', 'pinggan', 'ketul', 'keping', 'mangkuk', 'biji', 'cawan', 'gelas', 'tin', 'piring', 'bungkus', 'cucuk', 'sudu', 'genggam', 'ekor', 'tongkol', 'hidangan'];
+function parseUnit(u) {
+  const t = norm(u).replace(/½/g, ' 1/2').replace(/¼/g, ' 1/4');
+  let n = 0, m;
+  if ((m = t.match(/(\d+(?:[.,]\d+)?)\s+(\d)\/(\d)/))) n = parseFloat(m[1].replace(',', '.')) + Number(m[2]) / Number(m[3]);
+  else if ((m = t.match(/(\d)\/(\d)/))) n = Number(m[1]) / Number(m[2]);
+  else if ((m = t.match(/(\d+(?:[.,]\d+)?)/))) n = parseFloat(m[1].replace(',', '.'));
+  if (!n && /setengah|separuh/.test(t)) n = 0.5;
+  return { n: n > 0 ? n : 1, word: MEASURES.find(w => t.includes(w)) };
+}
+function presetKcal(name, unit, catalog) {
+  const cands = catalog.filter(f => norm(f.name) === norm(name));
+  if (!cands.length) return null;
+  const exact = cands.find(f => norm(f.unit) === norm(unit));
+  if (exact) return exact.kcal;
+  // "1 pinggan" ≈ "1 pinggan penuh"; "2 senduk" = 2 × "1 senduk"
+  const u = parseUnit(unit), same = cands.find(f => { const p = parseUnit(f.unit); return p.word && p.word === u.word; });
+  if (!same) return null;
+  return Math.round(same.kcal * u.n / parseUnit(same.unit).n);
+}
+
 // Recompute totals server-side, align kcal with the app's presets, drop anything malformed.
 function clean(out, catalog = []) {
-  const ref = new Map(catalog.map(f => [norm(f.name) + '|' + norm(f.unit), f.kcal]));
   const menus = Array.isArray(out.menus) ? out.menus.slice(0, 3).map(m => {
     const items = (Array.isArray(m.items) ? m.items : []).slice(0, 8).map(i => {
       const name = sentenceCase(str(i.name, 60)), unit = str(i.unit, 30) || '1 hidangan';
-      const preset = ref.get(norm(name) + '|' + norm(unit));
+      const preset = presetKcal(name, unit, catalog);
       return { name, unit, qty: 1, kcal: preset ?? num(i.kcal, 0, 1500) ?? 0,
         plate: ['serat', 'protein', 'karbo', 'lain'].includes(i.plate) ? i.plate : 'lain' };
     }).filter(i => i.name);
@@ -233,7 +264,8 @@ module.exports = async function handler(req, res) {
 
   const catalog = cleanCatalog(body.context?.catalog);
   const c = body.context || {};
-  const target = c.meal === 'umum' ? null : num(c.targetKcal, 60, 1500);
+  const fitMeal = c.meal === 'umum' ? c.nowMeal : c.meal;
+  const target = c.meal === 'umum' ? num(c.nowTargetKcal, 60, 1500) : num(c.targetKcal, 60, 1500);
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(body) }];
   try {
     const first = await callOpenAI(messages);
@@ -242,7 +274,7 @@ module.exports = async function handler(req, res) {
 
     // Fit each menu into this meal's kcal range by adjusting portions (no second AI call).
     if (target && out.menus.length) {
-      const [lo, hi] = targetRange(target, c.meal);
+      const [lo, hi] = targetRange(target, fitMeal);
       out.menus = out.menus.map(m => fitPortions(m, lo, hi, catalog));
       out.menus.forEach(m => { m.offTarget = m.kcal < lo ? 'low' : m.kcal > hi ? 'high' : ''; });
       out.range = [lo, hi];
@@ -284,4 +316,4 @@ async function callOpenAI(messages) {
 }
 
 // exported for local tests
-module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, SCHEMA };
+module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
