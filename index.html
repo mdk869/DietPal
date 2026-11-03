@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DietPal – Coach Diet Anda</title>
+<meta name="description" content="Pembantu diet & turun berat badan: kalori, air, berat badan dan bantuan bila pening.">
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DietPal">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  if (window.tailwind) tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+        colors: {
+          brand: { 50:'#effaf8',100:'#d6f2ec',200:'#ade4d9',500:'#14a38f',600:'#0f8a79',700:'#0f766e',800:'#115e57',900:'#134e48' },
+          veg: '#22c55e', pro: '#f4725e', carb: '#f5b324'
+        },
+        boxShadow: { card: '0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06)' }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { -webkit-tap-highlight-color: transparent; }
+  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .safe-top { padding-top: max(12px, env(safe-area-inset-top)); }
+  .safe-bottom { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .ring-anim { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1), stroke .3s; }
+  .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { scrollbar-width: none; }
+  .sheet-enter { animation: up .25s cubic-bezier(.2,.8,.2,1); }
+  @keyframes up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .fade { animation: fade .25s ease; } @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+  .pulse-ring { box-shadow: 0 0 0 0 rgba(244,63,94,.45); animation: pr 2.4s infinite; }
+  @keyframes pr { 0%{box-shadow:0 0 0 0 rgba(244,63,94,.45)} 70%{box-shadow:0 0 0 12px rgba(244,63,94,0)} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0)} }
+  .tap:active { transform: scale(.97); }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+</style>
+</head>
+<body class="bg-[#f6f8f7] text-slate-800 font-sans antialiased">
+
+<!-- Header -->
+<header class="safe-top sticky top-0 z-20 bg-[#f6f8f7]/90 backdrop-blur px-4 pb-2">
+  <div class="max-w-md mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <img src="icons/icon-192.png" alt="" class="w-9 h-9 rounded-xl">
+      <div>
+        <div class="text-[15px] font-extrabold leading-tight text-brand-900">DietPal</div>
+        <div id="hdrDate" class="text-xs text-slate-500"></div>
+      </div>
+    </div>
+    <button id="installBtn" data-act="install" class="hidden text-xs font-semibold bg-brand-700 text-white px-3 py-1.5 rounded-full tap">Pasang app</button>
+  </div>
+</header>
+
+<main id="view" class="max-w-md mx-auto px-4"></main>
+
+<!-- Bottom nav -->
+<nav class="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom">
+  <div class="max-w-md mx-auto grid grid-cols-4 pt-1.5" id="nav"></div>
+</nav>
+
+<!-- Bottom sheet -->
+<div id="sheetWrap" class="fixed inset-0 z-40 hidden">
+  <div class="absolute inset-0 bg-slate-900/40 fade" data-act="closeSheet"></div>
+  <div id="sheet" class="absolute bottom-0 inset-x-0 max-w-md mx-auto bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom sheet-enter"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 hidden bg-slate-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg"></div>
+
+<script>
+/* ============================================================
+   DATA & STORAGE
+   ============================================================ */
+const KEY = 'dietpal.v1';
+const OLD_KEY = 'sukuSeparuh.v1';   // pre-rename key: migrated once on load
+
+const DEFAULTS = {
+  profile: {
+    name: '', height: 170, startWeight: 98,
+    kcalMin: 1500, kcalMax: 1700,
+    waterGoal: 2500, waterIdeal: 3000,
+    milestones: [ { name: 'Fasa 1', kg: 87 }, { name: 'Fasa 2', kg: 77 }, { name: 'Berat ideal', kg: 65 } ]
+  },
+  days: {},          // { 'YYYY-MM-DD': { meals: [...], water: ml } }
+  weights: [],       // [{ date, kg }]
+  rescues: [],       // [{ t, symptoms, kcal, water }]
+  customFoods: []
+};
+
+// Malaysian food presets (anggaran kalori). plate: serat | protein | karbo | lain
+const FOODS = [
+  // Karbohidrat
+  { id:'nasi1', name:'Nasi putih', unit:'1 senduk', kcal:130, cat:'Karbo', plate:'karbo', e:'🍚' },
+  { id:'nasip', name:'Nasi putih', unit:'1 pinggan penuh', kcal:260, cat:'Karbo', plate:'karbo', e:'🍚' },
+  { id:'nasib', name:'Nasi perang', unit:'1 senduk', kcal:120, cat:'Karbo', plate:'karbo', e:'🍚' },
+  { id:'rotig', name:'Roti gandum', unit:'2 keping', kcal:140, cat:'Karbo', plate:'karbo', e:'🍞' },
+  { id:'oat',   name:'Oat + susu rendah lemak', unit:'1 mangkuk', kcal:200, cat:'Karbo', plate:'karbo', e:'🥣' },
+  { id:'ubi',   name:'Ubi keledek rebus', unit:'1 biji sederhana', kcal:110, cat:'Karbo', plate:'karbo', e:'🍠' },
+  { id:'capati',name:'Capati', unit:'1 keping', kcal:120, cat:'Karbo', plate:'karbo', e:'🫓' },
+  // Protein
+  { id:'agrill',name:'Ayam grill (tanpa kulit)', unit:'1 ketul', kcal:220, cat:'Protein', plate:'protein', e:'🍗' },
+  { id:'agoreng',name:'Ayam goreng', unit:'1 ketul', kcal:290, cat:'Protein', plate:'protein', e:'🍗' },
+  { id:'ikanb', name:'Ikan bakar / kukus', unit:'1 ekor kembung', kcal:170, cat:'Protein', plate:'protein', e:'🐟' },
+  { id:'ikang', name:'Ikan goreng', unit:'1 ekor kembung', kcal:230, cat:'Protein', plate:'protein', e:'🐟' },
+  { id:'telurr',name:'Telur rebus', unit:'1 biji', kcal:70, cat:'Protein', plate:'protein', e:'🥚' },
+  { id:'telurg',name:'Telur mata', unit:'1 biji', kcal:100, cat:'Protein', plate:'protein', e:'🍳' },
+  { id:'tempe', name:'Tempe goreng', unit:'3 keping', kcal:150, cat:'Protein', plate:'protein', e:'🟫' },
+  { id:'tauhu', name:'Tauhu', unit:'1 keping', kcal:90, cat:'Protein', plate:'protein', e:'⬜' },
+  { id:'dagingm',name:'Daging masak kicap', unit:'1 senduk', kcal:200, cat:'Protein', plate:'protein', e:'🥩' },
+  // Sayur / serat
+  { id:'ulam',  name:'Ulam-ulaman + sambal sikit', unit:'1 piring', kcal:40, cat:'Sayur', plate:'serat', e:'🥬' },
+  { id:'sayurc',name:'Sayur campur goreng', unit:'1 senduk', kcal:80, cat:'Sayur', plate:'serat', e:'🥦' },
+  { id:'sayurr',name:'Sayur rebus / sup sayur', unit:'1 mangkuk', kcal:50, cat:'Sayur', plate:'serat', e:'🥕' },
+  { id:'kangkung',name:'Kangkung belacan', unit:'1 senduk', kcal:90, cat:'Sayur', plate:'serat', e:'🌿' },
+  { id:'salad', name:'Salad / timun & tomato', unit:'1 mangkuk', kcal:30, cat:'Sayur', plate:'serat', e:'🥗' },
+  { id:'dal',   name:'Kuah dal / sayur lodeh', unit:'1 senduk', kcal:70, cat:'Sayur', plate:'serat', e:'🍲' },
+  // Hidangan penuh
+  { id:'nlemak',name:'Nasi lemak biasa (bungkus)', unit:'1 bungkus', kcal:400, cat:'Hidangan', plate:'lain', e:'🍛' },
+  { id:'ncampur',name:'Nasi campur (1 lauk + sayur)', unit:'1 pinggan', kcal:550, cat:'Hidangan', plate:'lain', e:'🍛' },
+  { id:'nayam', name:'Nasi ayam', unit:'1 pinggan', kcal:600, cat:'Hidangan', plate:'lain', e:'🍛' },
+  { id:'mgoreng',name:'Mee goreng mamak', unit:'1 pinggan', kcal:550, cat:'Hidangan', plate:'lain', e:'🍜' },
+  { id:'ktgoreng',name:'Kuey teow goreng', unit:'1 pinggan', kcal:650, cat:'Hidangan', plate:'lain', e:'🍜' },
+  { id:'msup',  name:'Mee sup / mee hoon sup', unit:'1 mangkuk', kcal:350, cat:'Hidangan', plate:'lain', e:'🍜' },
+  { id:'rcanai',name:'Roti canai kosong', unit:'1 keping', kcal:300, cat:'Hidangan', plate:'lain', e:'🫓' },
+  { id:'rtelur',name:'Roti telur', unit:'1 keping', kcal:380, cat:'Hidangan', plate:'lain', e:'🫓' },
+  { id:'tosai', name:'Tosai kosong', unit:'1 keping', kcal:170, cat:'Hidangan', plate:'lain', e:'🫓' },
+  // Minuman
+  { id:'kopio', name:'Kopi O / teh O kosong', unit:'1 cawan', kcal:5, cat:'Minuman', plate:'lain', e:'☕' },
+  { id:'tehtarik',name:'Teh tarik', unit:'1 cawan', kcal:150, cat:'Minuman', plate:'lain', e:'🧋' },
+  { id:'kopisusu',name:'Kopi / teh susu kurang manis', unit:'1 cawan', kcal:90, cat:'Minuman', plate:'lain', e:'☕' },
+  { id:'milo',  name:'Milo ais', unit:'1 gelas', kcal:190, cat:'Minuman', plate:'lain', e:'🥤' },
+  { id:'sirap', name:'Air sirap / sirap bandung', unit:'1 gelas', kcal:180, cat:'Minuman', plate:'lain', e:'🥤' },
+  { id:'p100z', name:'100Plus Zero Sugar', unit:'1 tin', kcal:0, cat:'Minuman', plate:'lain', e:'🥫', water:325 },
+  { id:'susu',  name:'Susu rendah lemak', unit:'1 gelas', kcal:110, cat:'Minuman', plate:'protein', e:'🥛' },
+  // Snek
+  { id:'pisang',name:'Pisang', unit:'1 biji', kcal:100, cat:'Snek', plate:'lain', e:'🍌' },
+  { id:'epal',  name:'Epal / oren', unit:'1 biji', kcal:80, cat:'Snek', plate:'serat', e:'🍎' },
+  { id:'betik', name:'Betik / tembikai', unit:'1 piring', kcal:60, cat:'Snek', plate:'serat', e:'🍉' },
+  { id:'kraker',name:'Biskut kraker', unit:'2 keping', kcal:70, cat:'Snek', plate:'karbo', e:'🍘' },
+  { id:'kurma', name:'Kurma', unit:'3 biji', kcal:70, cat:'Snek', plate:'lain', e:'🌴' },
+  { id:'kacang',name:'Kacang badam / tanah', unit:'1 genggam', kcal:160, cat:'Snek', plate:'lain', e:'🥜' },
+  { id:'karipap',name:'Karipap / kuih goreng', unit:'1 biji', kcal:130, cat:'Snek', plate:'lain', e:'🥟' },
+  { id:'yogurt',name:'Yogurt plain', unit:'1 cawan', kcal:100, cat:'Snek', plate:'protein', e:'🥛' },
+  { id:'jagung', name:'Jagung rebus', unit:'1 tongkol', kcal:120, cat:'Snek', plate:'karbo', e:'🌽' },
+  // Lauk & hidangan tambahan (digunakan oleh cadangan menu)
+  { id:'tunatin', name:'Tuna dalam air', unit:'½ tin', kcal:90, cat:'Protein', plate:'protein', e:'🐟' },
+  { id:'ayamsup', name:'Sup ayam', unit:'1 mangkuk', kcal:180, cat:'Protein', plate:'protein', e:'🍲' },
+  { id:'ayammerah', name:'Ayam masak merah', unit:'1 ketul', kcal:280, cat:'Protein', plate:'protein', e:'🍗' },
+  { id:'asampedas', name:'Ikan asam pedas', unit:'1 ketul', kcal:180, cat:'Protein', plate:'protein', e:'🌶️' },
+  { id:'telurdadar', name:'Telur dadar', unit:'1 biji', kcal:120, cat:'Protein', plate:'protein', e:'🍳' },
+  { id:'tandoori', name:'Ayam tandoori', unit:'1 ketul', kcal:230, cat:'Protein', plate:'protein', e:'🍗' },
+  { id:'sate', name:'Sate ayam', unit:'5 cucuk', kcal:200, cat:'Protein', plate:'protein', e:'🍢' },
+  { id:'rendang', name:'Rendang daging', unit:'1 senduk', kcal:230, cat:'Protein', plate:'protein', e:'🥩' },
+  { id:'yongtau', name:'Yong tau foo sup', unit:'6 keping', kcal:280, cat:'Hidangan', plate:'protein', e:'🍲' },
+  { id:'nasiminyak', name:'Nasi minyak', unit:'1 senduk', kcal:180, cat:'Karbo', plate:'karbo', e:'🍚' },
+  { id:'nasigoreng', name:'Nasi goreng kampung', unit:'1 senduk besar', kcal:200, cat:'Karbo', plate:'karbo', e:'🍳' },
+  { id:'bihun', name:'Bihun goreng', unit:'1 senduk', kcal:180, cat:'Karbo', plate:'karbo', e:'🍜' },
+  { id:'mashed', name:'Kentang lenyek', unit:'1 cawan kecil', kcal:110, cat:'Karbo', plate:'karbo', e:'🥔' },
+  { id:'acar', name:'Acar timun & nanas', unit:'1 senduk', kcal:50, cat:'Sayur', plate:'serat', e:'🥒' },
+  { id:'coleslaw', name:'Coleslaw', unit:'1 cawan kecil', kcal:120, cat:'Sayur', plate:'serat', e:'🥗' },
+  { id:'kuahkacang', name:'Kuah kacang', unit:'2 sudu', kcal:90, cat:'Hidangan', plate:'lain', e:'🥜' },
+  { id:'kuahkari', name:'Kuah kari campur', unit:'2 sudu', kcal:60, cat:'Hidangan', plate:'lain', e:'🍛' },
+  { id:'rotibakar', name:'Roti bakar kaya', unit:'2 keping', kcal:280, cat:'Hidangan', plate:'lain', e:'🍞' },
+  { id:'burger', name:'Burger ayam grill', unit:'1 biji', kcal:400, cat:'Hidangan', plate:'lain', e:'🍔' },
+  { id:'chickenchop', name:'Chicken chop grill (sos asing)', unit:'1 pinggan', kcal:520, cat:'Hidangan', plate:'lain', e:'🍽️' }
+];
+const CATS = ['Semua','Karbo','Protein','Sayur','Hidangan','Minuman','Snek','Sendiri'];
+const MEALS = [
+  { id:'sarapan', label:'Sarapan', e:'🌅' },
+  { id:'tengahari', label:'Tengah hari', e:'☀️' },
+  { id:'malam', label:'Makan malam', e:'🌙' },
+  { id:'snek', label:'Snek', e:'🍌' }
+];
+const PLATE = {
+  serat:   { label:'Sayur & serat', color:'#22c55e', bg:'bg-green-50',  text:'text-green-700' },
+  protein: { label:'Protein',       color:'#f4725e', bg:'bg-rose-50',   text:'text-rose-600' },
+  karbo:   { label:'Karbo kompleks',color:'#f5b324', bg:'bg-amber-50',  text:'text-amber-700' },
+  lain:    { label:'Lain-lain',     color:'#94a3b8', bg:'bg-slate-50',  text:'text-slate-600' }
+};
+
+let S = load();
+const UI = { tab: 'home', cat: 'Semua', q: '', meal: guessMeal(), sym: new Set(),
+  sug: { meal: guessMeal(), loc: S.sugPrefs?.loc || 'rumah', venue: S.sugPrefs?.venue || 'mamak', seed: 0 } };
+
+function load() {
+  try {
+    let raw = localStorage.getItem(KEY);
+    if (!raw && (raw = localStorage.getItem(OLD_KEY))) { localStorage.setItem(KEY, raw); localStorage.removeItem(OLD_KEY); }
+    if (raw) {
+      const d = JSON.parse(raw);
+      return { ...structuredClone(DEFAULTS), ...d, profile: { ...DEFAULTS.profile, ...(d.profile || {}) } };
+    }
+  } catch (e) { console.warn('load failed', e); }
+  const fresh = structuredClone(DEFAULTS);
+  fresh.weights.push({ date: todayKey(), kg: 97 });   // current weight from profile
+  return fresh;
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch (e) { toast('Tak dapat simpan – storan penuh?'); }
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function todayKey(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function parseKey(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+function day(k = todayKey()) { if (!S.days[k]) S.days[k] = { meals: [], water: 0 }; return S.days[k]; }
+function peekDay(k) { return S.days[k] || { meals: [], water: 0 }; }
+function kcalOf(d) { return Math.round(d.meals.reduce((a, m) => a + m.kcal, 0)); }
+function guessMeal() { const h = new Date().getHours(); return h < 11 ? 'sarapan' : h < 15 ? 'tengahari' : h < 18 ? 'snek' : 'malam'; }
+function fmt(n) { return Math.round(n).toLocaleString('ms-MY'); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function allFoods() { return [...FOODS, ...S.customFoods.map(f => ({ ...f, cat: 'Sendiri' }))]; }
+function findFood(id) { return allFoods().find(f => f.id === id); }
+function sortedWeights() { return [...S.weights].sort((a, b) => a.date.localeCompare(b.date)); }
+function currentWeight() { const w = sortedWeights(); return w.length ? w[w.length - 1].kg : S.profile.startWeight; }
+function bmi(kg) { const h = S.profile.height / 100; return kg / (h * h); }
+const BULAN = ['Jan','Feb','Mac','Apr','Mei','Jun','Jul','Ogo','Sep','Okt','Nov','Dis'];
+const HARI = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
+function niceDate(k) { const d = parseKey(k); return d.getDate() + ' ' + BULAN[d.getMonth()]; }
+function streak() {
+  let n = 0; const d = new Date();
+  if (!peekDay(todayKey(d)).meals.length) d.setDate(d.getDate() - 1);
+  while (peekDay(todayKey(d)).meals.length) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 2200);
+}
+function plateCounts(d) {
+  const c = { serat: 0, protein: 0, karbo: 0, lain: 0 };
+  d.meals.forEach(m => { c[m.plate || 'lain'] += (m.qty || 1); });
+  return c;
+}
+
+/* ============================================================
+   AI COACH (rule-based)
+   ============================================================ */
+function coach() {
+  const h = new Date().getHours();
+  const d = peekDay(todayKey()); const k = kcalOf(d); const p = S.profile;
+  const greet = h < 12 ? 'Selamat pagi' : h < 15 ? 'Selamat tengah hari' : h < 19 ? 'Selamat petang' : 'Selamat malam';
+  const name = p.name ? ', ' + esc(p.name) : '';
+  const expectedWater = Math.max(0, Math.min(1, (h - 7) / 14)) * p.waterGoal;
+  const pc = plateCounts(d);
+  let msg, mood = '😊';
+
+  if (k > p.kcalMax) { mood = '🤗'; msg = `Hari ini lebih ${fmt(k - p.kcalMax)} kcal dari sasaran. Tak apa — ini bahagian "20" dalam 80/20. Esok sambung macam biasa, tak perlu ganti dengan makan terlalu sikit.`; }
+  else if (h >= 19 && k > 0 && k < 1200) { mood = '⚠️'; msg = `Kalori hari ini baru ${fmt(k)} kcal — terlalu rendah boleh buat pening. Makan malam yang cukup ya: nasi 1 senduk + lauk + sayur.`; }
+  else if (!d.meals.length && h < 11) { mood = '🌅'; msg = 'Mulakan hari dengan sarapan berprotein — contoh 2 biji telur rebus + 2 keping roti gandum. Jangan skip sarapan, nanti lapar teruk waktu tengah hari.'; }
+  else if (d.water < expectedWater - 500) { mood = '💧'; msg = `Air baru ${fmt(d.water)} ml. Minum segelas sekarang — kurang air antara punca pening dan rasa lapar palsu.`; }
+  else if (k >= p.kcalMin && k <= p.kcalMax) { mood = '🎉'; msg = `Mantap! ${fmt(k)} kcal — tepat dalam sasaran. Konsisten macam ni yang bawa hasil.`; }
+  else if (pc.karbo + pc.protein >= 2 && pc.serat < 1) { mood = '🥬'; msg = 'Hari ini belum ada sayur lagi. Ingat suku-suku separuh: separuh pinggan sayur — ulam pun dikira!'; }
+  else { msg = `Baki ${fmt(Math.max(0, p.kcalMax - k))} kcal untuk hari ini. Makan perlahan, dahulukan sayur dan protein.`; }
+  return { greet: greet + name, msg, mood };
+}
+
+/* ============================================================
+   VIEWS
+   ============================================================ */
+function render() {
+  const now = new Date();
+  document.getElementById('hdrDate').textContent = `${HARI[now.getDay()]}, ${now.getDate()} ${BULAN[now.getMonth()]} ${now.getFullYear()}`;
+  const tabs = [ ['home','Utama',iconHome], ['food','Makan',iconFood], ['weight','Berat',iconScale], ['guide','Panduan',iconBook] ];
+  document.getElementById('nav').innerHTML = tabs.map(([id, l, ic]) => `
+    <button data-act="tab" data-tab="${id}" class="flex flex-col items-center gap-0.5 py-1 tap ${UI.tab === id ? 'text-brand-700' : 'text-slate-400'}">
+      ${ic(UI.tab === id)}<span class="text-[11px] font-semibold">${l}</span>
+    </button>`).join('');
+  const v = { home: viewHome, food: viewFood, weight: viewWeight, guide: viewGuide }[UI.tab]();
+  const anim = UI._last !== UI.tab ? 'fade ' : ''; UI._last = UI.tab;
+  document.getElementById('view').innerHTML = `<div class="${anim}space-y-4 pt-2 pb-6">${v}</div>`;
+}
+
+const card = (inner, cls = '') => `<section class="bg-white rounded-3xl shadow-card p-4 ${cls}">${inner}</section>`;
+
+/* ---------- HOME ---------- */
+function viewHome() {
+  const p = S.profile, d = peekDay(todayKey()), k = kcalOf(d), c = coach(), st = streak();
+  return `
+  ${card(`
+    <div class="flex gap-3">
+      <div class="w-11 h-11 shrink-0 rounded-2xl bg-brand-50 grid place-items-center text-2xl">${c.mood}</div>
+      <div>
+        <div class="text-xs font-semibold text-brand-700">Coach DietPal · ${c.greet}</div>
+        <p class="text-[14px] leading-snug mt-0.5 text-slate-700">${c.msg}</p>
+      </div>
+    </div>`, 'border border-brand-100')}
+
+  <button data-act="rescue" class="w-full tap pulse-ring rounded-3xl bg-gradient-to-r from-rose-500 to-orange-500 text-white p-4 flex items-center gap-3 text-left shadow-card">
+    <div class="w-11 h-11 rounded-2xl bg-white/20 grid place-items-center text-2xl">🆘</div>
+    <div class="flex-1">
+      <div class="font-extrabold text-[16px]">Pening / Masuk Angin?</div>
+      <div class="text-[13px] text-white/90">Tekan sini untuk langkah lega yang selamat</div>
+    </div>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+
+  ${card(`
+    <div class="flex items-center gap-4">
+      ${ring(k, p.kcalMin, p.kcalMax)}
+      <div class="flex-1 min-w-0">
+        <div class="text-xs text-slate-500 font-medium">Sasaran harian</div>
+        <div class="text-lg font-extrabold text-slate-800">${fmt(p.kcalMin)}–${fmt(p.kcalMax)} <span class="text-sm font-semibold text-slate-400">kcal</span></div>
+        <div class="mt-2 text-[13px] ${statusColor(k)} font-semibold">${statusText(k)}</div>
+        <div class="mt-3 flex gap-2">
+          <button data-act="tab" data-tab="food" class="tap flex-1 bg-brand-700 text-white text-sm font-semibold py-2.5 rounded-xl">+ Log makan</button>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-4 gap-2 mt-4">
+      ${MEALS.map(m => { const mk = d.meals.filter(x => x.meal === m.id).reduce((a, x) => a + x.kcal, 0);
+        return `<button data-act="quickMeal" data-meal="${m.id}" class="tap rounded-2xl ${mk ? 'bg-brand-50' : 'bg-slate-50'} py-2 text-center">
+          <div class="text-lg">${m.e}</div><div class="text-[10.5px] text-slate-500 leading-tight">${m.label}</div>
+          <div class="text-[12px] font-bold ${mk ? 'text-brand-700' : 'text-slate-300'}">${mk ? fmt(mk) : '–'}</div></button>`; }).join('')}
+    </div>`)}
+
+  ${card(suggestBlock(), 'border border-brand-100')}
+
+  ${waterCard()}
+
+  ${plateMini(d)}
+
+  <div class="grid grid-cols-2 gap-3">
+    ${card(`<div class="text-xs text-slate-500 font-medium">Berat semasa</div>
+      <div class="text-2xl font-extrabold">${currentWeight().toFixed(1)}<span class="text-sm text-slate-400 font-semibold"> kg</span></div>
+      <div class="text-[12px] text-brand-700 font-semibold">${lostText()}</div>
+      <button data-act="tab" data-tab="weight" class="tap mt-2 text-[12px] font-semibold text-brand-700">Log berat →</button>`, 'p-4')}
+    ${card(`<div class="text-xs text-slate-500 font-medium">Konsisten log</div>
+      <div class="text-2xl font-extrabold">${st}<span class="text-sm text-slate-400 font-semibold"> hari</span></div>
+      <div class="text-[12px] text-slate-500">${st >= 7 ? 'Hebat, teruskan! 🔥' : st >= 1 ? 'Sikit-sikit, lama-lama jadi bukit' : 'Log makanan pertama hari ini'}</div>`, 'p-4')}
+  </div>`;
+}
+
+function statusText(k) {
+  const p = S.profile;
+  if (k === 0) return 'Belum log makanan hari ini';
+  if (k < p.kcalMin) return `Baki ${fmt(p.kcalMin - k)}–${fmt(p.kcalMax - k)} kcal lagi`;
+  if (k <= p.kcalMax) return '✓ Dalam sasaran';
+  return `Lebih ${fmt(k - p.kcalMax)} kcal — tak apa, 80/20`;
+}
+function statusColor(k) { const p = S.profile; return k > p.kcalMax ? 'text-amber-600' : k >= p.kcalMin ? 'text-green-600' : 'text-slate-600'; }
+
+function ring(k, min, max) {
+  const r = 50, C = 2 * Math.PI * r;
+  const scale = max * 1.15;                      // ring represents 0 → 115% of max
+  const pct = Math.min(k / scale, 1);
+  const color = k > max ? '#f59e0b' : k >= min ? '#22c55e' : '#14a38f';
+  const tick = (v) => { const a = (v / scale) * 2 * Math.PI - Math.PI / 2; return [60 + Math.cos(a) * 50, 60 + Math.sin(a) * 50]; };
+  const a0 = (min / scale) * 360, a1 = (max / scale) * 360;
+  const band = arcPath(60, 60, 50, a0, a1);
+  return `
+  <svg viewBox="0 0 120 120" class="w-[120px] h-[120px] shrink-0">
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#eef2f1" stroke-width="11"/>
+    <path d="${band}" fill="none" stroke="#bbf7d0" stroke-width="11"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round"
+      stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" transform="rotate(-90 60 60)" class="ring-anim"/>
+    <text x="60" y="58" text-anchor="middle" font-size="22" font-weight="800" fill="#0f172a">${fmt(k)}</text>
+    <text x="60" y="75" text-anchor="middle" font-size="10" fill="#64748b">kcal dimakan</text>
+  </svg>`;
+}
+function arcPath(cx, cy, r, a0, a1) {
+  const p = (a) => { const t = (a - 90) * Math.PI / 180; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; };
+  const [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+}
+
+function lostText() {
+  const diff = S.profile.startWeight - currentWeight();
+  return diff > 0 ? `↓ ${diff.toFixed(1)} kg sejak mula` : diff < 0 ? `+${(-diff).toFixed(1)} kg dari berat mula` : 'Berat mula';
+}
+
+/* ---------- WATER ---------- */
+function waterCard() {
+  const p = S.profile, d = peekDay(todayKey()), w = d.water;
+  const glasses = Math.ceil(p.waterIdeal / 250);
+  const filled = Math.floor(w / 250);
+  const pct = Math.min(100, (w / p.waterGoal) * 100);
+  return card(`
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Air hari ini 💧</div>
+        <div class="text-xl font-extrabold">${(w / 1000).toFixed(2)} <span class="text-sm text-slate-400 font-semibold">/ ${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L</span></div>
+      </div>
+      <div class="text-[12px] font-semibold ${w >= p.waterGoal ? 'text-sky-600' : 'text-slate-400'}">${w >= p.waterIdeal ? 'Cukup! 🎉' : w >= p.waterGoal ? 'Sasaran capai ✓' : fmt(p.waterGoal - w) + ' ml lagi'}</div>
+    </div>
+    <div class="h-2 bg-sky-50 rounded-full mt-2 overflow-hidden"><div class="h-full bg-sky-400 rounded-full transition-all" style="width:${pct}%"></div></div>
+    <div class="grid grid-cols-12 gap-1 mt-3">
+      ${Array.from({ length: glasses }, (_, i) => `<div class="h-6 rounded-md ${i < filled ? 'bg-sky-400' : 'bg-sky-50'} transition-colors"></div>`).join('')}
+    </div>
+    <div class="grid grid-cols-3 gap-2 mt-3">
+      <button data-act="water" data-ml="250" class="tap bg-sky-50 text-sky-700 font-semibold text-sm py-2.5 rounded-xl">+ 1 gelas<span class="block text-[10px] font-medium">250 ml</span></button>
+      <button data-act="water" data-ml="500" class="tap bg-sky-500 text-white font-semibold text-sm py-2.5 rounded-xl">+ 1 botol<span class="block text-[10px] font-medium opacity-90">500 ml</span></button>
+      <button data-act="water" data-ml="-250" class="tap bg-slate-50 text-slate-500 font-semibold text-sm py-2.5 rounded-xl" ${w <= 0 ? 'disabled' : ''}>↺ Undo<span class="block text-[10px] font-medium">−250 ml</span></button>
+    </div>`);
+}
+
+/* ---------- PLATE ---------- */
+function plateSVG(size = 150) {
+  return `
+  <svg viewBox="0 0 200 200" width="${size}" height="${size}" class="shrink-0">
+    <circle cx="100" cy="100" r="96" fill="#fff" stroke="#e2e8f0" stroke-width="4"/>
+    <path d="M100 18 A82 82 0 0 0 100 182 Z" fill="#22c55e"/>
+    <path d="M100 18 A82 82 0 0 1 182 100 L100 100 Z" fill="#f4725e"/>
+    <path d="M182 100 A82 82 0 0 1 100 182 L100 100 Z" fill="#f5b324"/>
+    <line x1="100" y1="16" x2="100" y2="184" stroke="#fff" stroke-width="4"/>
+    <line x1="100" y1="100" x2="184" y2="100" stroke="#fff" stroke-width="4"/>
+    <text x="58" y="96" text-anchor="middle" font-size="26">🥬</text>
+    <text x="58" y="122" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">50%</text>
+    <text x="138" y="70" text-anchor="middle" font-size="20">🍗</text>
+    <text x="138" y="88" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">25%</text>
+    <text x="138" y="134" text-anchor="middle" font-size="20">🍚</text>
+    <text x="138" y="152" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">25%</text>
+  </svg>`;
+}
+function plateMini(d) {
+  const c = plateCounts(d); const tot = c.serat + c.protein + c.karbo;
+  const bar = tot ? ['serat', 'protein', 'karbo'].map(k => `<div style="width:${(c[k] / tot) * 100}%;background:${PLATE[k].color}"></div>`).join('') : '';
+  return card(`
+    <div class="flex items-center gap-3">
+      ${plateSVG(84)}
+      <div class="flex-1">
+        <div class="font-bold text-[15px]">Suku-Suku Separuh</div>
+        <div class="text-[12.5px] text-slate-500 leading-snug">½ sayur · ¼ protein · ¼ karbo kompleks</div>
+        <div class="mt-2 text-[11px] text-slate-400 font-medium">Imbangan pinggan hari ini</div>
+        <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden flex mt-1">${bar}</div>
+        <div class="flex gap-3 mt-1 text-[11px] text-slate-500">
+          <span><b class="text-green-600">${c.serat}</b> sayur</span><span><b class="text-rose-500">${c.protein}</b> protein</span><span><b class="text-amber-600">${c.karbo}</b> karbo</span>
+        </div>
+      </div>
+    </div>
+    <button data-act="tab" data-tab="guide" class="tap mt-3 w-full text-[13px] font-semibold text-brand-700 bg-brand-50 rounded-xl py-2">Lihat panduan pinggan →</button>`);
+}
+
+/* ---------- FOOD ---------- */
+function viewFood() {
+  const d = peekDay(todayKey()), k = kcalOf(d), p = S.profile;
+  const q = UI.q.trim().toLowerCase();
+  let list = allFoods();
+  if (UI.cat !== 'Semua') list = list.filter(f => f.cat === UI.cat);
+  if (q) list = list.filter(f => (f.name + ' ' + f.unit).toLowerCase().includes(q));
+  const freq = frequentFoods();
+  return `
+  ${card(`
+    <div class="flex items-center justify-between">
+      <div><div class="text-xs text-slate-500">Hari ini</div><div class="text-xl font-extrabold">${fmt(k)} <span class="text-sm text-slate-400 font-semibold">/ ${fmt(p.kcalMax)} kcal</span></div></div>
+      <div class="text-[13px] font-semibold ${statusColor(k)} text-right max-w-[50%]">${statusText(k)}</div>
+    </div>
+    <div class="h-2 bg-slate-100 rounded-full mt-2 overflow-hidden relative">
+      <div class="h-full rounded-full transition-all" style="width:${Math.min(100, k / p.kcalMax * 100)}%;background:${k > p.kcalMax ? '#f59e0b' : k >= p.kcalMin ? '#22c55e' : '#14a38f'}"></div>
+      <div class="absolute top-0 h-full w-0.5 bg-green-600/60" style="left:${p.kcalMin / p.kcalMax * 100}%"></div>
+    </div>`)}
+
+  <button data-act="openSuggest" class="tap w-full flex items-center gap-3 bg-gradient-to-r from-brand-700 to-brand-500 text-white rounded-2xl p-3.5 text-left shadow-card">
+    <div class="w-10 h-10 rounded-xl bg-white/20 grid place-items-center text-xl">💡</div>
+    <div class="flex-1"><div class="font-bold text-[14px]">Tak tahu nak makan apa?</div><div class="text-[12px] text-white/85">Dapatkan cadangan menu ikut baki kalori</div></div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+
+  <div>
+    <div class="text-xs font-semibold text-slate-500 mb-2 px-1">Log untuk</div>
+    <div class="grid grid-cols-4 gap-2">
+      ${MEALS.map(m => `<button data-act="setMeal" data-meal="${m.id}" class="tap rounded-2xl py-2 text-center border ${UI.meal === m.id ? 'bg-brand-700 border-brand-700 text-white' : 'bg-white border-slate-200 text-slate-600'}">
+        <div class="text-lg">${m.e}</div><div class="text-[11px] font-semibold leading-tight">${m.label}</div></button>`).join('')}
+    </div>
+  </div>
+
+  <div class="relative">
+    <input id="foodSearch" value="${esc(UI.q)}" placeholder="Cari makanan… (cth: nasi, ayam, teh)" class="w-full bg-white rounded-2xl shadow-card px-4 py-3 pl-10 text-[15px] outline-none focus:ring-2 focus:ring-brand-500">
+    <svg class="absolute left-3.5 top-3.5 text-slate-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+  </div>
+
+  <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+    ${CATS.map(c => `<button data-act="cat" data-cat="${c}" class="tap shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-semibold border ${UI.cat === c ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'}">${c}</button>`).join('')}
+  </div>
+
+  ${!q && UI.cat === 'Semua' && freq.length ? `
+    <div>
+      <div class="text-xs font-semibold text-slate-500 mb-2 px-1">⭐ Kerap dimakan</div>
+      <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+        ${freq.map(f => `<button data-act="pickFood" data-id="${f.id}" class="tap shrink-0 bg-white rounded-2xl shadow-card px-3 py-2 text-left">
+          <div class="text-[13px] font-semibold whitespace-nowrap">${f.e || '🍽️'} ${esc(f.name)}</div><div class="text-[11px] text-slate-400">${f.kcal} kcal</div></button>`).join('')}
+      </div>
+    </div>` : ''}
+
+  ${card(`
+    <div class="divide-y divide-slate-100 -my-1">
+      ${list.length ? list.map(f => `
+        <button data-act="pickFood" data-id="${f.id}" class="tap w-full flex items-center gap-3 py-2.5 text-left">
+          <div class="w-10 h-10 rounded-xl ${PLATE[f.plate || 'lain'].bg} grid place-items-center text-xl shrink-0">${f.e || '🍽️'}</div>
+          <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold truncate">${esc(f.name)}</div><div class="text-[12px] text-slate-400">${esc(f.unit)}</div></div>
+          <div class="text-[14px] font-bold text-slate-700">${f.kcal}<span class="text-[11px] text-slate-400 font-medium"> kcal</span></div>
+          <div class="w-7 h-7 rounded-full bg-brand-50 text-brand-700 grid place-items-center font-bold">+</div>
+        </button>`).join('') : `<div class="py-6 text-center text-sm text-slate-400">Tiada padanan. Tambah makanan sendiri di bawah.</div>`}
+    </div>`, 'py-2')}
+
+  <button data-act="customFood" class="tap w-full bg-white border-2 border-dashed border-slate-300 text-slate-600 font-semibold text-sm py-3 rounded-2xl">+ Tambah makanan sendiri</button>
+
+  <div class="pt-2">
+    <div class="text-sm font-bold text-slate-700 mb-2 px-1">Log hari ini</div>
+    ${MEALS.map(m => { const items = d.meals.filter(x => x.meal === m.id); if (!items.length) return '';
+      return card(`
+        <div class="flex justify-between items-center mb-1"><div class="font-semibold text-[14px]">${m.e} ${m.label}</div><div class="text-[13px] font-bold text-slate-500">${fmt(items.reduce((a, x) => a + x.kcal, 0))} kcal</div></div>
+        ${items.map(x => `<div class="flex items-center gap-2 py-1.5 border-t border-slate-50">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[x.plate || 'lain'].color}"></span>
+          <div class="flex-1 text-[13px] text-slate-600">${esc(x.name)} <span class="text-slate-400">· ${x.qty !== 1 ? x.qty + ' × ' : ''}${esc(x.unit || '')}</span></div>
+          <div class="text-[13px] font-semibold">${fmt(x.kcal)}</div>
+          <button data-act="delMeal" data-id="${x.id}" class="tap w-7 h-7 grid place-items-center text-slate-300 hover:text-rose-500" aria-label="Padam">✕</button>
+        </div>`).join('')}`, 'mb-3 py-3'); }).join('') || `<div class="text-center text-sm text-slate-400 py-4">Belum ada makanan dilog hari ini.</div>`}
+  </div>
+  <p class="text-[11px] text-slate-400 text-center px-4">Nilai kalori ialah anggaran purata. Saiz hidangan kedai berbeza-beza.</p>`;
+}
+
+function frequentFoods() {
+  const cnt = {};
+  Object.values(S.days).forEach(d => d.meals.forEach(m => { if (m.foodId) cnt[m.foodId] = (cnt[m.foodId] || 0) + 1; }));
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => findFood(id)).filter(Boolean);
+}
+
+function sheetFood(id) {
+  const f = findFood(id); if (!f) return;
+  UI.pick = { id, qty: 1 };
+  openSheet(() => {
+    const q = UI.pick.qty;
+    return `
+    <div class="p-5">
+      <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+      <div class="flex items-center gap-3">
+        <div class="w-14 h-14 rounded-2xl ${PLATE[f.plate || 'lain'].bg} grid place-items-center text-3xl">${f.e || '🍽️'}</div>
+        <div><div class="font-bold text-lg leading-tight">${esc(f.name)}</div><div class="text-sm text-slate-500">${esc(f.unit)} · ${f.kcal} kcal</div>
+          <div class="text-[11px] font-semibold mt-0.5 ${PLATE[f.plate || 'lain'].text}">${PLATE[f.plate || 'lain'].label}</div></div>
+      </div>
+      <div class="mt-5 flex items-center justify-between bg-slate-50 rounded-2xl p-2">
+        <button data-act="qty" data-d="-0.5" class="tap w-12 h-12 rounded-xl bg-white shadow-card text-xl font-bold">−</button>
+        <div class="text-center"><div class="text-2xl font-extrabold">${q}</div><div class="text-[11px] text-slate-500">hidangan</div></div>
+        <button data-act="qty" data-d="0.5" class="tap w-12 h-12 rounded-xl bg-white shadow-card text-xl font-bold">+</button>
+      </div>
+      <div class="text-xs font-semibold text-slate-500 mt-4 mb-2">Waktu makan</div>
+      <div class="grid grid-cols-4 gap-2">
+        ${MEALS.map(m => `<button data-act="setMealSheet" data-meal="${m.id}" class="tap rounded-xl py-2 text-[11px] font-semibold border ${UI.meal === m.id ? 'bg-brand-700 text-white border-brand-700' : 'bg-white border-slate-200 text-slate-600'}">${m.e}<br>${m.label}</button>`).join('')}
+      </div>
+      ${f.plate === 'karbo' && /nasi/i.test(f.name) ? `<div class="mt-4 text-[12.5px] bg-amber-50 text-amber-800 rounded-xl p-3">💡 Nasi tak perlu dipotong terus — 1 senduk (¼ pinggan) cukup untuk tenaga & elak pening.</div>` : ''}
+      <button data-act="addFood" class="tap mt-5 w-full bg-brand-700 text-white font-bold py-3.5 rounded-2xl text-[15px]">Tambah · ${fmt(f.kcal * q)} kcal</button>
+    </div>`;
+  });
+}
+
+function sheetCustom() {
+  openSheet(() => `
+    <div class="p-5">
+      <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+      <div class="font-bold text-lg">Tambah makanan sendiri</div>
+      <p class="text-[13px] text-slate-500">Akan disimpan dalam kategori "Sendiri" untuk guna semula.</p>
+      <label class="block mt-4 text-xs font-semibold text-slate-500">Nama makanan</label>
+      <input id="cfName" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500" placeholder="cth: Nasi kerabu">
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        <div><label class="block text-xs font-semibold text-slate-500">Kalori (kcal)</label>
+          <input id="cfKcal" type="number" inputmode="numeric" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500" placeholder="350"></div>
+        <div><label class="block text-xs font-semibold text-slate-500">Hidangan</label>
+          <input id="cfUnit" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500" placeholder="1 pinggan"></div>
+      </div>
+      <label class="block mt-3 text-xs font-semibold text-slate-500">Jenis (untuk imbangan pinggan)</label>
+      <select id="cfPlate" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-3 outline-none">
+        <option value="lain">Lain-lain / hidangan campur</option><option value="serat">Sayur & serat</option><option value="protein">Protein</option><option value="karbo">Karbo</option>
+      </select>
+      <button data-act="saveCustom" class="tap mt-5 w-full bg-brand-700 text-white font-bold py-3.5 rounded-2xl">Simpan & log ke ${MEALS.find(m => m.id === UI.meal).label}</button>
+    </div>`);
+}
+
+/* ---------- WEIGHT ---------- */
+function viewWeight() {
+  const p = S.profile, ws = sortedWeights(), cur = currentWeight(), b = bmi(cur);
+  const wk = weeklyChange();
+  return `
+  ${card(`
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div><div class="text-[11px] text-slate-500">Semasa</div><div class="text-xl font-extrabold">${cur.toFixed(1)}</div><div class="text-[11px] text-slate-400">kg</div></div>
+      <div><div class="text-[11px] text-slate-500">Dah turun</div><div class="text-xl font-extrabold text-brand-700">${Math.max(0, p.startWeight - cur).toFixed(1)}</div><div class="text-[11px] text-slate-400">dari ${p.startWeight} kg</div></div>
+      <div><div class="text-[11px] text-slate-500">BMI</div><div class="text-xl font-extrabold">${b.toFixed(1)}</div><div class="text-[11px] text-slate-400">${bmiLabel(b)}</div></div>
+    </div>
+    ${wk !== null ? `<div class="mt-3 text-[12.5px] text-center rounded-xl py-2 ${wk <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}">7 hari lepas: ${wk <= 0 ? '↓' : '↑'} ${Math.abs(wk).toFixed(1)} kg ${wk > 0 ? '— biasa naik turun sebab air & garam, tengok trend minggu ke minggu' : wk < -1.2 ? '— laju! Pastikan makan cukup, jangan bawah 1,500 kcal selalu' : '— kadar sihat 👍'}</div>` : ''}`)}
+
+  ${card(`
+    <div class="font-bold text-[15px] mb-3">Log berat</div>
+    <div class="flex gap-2">
+      <div class="relative flex-1">
+        <input id="wKg" type="number" step="0.1" inputmode="decimal" value="${cur.toFixed(1)}" class="w-full bg-slate-50 rounded-xl px-3 py-3 pr-10 text-lg font-bold outline-none focus:ring-2 focus:ring-brand-500">
+        <span class="absolute right-3 top-3.5 text-slate-400 text-sm">kg</span>
+      </div>
+      <input id="wDate" type="date" value="${todayKey()}" max="${todayKey()}" class="bg-slate-50 rounded-xl px-2 py-3 text-sm outline-none w-[140px]">
+    </div>
+    <button data-act="saveWeight" class="tap mt-3 w-full bg-brand-700 text-white font-bold py-3 rounded-xl">Simpan berat</button>
+    <p class="text-[11.5px] text-slate-400 mt-2">Tip: timbang waktu pagi, lepas ke tandas, sebelum makan — supaya bacaan konsisten.</p>`)}
+
+  ${card(`
+    <div class="flex justify-between items-center mb-2"><div class="font-bold text-[15px]">Trend berat</div><div class="text-[11px] text-slate-400">${ws.length} catatan</div></div>
+    ${weightChart(ws)}`)}
+
+  ${card(`
+    <div class="font-bold text-[15px] mb-3">Milestone 🏁</div>
+    <div class="space-y-4">${p.milestones.map((m, i) => milestoneRow(m, i)).join('')}</div>`)}
+
+  ${ws.length ? card(`
+    <div class="font-bold text-[15px] mb-1">Sejarah</div>
+    <div class="divide-y divide-slate-100">
+      ${[...ws].reverse().slice(0, 14).map((w, i, arr) => { const prev = arr[i + 1]; const dlt = prev ? w.kg - prev.kg : 0;
+        return `<div class="flex items-center py-2.5 text-[14px]"><div class="flex-1 text-slate-600">${niceDate(w.date)}</div>
+        <div class="w-16 text-right text-[12px] ${dlt < 0 ? 'text-green-600' : dlt > 0 ? 'text-amber-600' : 'text-slate-300'}">${prev ? (dlt > 0 ? '+' : '') + dlt.toFixed(1) : ''}</div>
+        <div class="w-20 text-right font-bold">${w.kg.toFixed(1)} kg</div>
+        <button data-act="delWeight" data-date="${w.date}" class="tap w-8 text-slate-300 text-right" aria-label="Padam">✕</button></div>`; }).join('')}
+    </div>`) : ''}`;
+}
+
+function bmiLabel(b) { return b < 18.5 ? 'kurang' : b < 23 ? 'normal' : b < 27.5 ? 'berlebihan' : 'obes'; } // Asian cut-offs (KKM)
+function weeklyChange() {
+  const ws = sortedWeights(); if (ws.length < 2) return null;
+  const last = ws[ws.length - 1]; const target = parseKey(last.date); target.setDate(target.getDate() - 7);
+  let ref = null;
+  for (const w of ws) { if (parseKey(w.date) <= target) ref = w; }
+  if (!ref) return null;
+  return last.kg - ref.kg;
+}
+function milestoneRow(m, i) {
+  const p = S.profile, cur = currentWeight();
+  const from = i === 0 ? p.startWeight : p.milestones[i - 1].kg;
+  const done = cur <= m.kg;
+  const pct = Math.max(0, Math.min(100, ((from - cur) / (from - m.kg)) * 100));
+  const left = cur - m.kg;
+  const active = !done && (i === 0 || cur <= p.milestones[i - 1].kg);
+  return `
+  <div class="${!done && !active ? 'opacity-60' : ''}">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full grid place-items-center text-sm ${done ? 'bg-green-500 text-white' : active ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-400'}">${done ? '✓' : i + 1}</div>
+      <div><div class="font-semibold text-[14px]">${esc(m.name)}: ${m.kg} kg</div>
+      <div class="text-[11.5px] text-slate-500">${done ? 'Tercapai! 🎉' : `${left.toFixed(1)} kg lagi · anggaran ${Math.ceil(left / 1)}–${Math.ceil(left / 0.5)} minggu`}</div></div></div>
+      <div class="text-[13px] font-bold ${done ? 'text-green-600' : 'text-slate-500'}">${Math.round(done ? 100 : pct)}%</div>
+    </div>
+    <div class="h-2 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full rounded-full ${done ? 'bg-green-500' : 'bg-brand-500'}" style="width:${done ? 100 : pct}%"></div></div>
+  </div>`;
+}
+function weightChart(ws) {
+  if (ws.length < 2) return `<div class="h-36 grid place-items-center text-center text-sm text-slate-400 bg-slate-50 rounded-2xl px-6">Log berat sekurang-kurangnya 2 kali untuk lihat graf trend.</div>`;
+  const pts = ws.slice(-30);
+  const W = 320, H = 170, pl = 34, pr = 12, pt = 14, pb = 24;
+  const t0 = parseKey(pts[0].date).getTime(), t1 = parseKey(pts[pts.length - 1].date).getTime() || t0 + 1;
+  const next = S.profile.milestones.find(m => currentWeight() > m.kg);
+  const kgs = pts.map(p => p.kg);
+  let lo = Math.min(...kgs), hi = Math.max(...kgs);
+  if (next && next.kg > lo - 6) lo = Math.min(lo, next.kg);
+  lo = Math.floor(lo - 0.5); hi = Math.ceil(hi + 0.5); if (hi - lo < 3) hi = lo + 3;
+  const x = t => pl + ((t - t0) / Math.max(1, t1 - t0)) * (W - pl - pr);
+  const y = kg => pt + (1 - (kg - lo) / (hi - lo)) * (H - pt - pb);
+  const coords = pts.map(p => [x(parseKey(p.date).getTime()), y(p.kg)]);
+  const line = coords.map((c, i) => (i ? 'L' : 'M') + c[0].toFixed(1) + ' ' + c[1].toFixed(1)).join(' ');
+  const area = line + ` L${coords[coords.length - 1][0]} ${H - pb} L${coords[0][0]} ${H - pb} Z`;
+  const ticks = [lo, Math.round((lo + hi) / 2), hi];
+  const last = coords[coords.length - 1];
+  return `
+  <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14a38f" stop-opacity=".25"/><stop offset="1" stop-color="#14a38f" stop-opacity="0"/></linearGradient></defs>
+    ${ticks.map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#eef2f1"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="#94a3b8">${t}</text>`).join('')}
+    ${next && next.kg >= lo ? `<line x1="${pl}" x2="${W - pr}" y1="${y(next.kg)}" y2="${y(next.kg)}" stroke="#22c55e" stroke-dasharray="4 4"/><text x="${W - pr}" y="${y(next.kg) - 4}" text-anchor="end" font-size="10" font-weight="700" fill="#16a34a">${esc(next.name)} ${next.kg} kg</text>` : ''}
+    <path d="${area}" fill="url(#g)"/>
+    <path d="${line}" fill="none" stroke="#0f8a79" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${coords.map(c => `<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="#fff" stroke="#0f8a79" stroke-width="2"/>`).join('')}
+    <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="#0f8a79"/>
+    <text x="${pl}" y="${H - 6}" font-size="10" fill="#94a3b8">${niceDate(pts[0].date)}</text>
+    <text x="${W - pr}" y="${H - 6}" text-anchor="end" font-size="10" fill="#94a3b8">${niceDate(pts[pts.length - 1].date)}</text>
+  </svg>`;
+}
+
+/* ---------- GUIDE ---------- */
+function viewGuide() {
+  const p = S.profile;
+  return `
+  ${card(`
+    <div class="text-center"><div class="font-extrabold text-lg text-brand-900">Pinggan Suku-Suku Separuh</div>
+    <p class="text-[13px] text-slate-500">Guna pinggan biasa — tak perlu timbang makanan.</p></div>
+    <div class="flex justify-center my-3">${plateSVG(200)}</div>
+    <div class="space-y-2.5">
+      ${guideRow('#22c55e', '½ pinggan — Sayur & serat', 'Ulam, kangkung, kobis, bayam, timun, kacang panjang, sup sayur. Makan ini dulu supaya cepat kenyang.')}
+      ${guideRow('#f4725e', '¼ pinggan — Protein', 'Ayam (buang kulit), ikan bakar/kukus, telur, tempe, tauhu. Sebesar tapak tangan.')}
+      ${guideRow('#f5b324', '¼ pinggan — Karbo kompleks', 'Nasi 1 senduk (perang lebih baik), ubi, roti gandum, oat. Sebesar penumbuk.')}
+    </div>`)}
+
+  ${card(`
+    <div class="font-bold text-[15px]">Prinsip 80/20 🌿</div>
+    <p class="text-[13.5px] text-slate-600 mt-1 leading-relaxed">80% masa ikut pinggan sihat, 20% boleh santai — nasi lemak hujung minggu atau kenduri. Yang penting <b>konsisten</b>, bukan sempurna. Satu hari terlebih tak rosakkan progres.</p>`)}
+
+  ${card(`
+    <div class="font-bold text-[15px] mb-2">Pengajaran penting 🧂🍚</div>
+    <ul class="space-y-2 text-[13.5px] text-slate-600">
+      <li class="flex gap-2"><span>❌</span><span>Jangan potong <b>garam & nasi terus</b> (cold turkey). Badan boleh hilang elektrolit — pening, sakit kepala, masuk angin.</span></li>
+      <li class="flex gap-2"><span>✅</span><span>Kurangkan <b>sikit-sikit</b>: 1 pinggan → 1½ senduk → 1 senduk dalam 2–3 minggu.</span></li>
+      <li class="flex gap-2"><span>✅</span><span>Garam secukup rasa masih perlu. Kurangkan makanan proses & kuah pekat, bukan buang garam sepenuhnya.</span></li>
+      <li class="flex gap-2"><span>✅</span><span>Jangan makan bawah <b>${fmt(p.kcalMin)} kcal</b> selalu — defisit terlalu besar buat badan lemah & cepat give up.</span></li>
+      <li class="flex gap-2"><span>💧</span><span>Minum ${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L air sehari. Kadang-kadang "lapar" sebenarnya dahaga.</span></li>
+    </ul>`)}
+
+  ${card(`
+    <div class="font-bold text-[15px] mb-2">Pilihan pintar di kedai 🍽️</div>
+    <div class="grid grid-cols-1 gap-2 text-[13px]">
+      ${swap('Nasi lemak (400)', 'Nasi lemak tanpa goreng-goreng, sambal sikit')}
+      ${swap('Roti canai (300)', 'Tosai kosong (170) / capati (120)')}
+      ${swap('Teh tarik (150)', 'Teh O / kopi O kosong (5)')}
+      ${swap('Ayam goreng (290)', 'Ayam bakar/grill tanpa kulit (220)')}
+      ${swap('Mee goreng (550)', 'Mee sup + tambah sayur (350)')}
+    </div>`)}
+
+  ${rescueHistory()}
+
+  ${card(`
+    <div class="font-bold text-[15px] mb-3">⚙️ Tetapan</div>
+    <div class="grid grid-cols-2 gap-3">
+      ${field('stName', 'Nama panggilan', p.name, 'text')}
+      ${field('stHeight', 'Tinggi (cm)', p.height)}
+      ${field('stStart', 'Berat mula (kg)', p.startWeight)}
+      ${field('stWater', 'Sasaran air (ml)', p.waterGoal)}
+      ${field('stMin', 'Kalori min', p.kcalMin)}
+      ${field('stMax', 'Kalori maks', p.kcalMax)}
+      ${p.milestones.map((m, i) => field('stM' + i, m.name + ' (kg)', m.kg)).join('')}
+    </div>
+    <button data-act="saveSettings" class="tap mt-4 w-full bg-brand-700 text-white font-bold py-3 rounded-xl">Simpan tetapan</button>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button data-act="export" class="tap bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl">⬇ Backup data</button>
+      <label class="tap bg-slate-100 text-slate-700 font-semibold text-sm py-2.5 rounded-xl text-center cursor-pointer">⬆ Restore<input id="importFile" type="file" accept="application/json" class="hidden"></label>
+    </div>
+    <button data-act="reset" class="tap mt-2 w-full text-rose-500 font-semibold text-sm py-2.5">Padam semua data</button>
+    <p class="text-[11px] text-slate-400 mt-2">Semua data disimpan dalam telefon anda sahaja (localStorage). Buat backup sekali-sekala.</p>`)}
+
+  <p class="text-[11px] text-slate-400 text-center px-6 pb-2">App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.</p>`;
+}
+const guideRow = (c, t, d) => `<div class="flex gap-3 items-start"><span class="w-3.5 h-3.5 rounded-full mt-1 shrink-0" style="background:${c}"></span><div><div class="font-semibold text-[14px]">${t}</div><div class="text-[13px] text-slate-500 leading-snug">${d}</div></div></div>`;
+const swap = (a, b) => `<div class="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2"><span class="text-slate-400 line-through decoration-rose-300 flex-1">${a}</span><span class="text-slate-300">→</span><span class="text-brand-800 font-semibold flex-1">${b}</span></div>`;
+const field = (id, label, val, type = 'number') => `<div><label class="block text-[11px] font-semibold text-slate-500">${label}</label><input id="${id}" type="${type}" ${type === 'number' ? 'inputmode="decimal" step="any"' : ''} value="${esc(val ?? '')}" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-500"></div>`;
+
+function rescueHistory() {
+  if (!S.rescues.length) return '';
+  const r = [...S.rescues].reverse().slice(0, 6);
+  return card(`
+    <div class="font-bold text-[15px] mb-1">Rekod pening / masuk angin</div>
+    <p class="text-[12px] text-slate-500 mb-2">Tengok corak — selalunya berlaku bila makan terlalu sikit atau kurang air.</p>
+    <div class="divide-y divide-slate-100">
+      ${r.map(x => { const d = new Date(x.t); return `<div class="py-2 text-[13px]"><div class="flex justify-between"><span class="font-semibold">${x.symptoms.map(s => SYMPTOMS[s]?.label || s).join(', ')}</span><span class="text-slate-400">${d.getDate()} ${BULAN[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span></div>
+      <div class="text-[12px] text-slate-500">Masa itu: ${fmt(x.kcal)} kcal · air ${fmt(x.water)} ml</div></div>`; }).join('')}
+    </div>`);
+}
+
+/* ============================================================
+   RESCUE ASSISTANT
+   ============================================================ */
+const SYMPTOMS = {
+  pening:  { label: 'Pening', e: '😵‍💫' },
+  kepala:  { label: 'Sakit kepala', e: '🤕' },
+  angin:   { label: 'Masuk angin / kembung', e: '🎈' },
+  lemah:   { label: 'Lemah / menggigil', e: '🥶' },
+  loya:    { label: 'Loya', e: '🤢' },
+  kejang:  { label: 'Kejang otot', e: '🦵' }
+};
+
+function sheetRescue() {
+  UI.sym = new Set(); UI.rescueDone = false;
+  openSheet(rescueBody);
+}
+function rescueBody() {
+  if (UI.rescueDone) return rescueResult();
+  return `
+  <div class="p-5">
+    <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+    <div class="flex items-center gap-3"><div class="w-12 h-12 rounded-2xl bg-rose-50 grid place-items-center text-2xl">🆘</div>
+      <div><div class="font-extrabold text-lg leading-tight">Bantuan Pening</div><div class="text-[13px] text-slate-500">Tenang dulu. Apa yang anda rasa sekarang?</div></div></div>
+    ${redFlags()}
+    <div class="grid grid-cols-2 gap-2 mt-4">
+      ${Object.entries(SYMPTOMS).map(([k, s]) => `<button data-act="sym" data-s="${k}" class="tap rounded-2xl border-2 px-3 py-3 text-left ${UI.sym.has(k) ? 'border-rose-400 bg-rose-50' : 'border-slate-200 bg-white'}">
+        <div class="text-xl">${s.e}</div><div class="text-[13px] font-semibold">${s.label}</div></button>`).join('')}
+    </div>
+    <button data-act="rescueGo" class="tap mt-5 w-full bg-rose-500 disabled:opacity-40 text-white font-bold py-3.5 rounded-2xl" ${UI.sym.size ? '' : 'disabled'}>Bantu saya sekarang</button>
+  </div>`;
+}
+function redFlags() {
+  return `<div class="mt-4 bg-red-50 border border-red-200 rounded-2xl p-3 text-[12.5px] text-red-800 leading-snug">
+    <b>🚨 Segera dapatkan rawatan / hubungi 999</b> jika ada sakit dada, sesak nafas, pengsan, muka/badan sebelah lemah, cakap pelat, penglihatan kabur tiba-tiba, atau sakit kepala yang paling teruk pernah rasa.</div>`;
+}
+function rescueResult() {
+  const d = peekDay(todayKey()), k = kcalOf(d), h = new Date().getHours(), s = UI.sym;
+  const lowFood = (h >= 12 && k < 600) || (h >= 17 && k < 1000);
+  const lowWater = d.water < Math.max(750, ((h - 7) / 14) * S.profile.waterGoal * 0.6);
+  const carbsToday = d.meals.filter(m => m.plate === 'karbo' || /nasi|roti|mee|kuey/i.test(m.name)).length;
+
+  const insights = [];
+  if (lowFood) insights.push(`Hari ini anda baru makan <b>${fmt(k)} kcal</b>. Ini mungkin terlalu sikit — badan kekurangan tenaga.`);
+  if (lowWater) insights.push(`Air hari ini baru <b>${fmt(d.water)} ml</b>. Kurang air ialah punca biasa pening & sakit kepala.`);
+  if (h >= 13 && carbsToday === 0) insights.push('Belum ada karbo hari ini. Potong nasi terus boleh cetuskan "keto flu".');
+
+  const steps = [
+    ['🪑', 'Berhenti & duduk', 'Duduk atau baring dalam tempat sejuk. Jangan memandu atau buat kerja berat sekarang.'],
+    ['🥤', 'Ganti elektrolit', s.has('angin')
+      ? 'Minum segelas air suam dengan secubit garam, perlahan-lahan. Perut kembung? Elak minuman bergas buat masa ini.'
+      : 'Minum <b>100Plus Zero Sugar</b> atau segelas air suam + secubit garam. Hirup perlahan-lahan.'],
+    ['🍘', 'Makan sesuatu ringan', (s.has('lemah') || lowFood)
+      ? 'Makan <b>1 biji pisang</b> atau <b>3 biji kurma</b> untuk naikkan gula darah, diikuti 2–3 keping biskut kraker.'
+      : 'Makan <b>2–3 keping biskut kraker</b> atau <b>1 biji pisang</b>. Kraker ada sedikit garam yang membantu.']
+  ];
+  if (s.has('kepala') || s.has('pening')) steps.push(['😮‍💨', 'Rehatkan mata & kepala', 'Tutup mata 10–15 minit, jauhkan skrin. Kalau biasa ambil panadol dan sesuai dengan anda, boleh ikut dos pada label.']);
+  if (s.has('angin')) steps.push(['🫚', 'Lega perut', 'Minum air halia suam (tanpa gula), sapu minyak angin di perut, dan jalan perlahan 5–10 minit. Elak baring terus lepas makan.']);
+  if (s.has('loya')) steps.push(['🫖', 'Hirup sikit-sikit', 'Ambil air dalam teguk kecil. Kraker kering lebih senang diterima perut berbanding makanan berminyak.']);
+  if (s.has('kejang')) steps.push(['🍌', 'Kalium & magnesium', 'Pisang dan sedikit garam membantu kejang otot. Regangkan otot perlahan-lahan.']);
+  if (lowFood) steps.push(['🍚', 'Waktu makan seterusnya', 'Makan hidangan penuh: <b>nasi 1 senduk</b> + lauk protein + sayur. Jangan skip — nasi dalam kadar betul OK.']);
+  steps.push(['⏱️', 'Tunggu 15–20 minit', 'Kebanyakan simptom keto flu lega selepas ini. Kalau tak lega dalam sejam atau makin teruk, jumpa doktor.']);
+
+  return `
+  <div class="p-5">
+    <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+    <div class="font-extrabold text-lg">Langkah lega untuk anda 💛</div>
+    <p class="text-[13px] text-slate-500">${[...s].map(x => SYMPTOMS[x].label).join(' · ')}</p>
+
+    ${insights.length ? `<div class="mt-3 bg-amber-50 rounded-2xl p-3 space-y-1.5 text-[13px] text-amber-900">
+      <div class="font-bold text-[12px] uppercase tracking-wide text-amber-700">Coach perasan…</div>${insights.map(i => `<div>• ${i}</div>`).join('')}</div>` : ''}
+
+    <ol class="mt-4 space-y-3">
+      ${steps.map(([e, t, dsc], i) => `<li class="flex gap-3"><div class="w-9 h-9 shrink-0 rounded-xl bg-rose-50 grid place-items-center text-lg">${e}</div>
+        <div><div class="font-semibold text-[14px]">${i + 1}. ${t}</div><div class="text-[13px] text-slate-600 leading-snug">${dsc}</div></div></li>`).join('')}
+    </ol>
+
+    <div class="mt-4 text-xs font-semibold text-slate-500 mb-2">Dah ambil? Tekan untuk log terus:</div>
+    <div class="grid grid-cols-3 gap-2">
+      <button data-act="rescueLog" data-id="p100z" class="tap bg-sky-50 text-sky-700 rounded-xl py-2.5 text-[12px] font-semibold">🥫 100Plus Zero</button>
+      <button data-act="rescueLog" data-id="kraker" class="tap bg-amber-50 text-amber-800 rounded-xl py-2.5 text-[12px] font-semibold">🍘 Kraker</button>
+      <button data-act="rescueLog" data-id="pisang" class="tap bg-yellow-50 text-yellow-800 rounded-xl py-2.5 text-[12px] font-semibold">🍌 Pisang</button>
+    </div>
+
+    <div class="mt-4 bg-brand-50 rounded-2xl p-3 text-[12.5px] text-brand-900 leading-snug">
+      <b>Ingat pengajaran lepas:</b> potong garam & nasi secara mendadak buat badan "terkejut". Kurangkan sikit-sikit — progres lambat tapi selamat lebih baik dari pening hari-hari.
+    </div>
+    <p class="text-[11px] text-slate-400 mt-3">Ada kencing manis atau ambil ubat darah tinggi? Simptom ini mungkin berkaitan ubat atau gula rendah — semak bacaan dan rujuk doktor.</p>
+    <button data-act="closeSheet" class="tap mt-4 w-full bg-slate-800 text-white font-bold py-3.5 rounded-2xl">Saya dah rasa okay</button>
+  </div>`;
+}
+
+/* ============================================================
+   MENU SUGGESTION ENGINE (Enjin A — rule-based, offline)
+   ============================================================ */
+// Set this to your Vercel function URL (e.g. '/api/coach') once the Claude API key is ready.
+// While empty, the "Tanya Coach AI" button stays hidden and the app relies on Enjin A only.
+const AI_ENDPOINT = '';
+
+const VENUES = {
+  gerai:    { label: 'Gerai / warung', e: '🛖' },
+  mamak:    { label: 'Mamak', e: '🫓' },
+  campur:   { label: 'Nasi campur', e: '🍛' },
+  kopitiam: { label: 'Kopitiam', e: '☕' },
+  segera:   { label: 'Makanan segera', e: '🍔' },
+  kenduri:  { label: 'Kenduri', e: '🎉' },
+  kedai:    { label: 'Kedai serbaneka', e: '🏪' }
+};
+
+// items: [foodId, qty]   meals: s=sarapan t=tengahari m=malam n=snek
+const MENUS = [
+  // ---------- RUMAH: sarapan ----------
+  { id:'r1', loc:'rumah', meals:'s', e:'🥚', name:'Telur rebus & roti gandum', items:[['telurr',2],['rotig',1],['salad',0.5],['kopio',1]], tip:'Protein pagi buat kenyang lebih lama — kurang craving tengah hari.' },
+  { id:'r2', loc:'rumah', meals:'s', e:'🥣', name:'Oat pisang', items:[['oat',1],['pisang',0.5]], tip:'Guna oat biasa (rolled oats), bukan oat segera berperisa.' },
+  { id:'r3', loc:'rumah', meals:'s', e:'🫓', name:'Capati, dal & telur', items:[['capati',1],['dal',1],['telurr',1]], tip:'Capati beku pun boleh — panaskan tanpa minyak.' },
+  { id:'r4', loc:'rumah', meals:'s', e:'🍳', name:'Nasi goreng kampung sikit + telur mata', items:[['nasigoreng',1],['telurg',1],['salad',0.5]], tip:'Guna nasi semalam, minyak 1 sudu sahaja, banyakkan sayur.' },
+  { id:'r5', loc:'rumah', meals:'s', e:'🍠', name:'Ubi keledek & telur rebus', items:[['ubi',1],['telurr',2],['kopio',1]], tip:'Ubi keledek ialah karbo kompleks — tenaga stabil sampai tengah hari.' },
+  { id:'r6', loc:'rumah', meals:'s', e:'🐟', name:'Roti tuna', items:[['rotig',1],['tunatin',1],['salad',0.5]], tip:'Pilih tuna dalam air, bukan dalam minyak atau mayonis.' },
+  { id:'r7', loc:'rumah', meals:'st', e:'🍜', name:'Bihun goreng sayur + telur', items:[['bihun',1.5],['telurg',1],['sayurc',1]], tip:'Masukkan sayur lebih dari bihun.' },
+  // ---------- RUMAH: tengah hari / malam ----------
+  { id:'r10', loc:'rumah', meals:'tm', e:'🐟', name:'Nasi + ikan bakar + ulam', items:[['nasi1',1],['ikanb',1],['ulam',1],['sayurc',1]], tip:'Klasik suku-suku separuh. Makan ulam dulu.' },
+  { id:'r11', loc:'rumah', meals:'tm', e:'🍗', name:'Nasi perang + ayam grill + sayur', items:[['nasib',1],['agrill',1],['sayurr',1]], tip:'Perap ayam dengan kunyit, garam & lada — tak perlu sos manis.' },
+  { id:'r12', loc:'rumah', meals:'tm', e:'🌶️', name:'Asam pedas & kangkung', items:[['nasi1',1],['asampedas',1],['kangkung',1]], tip:'Ambil isi ikan, kuah secukupnya sahaja.' },
+  { id:'r13', loc:'rumah', meals:'tm', e:'🍲', name:'Nasi + sup ayam + sayur', items:[['nasi1',1],['ayamsup',1],['sayurc',1]], tip:'Sup ayam sesuai bila badan rasa lemah atau masuk angin.' },
+  { id:'r14', loc:'rumah', meals:'tm', e:'🍳', name:'Telur dadar, tempe & sayur', items:[['nasi1',1],['telurdadar',1],['tempe',1],['sayurc',1]], tip:'Menu jimat & tinggi protein. Goreng tempe guna sedikit minyak.' },
+  { id:'r15', loc:'rumah', meals:'m', e:'🐠', name:'Ikan kukus + ubi + sayur rebus', items:[['ikanb',1],['ubi',1],['sayurr',1]], tip:'Makan malam ringan tapi cukup — tidur lebih selesa.' },
+  { id:'r16', loc:'rumah', meals:'tm', e:'🥗', name:'Salad ayam & telur', items:[['salad',1],['agrill',1],['telurr',1],['rotig',0.5]], tip:'Dressing: perahan limau + sedikit minyak zaitun, elak mayonis.' },
+  { id:'r17', loc:'rumah', meals:'m', e:'⬜', name:'Tauhu, telur & kangkung', items:[['nasib',1],['tauhu',1],['telurr',1],['kangkung',1]], tip:'Tauhu sumber protein murah dan ringan untuk malam.' },
+  { id:'r18', loc:'rumah', meals:'t', e:'🥩', name:'Daging masak kicap + ulam', items:[['nasi1',1],['dagingm',1],['sayurc',1],['ulam',1]], tip:'Pilih daging tanpa lemak, kicap sikit.' },
+  // ---------- RUMAH: snek ----------
+  { id:'n1', loc:'rumah', meals:'n', e:'🍌', name:'Pisang', items:[['pisang',1]], tip:'Kalium dalam pisang bantu elak kejang & pening.' },
+  { id:'n2', loc:'rumah', meals:'n', e:'🍎', name:'Epal / oren', items:[['epal',1]], tip:'Makan buah, bukan jus — seratnya buat kenyang.' },
+  { id:'n3', loc:'rumah', meals:'n', e:'🥛', name:'Yogurt + betik', items:[['yogurt',1],['betik',0.5]], tip:'Yogurt plain bagus untuk perut yang selalu kembung.' },
+  { id:'n4', loc:'rumah', meals:'n', e:'🍘', name:'Biskut kraker + kopi O', items:[['kraker',1],['kopio',1]], tip:'Snek petang klasik yang ringan.' },
+  { id:'n5', loc:'rumah', meals:'n', e:'🥚', name:'Telur rebus + timun', items:[['telurr',1],['salad',0.5]], tip:'Snek protein — tahan lapar sampai makan malam.' },
+  { id:'n6', loc:'rumah', meals:'n', e:'🌴', name:'Kurma + susu rendah lemak', items:[['kurma',1],['susu',1]], tip:'Sesuai bila rasa lemah atau sebelum aktiviti.' },
+  { id:'n7', loc:'rumah', meals:'n', e:'🥜', name:'Kacang separuh genggam', items:[['kacang',0.5]], tip:'Kacang tinggi kalori — separuh genggam cukup.' },
+  { id:'n8', loc:'rumah', meals:'n', e:'🌽', name:'Jagung rebus', items:[['jagung',1]], tip:'Tak perlu mentega & susu pekat.' },
+  // ---------- LUAR: gerai / warung ----------
+  { id:'g1', loc:'luar', venue:'gerai', meals:'s', e:'🍛', name:'Nasi lemak biasa + kopi O', items:[['nlemak',1],['kopio',1]], tip:'Minta sambal sikit, tak payah tambah ayam goreng.' },
+  { id:'g2', loc:'luar', venue:'gerai', meals:'s', e:'🍛', name:'Nasi lemak separuh + telur rebus', items:[['nlemak',0.5],['telurr',1],['kopio',1]], tip:'Kongsi atau minta "nasi sikit" — protein dari telur.' },
+  { id:'g3', loc:'luar', venue:'gerai', meals:'s', e:'🥟', name:'Kuih 1 biji + 2 telur rebus', items:[['karipap',1],['telurr',2],['kopio',1]], tip:'Satu kuih je — pilih yang tak bergoreng kalau ada.' },
+  { id:'g4', loc:'luar', venue:'gerai', meals:'m', e:'🍢', name:'Sate 5 cucuk + timun', items:[['sate',1],['kuahkacang',1],['salad',1]], tip:'Kuah kacang 2 sudu je, skip nasi impit kalau dah makan nasi siang.' },
+  { id:'g5', loc:'luar', venue:'gerai', meals:'tm', e:'🍲', name:'Mee sup tambah sayur', items:[['msup',1],['kopio',1]], tip:'Minta tambah sayur & ayam, kurangkan mee.' },
+  // ---------- LUAR: mamak ----------
+  { id:'m1', loc:'luar', venue:'mamak', meals:'s', e:'🫓', name:'Tosai + dal + teh O', items:[['tosai',1],['dal',1],['kopio',1]], tip:'Tosai lebih ringan dari roti canai.' },
+  { id:'m2', loc:'luar', venue:'mamak', meals:'sm', e:'🫓', name:'Capati 2 keping + dal', items:[['capati',2],['dal',1],['kopio',1]], tip:'Capati tiada minyak — pilihan paling selamat di mamak.' },
+  { id:'m3', loc:'luar', venue:'mamak', meals:'s', e:'🫓', name:'Roti canai 1 + telur separuh masak', items:[['rcanai',1],['telurr',2],['kopio',1]], tip:'Satu keping je. Minta kuah dal, bukan kari.' },
+  { id:'m4', loc:'luar', venue:'mamak', meals:'tm', e:'🐟', name:'Ikan bakar + nasi sikit + sayur', items:[['ikanb',1],['nasi1',1],['sayurc',1],['kopio',1]], tip:'Minta kuah asing supaya boleh kawal.' },
+  { id:'m5', loc:'luar', venue:'mamak', meals:'tm', e:'🍗', name:'Ayam tandoori + capati + salad', items:[['tandoori',1],['capati',1],['salad',1]], tip:'Tukar naan ke capati — jimat ~150 kcal.' },
+  { id:'m6', loc:'luar', venue:'mamak', meals:'tm', e:'🍜', name:'Mee sup / mee hoon sup', items:[['msup',1],['kopio',1]], tip:'Minta tambah sayur.' },
+  { id:'m7', loc:'luar', venue:'mamak', meals:'t', e:'🍛', name:'Nasi kandar ringan', items:[['nasi1',1.5],['agrill',1],['sayurc',1],['kuahkari',1]], tip:'Kuah campur sikit sahaja, minta asing.' },
+  // ---------- LUAR: nasi campur ----------
+  { id:'c1', loc:'luar', venue:'campur', meals:'tm', e:'🍛', name:'Nasi + ikan goreng + 2 sayur', items:[['nasi1',1],['ikang',1],['sayurc',2]], tip:'Formula mudah: 1 senduk nasi, 1 lauk, 2 sayur.' },
+  { id:'c2', loc:'luar', venue:'campur', meals:'tm', e:'🍗', name:'Nasi + ayam masak merah + ulam', items:[['nasi1',1],['ayammerah',1],['ulam',1],['sayurc',1]], tip:'Ambil isi ayam, kurangkan kuah merah.' },
+  { id:'c3', loc:'luar', venue:'campur', meals:'tm', e:'🌶️', name:'Nasi + asam pedas + sayur', items:[['nasi1',1],['asampedas',1],['sayurc',1]], tip:'Lauk berkuah lebih ringan dari lauk goreng.' },
+  { id:'c4', loc:'luar', venue:'campur', meals:'tm', e:'🍳', name:'Nasi + telur dadar + tempe + sayur', items:[['nasi1',1],['telurdadar',1],['tempe',1],['sayurc',1]], tip:'Pilihan jimat & tinggi protein.' },
+  { id:'c5', loc:'luar', venue:'campur', meals:'tm', e:'🍲', name:'Nasi + sup ayam + sayur', items:[['nasi1',1],['ayamsup',1],['sayurc',1]], tip:'Elok untuk perut — tak berminyak.' },
+  // ---------- LUAR: kopitiam ----------
+  { id:'k1', loc:'luar', venue:'kopitiam', meals:'s', e:'🍞', name:'Roti bakar + telur separuh masak', items:[['rotibakar',1],['telurr',2],['kopio',1]], tip:'Minta kaya sikit, tak nak mentega.' },
+  { id:'k2', loc:'luar', venue:'kopitiam', meals:'stm', e:'🍜', name:'Mee hoon sup', items:[['msup',1],['kopio',1]], tip:'Minta tambah sayur sawi.' },
+  { id:'k3', loc:'luar', venue:'kopitiam', meals:'tm', e:'🍲', name:'Yong tau foo sup', items:[['yongtau',1],['sayurr',1]], tip:'Pilih tauhu & sayur, kurangkan yang bergoreng.' },
+  { id:'k4', loc:'luar', venue:'kopitiam', meals:'t', e:'🍗', name:'Nasi ayam panggang (nasi sikit)', items:[['nasi1',1],['agrill',1],['salad',1]], tip:'Minta nasi sikit & ayam panggang, tambah timun.' },
+  { id:'k5', loc:'luar', venue:'kopitiam', meals:'m', e:'🍽️', name:'Chicken chop grill', items:[['chickenchop',1]], tip:'Sos asing, tukar fries ke salad.' },
+  // ---------- LUAR: makanan segera ----------
+  { id:'f1', loc:'luar', venue:'segera', meals:'tm', e:'🍗', name:'Ayam panggang + coleslaw', items:[['agrill',1],['coleslaw',1],['p100z',1]], tip:'Pilih menu panggang/grill, minum air kosong atau zero sugar.' },
+  { id:'f2', loc:'luar', venue:'segera', meals:'tm', e:'🍔', name:'Burger ayam grill tanpa fries', items:[['burger',1],['p100z',1]], tip:'Skip fries & air manis — jimat ~450 kcal.' },
+  { id:'f3', loc:'luar', venue:'segera', meals:'tm', e:'🍗', name:'1 ketul ayam goreng + kentang lenyek', items:[['agoreng',1],['mashed',1]], tip:'Buang kulit ayam — jimat ~90 kcal.' },
+  // ---------- LUAR: kenduri ----------
+  { id:'e1', loc:'luar', venue:'kenduri', meals:'tm', e:'🎉', name:'Nasi minyak 1 senduk + ayam merah + acar', items:[['nasiminyak',1],['ayammerah',1],['acar',1],['dal',1]], tip:'Guna pinggan kecil, isi acar & sayur dulu.' },
+  { id:'e2', loc:'luar', venue:'kenduri', meals:'tm', e:'🥩', name:'Nasi putih + rendang + sayur', items:[['nasi1',1],['rendang',1],['sayurc',1],['acar',1]], tip:'Pilih nasi putih kalau ada — lebih ringan dari nasi minyak.' },
+  { id:'e3', loc:'luar', venue:'kenduri', meals:'tm', e:'🎉', name:'Pinggan ringan kenduri', items:[['nasiminyak',1],['ayammerah',0.5],['dal',1],['acar',1]], tip:'Separuh ketul ayam, tak perlu tambah pinggan kedua.' },
+  // ---------- LUAR: kedai serbaneka (snek) ----------
+  { id:'s1', loc:'luar', venue:'kedai', meals:'n', e:'🍌', name:'Pisang', items:[['pisang',1]], tip:'Ada di kebanyakan kedai serbaneka.' },
+  { id:'s2', loc:'luar', venue:'kedai', meals:'n', e:'🥚', name:'Telur rebus 2 biji', items:[['telurr',2]], tip:'Snek protein paling mudah dibeli.' },
+  { id:'s3', loc:'luar', venue:'kedai', meals:'n', e:'🥛', name:'Yogurt / susu rendah lemak', items:[['yogurt',1]], tip:'Semak label — pilih kurang gula.' },
+  { id:'s4', loc:'luar', venue:'kedai', meals:'n', e:'🥜', name:'Kacang + 100Plus Zero', items:[['kacang',0.5],['p100z',1]], tip:'Beli paket kecil, jangan paket besar.' },
+  { id:'s5', loc:'luar', venue:'kedai', meals:'n', e:'🍘', name:'Biskut kraker', items:[['kraker',1]], tip:'Pilih kraker biasa, bukan yang berkrim.' },
+  { id:'s6', loc:'luar', venue:'gerai', meals:'n', e:'🌽', name:'Jagung rebus', items:[['jagung',1]], tip:'Minta tanpa mentega & susu pekat.' }
+];
+
+const MEAL_CODE = { sarapan:'s', tengahari:'t', malam:'m', snek:'n' };
+const MEAL_SHARE = { sarapan:0.25, tengahari:0.35, snek:0.10, malam:0.30 };
+const MEAL_FLOW = ['sarapan', 'tengahari', 'snek', 'malam'];
+
+function menuItems(m) { return m.items.map(([id, qty]) => ({ f: findFood(id), qty })).filter(x => x.f); }
+function menuKcal(m) { return Math.round(menuItems(m).reduce((a, x) => a + x.f.kcal * x.qty, 0)); }
+function seeded(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; }
+function nextMeal(meal) { const i = MEAL_FLOW.indexOf(meal); return MEAL_FLOW[Math.min(i + 1, MEAL_FLOW.length - 1)]; }
+
+// How many kcal should this meal be, given what's been eaten and which meals are still to come?
+function mealTarget(meal) {
+  const p = S.profile, d = peekDay(todayKey()), k = kcalOf(d);
+  const remaining = p.kcalMax - k;
+  const logged = new Set(d.meals.map(x => x.meal));
+  const idx = MEAL_FLOW.indexOf(meal);
+  const future = MEAL_FLOW.slice(idx + 1).filter(m => !logged.has(m) && m !== 'snek');
+  const futureShare = future.reduce((a, m) => a + MEAL_SHARE[m], 0);
+  const isSnack = meal === 'snek';
+  let ideal = remaining * MEAL_SHARE[meal] / (MEAL_SHARE[meal] + futureShare);
+  let note = '';
+  const [lo, hi] = isSnack ? [60, 200] : [300, 700];
+  if (remaining <= (isSnack ? 60 : 300)) {
+    ideal = lo;
+    note = isSnack
+      ? 'Kalori hari ini dah hampir cukup. Kalau lapar, pilih buah atau telur rebus.'
+      : 'Kalori hari ini dah hampir/lebih sasaran — tak apa. Makan ringan tapi seimbang, jangan skip makan.';
+  } else if (!isSnack && ideal > hi) {
+    note = k === 0
+      ? 'Belum ada makanan dilog hari ini. Kalau terlepas makan, makan dengan cukup ya — jangan terlalu sikit.'
+      : `Hari ini baru ${fmt(k)} kcal — makan dengan cukup ya, jangan terlalu sikit.`;
+  }
+  ideal = Math.round(Math.max(lo, Math.min(hi, ideal)) / 10) * 10;
+  return { ideal, remaining, note };
+}
+
+function suggestMenus(venue) {
+  const s = UI.sug, code = MEAL_CODE[s.meal], t = mealTarget(s.meal);
+  const d = peekDay(todayKey()), pc = plateCounts(d);
+  const eatenToday = new Set(d.meals.map(x => x.foodId));
+  const needVeg = pc.serat < Math.max(1, (pc.protein + pc.karbo) / 2);
+  let pool = MENUS.filter(m => m.meals.includes(code) && m.loc === s.loc && (s.loc === 'rumah' || m.venue === venue));
+  const scored = pool.map(m => {
+    const kc = menuKcal(m), its = menuItems(m);
+    let score = -Math.abs(kc - t.ideal) / t.ideal * 100;
+    if (kc > t.ideal * 1.4) score -= 25;
+    if (needVeg && its.some(x => x.f.plate === 'serat')) score += 15;
+    if (s.meal !== 'snek' && its.some(x => x.f.plate === 'protein')) score += 6;
+    its.forEach(x => { if (eatenToday.has(x.f.id) && x.f.plate !== 'serat' && x.f.id !== 'kopio') score -= 8; });
+    score += seeded(todayKey() + s.meal + s.loc + venue + s.seed + m.id) * 22; // variety + "Cadangan lain"
+    return { m, kc, score };
+  }).sort((a, b) => b.score - a.score);
+  return { list: scored.slice(0, 3), t, needVeg };
+}
+
+function venuesFor(meal) {
+  const code = MEAL_CODE[meal];
+  return Object.keys(VENUES).filter(v => MENUS.some(m => m.venue === v && m.meals.includes(code)));
+}
+
+function suggestBlock() {
+  const s = UI.sug;
+  const vs = venuesFor(s.meal);
+  const venue = vs.includes(s.venue) ? s.venue : vs[0];   // don't overwrite the saved choice
+  const { list, t, needVeg } = suggestMenus(venue);
+  const mealInfo = MEALS.find(m => m.id === s.meal);
+  const logged = peekDay(todayKey()).meals.some(x => x.meal === s.meal);
+  return `
+  <div class="flex items-start justify-between gap-2">
+    <div><div class="text-xs font-semibold text-brand-700">💡 Cadangan menu Coach</div>
+      <div class="font-bold text-[16px]">${mealInfo.e} ${mealInfo.label}${logged ? ' <span class="text-[11px] font-semibold text-green-600 align-middle">· dah log</span>' : ''}</div></div>
+    <div class="text-right shrink-0"><div class="text-[11px] text-slate-500">Sasaran</div><div class="font-extrabold text-[15px]">~${fmt(t.ideal)} <span class="text-[11px] font-semibold text-slate-400">kcal</span></div></div>
+  </div>
+
+  <div class="grid grid-cols-4 gap-1.5 mt-3">
+    ${MEALS.map(m => `<button data-act="sugMeal" data-meal="${m.id}" class="tap rounded-xl py-1.5 text-[11px] font-semibold ${s.meal === m.id ? 'bg-slate-800 text-white' : 'bg-slate-50 text-slate-500'}">${m.label}</button>`).join('')}
+  </div>
+
+  <div class="grid grid-cols-2 gap-1 mt-2 bg-slate-100 p-1 rounded-xl">
+    <button data-act="sugLoc" data-loc="rumah" class="tap rounded-lg py-2 text-[13px] font-semibold ${s.loc === 'rumah' ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">🏠 Di rumah</button>
+    <button data-act="sugLoc" data-loc="luar" class="tap rounded-lg py-2 text-[13px] font-semibold ${s.loc === 'luar' ? 'bg-white shadow-card text-brand-800' : 'text-slate-500'}">🍽️ Di luar</button>
+  </div>
+
+  ${s.loc === 'luar' ? `<div class="flex gap-1.5 overflow-x-auto no-scrollbar mt-2 -mx-4 px-4">
+    ${vs.map(v => `<button data-act="sugVenue" data-v="${v}" class="tap shrink-0 px-3 py-1.5 rounded-full text-[12px] font-semibold border ${venue === v ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-600 border-slate-200'}">${VENUES[v].e} ${VENUES[v].label}</button>`).join('')}
+  </div>` : ''}
+
+  ${t.note ? `<div class="mt-3 text-[12.5px] bg-amber-50 text-amber-800 rounded-xl px-3 py-2">${t.note}</div>`
+    : needVeg && s.meal !== 'snek' ? `<div class="mt-3 text-[12.5px] bg-green-50 text-green-800 rounded-xl px-3 py-2">🥬 Hari ini kurang sayur — cadangan di bawah diutamakan yang ada sayur.</div>` : ''}
+
+  <div class="space-y-2.5 mt-3">
+    ${list.map(({ m, kc }, i) => {
+      const its = menuItems(m); const fit = Math.abs(kc - t.ideal) <= t.ideal * 0.2;
+      return `
+      <div class="rounded-2xl border ${i === 0 ? 'border-brand-200 bg-brand-50/40' : 'border-slate-100'} p-3">
+        <div class="flex items-start gap-2.5">
+          <div class="text-2xl leading-none mt-0.5">${m.e}</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-[14px] leading-snug">${esc(m.name)}${i === 0 ? ' <span class="text-[10px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded-full align-middle">Pilihan utama</span>' : ''}</div>
+            <div class="mt-1 text-[12px] text-slate-500 leading-relaxed">
+              ${its.map(x => `<span class="inline-flex items-center gap-1 whitespace-nowrap mr-2"><span class="w-1.5 h-1.5 rounded-full" style="background:${PLATE[x.f.plate || 'lain'].color}"></span>${x.qty !== 1 ? x.qty + '× ' : ''}${esc(x.f.name)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="text-right shrink-0"><div class="font-extrabold text-[15px]">${fmt(kc)}</div><div class="text-[10px] ${fit ? 'text-green-600 font-semibold' : 'text-slate-400'}">${fit ? '✓ sesuai' : 'kcal'}</div></div>
+        </div>
+        <div class="text-[12px] text-slate-600 mt-2">💡 ${esc(m.tip)}</div>
+        <button data-act="logMenu" data-id="${m.id}" class="tap mt-2.5 w-full text-[13px] font-semibold rounded-xl py-2 ${i === 0 ? 'bg-brand-700 text-white' : 'bg-white border border-slate-200 text-brand-700'}">+ Log menu ini</button>
+      </div>`; }).join('') || `<div class="text-center text-sm text-slate-400 py-4">Tiada cadangan untuk pilihan ini.</div>`}
+  </div>
+
+  <div class="grid ${AI_ENDPOINT ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-3">
+    <button data-act="sugShuffle" class="tap bg-slate-100 text-slate-700 font-semibold text-[13px] py-2.5 rounded-xl">🔄 Cadangan lain</button>
+    ${AI_ENDPOINT ? `<button data-act="askAI" class="tap bg-gradient-to-r from-violet-500 to-brand-600 text-white font-semibold text-[13px] py-2.5 rounded-xl">✨ Tanya Coach AI</button>` : ''}
+  </div>`;
+}
+
+// Context the AI coach (Enjin B) will receive later — no name, no weight history.
+function buildAIContext(extra = {}) {
+  const d = peekDay(todayKey()), p = S.profile, t = mealTarget(UI.sug.meal);
+  return {
+    meal: UI.sug.meal, location: UI.sug.loc, venue: UI.sug.loc === 'luar' ? UI.sug.venue : null,
+    targetKcal: t.ideal, remainingKcal: t.remaining, dailyRange: [p.kcalMin, p.kcalMax],
+    eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal })),
+    plateToday: plateCounts(d), ...extra
+  };
+}
+
+function sheetSuggest() {
+  openSheet(() => `<div class="p-5"><div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>${suggestBlock()}</div>`);
+}
+
+/* ============================================================
+   SHEET
+   ============================================================ */
+let sheetFn = null;
+function openSheet(fn) { sheetFn = fn; document.getElementById('sheet').innerHTML = fn(); document.getElementById('sheetWrap').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function refreshSheet() { if (sheetFn) document.getElementById('sheet').innerHTML = sheetFn(); }
+function closeSheet() { sheetFn = null; document.getElementById('sheetWrap').classList.add('hidden'); document.body.style.overflow = ''; }
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+function addMeal(f, qty, meal) {
+  const d = day();
+  d.meals.push({ id: uid(), foodId: f.id, name: f.name, unit: f.unit, qty, kcal: Math.round(f.kcal * qty), plate: f.plate || 'lain', meal, t: Date.now() });
+  if (f.water) d.water += Math.round(f.water * qty);
+  save();
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
+  const a = el.dataset.act;
+  switch (a) {
+    case 'tab': UI.tab = el.dataset.tab; if (UI.tab !== 'food') UI.q = ''; render(); window.scrollTo({ top: 0 }); break;
+    case 'quickMeal': UI.meal = el.dataset.meal; UI.tab = 'food'; render(); window.scrollTo({ top: 0 }); break;
+    case 'setMeal': UI.meal = el.dataset.meal; render(); break;
+    case 'setMealSheet': UI.meal = el.dataset.meal; refreshSheet(); render(); break;
+    case 'cat': UI.cat = el.dataset.cat; render(); break;
+    case 'pickFood': sheetFood(el.dataset.id); break;
+    case 'qty': UI.pick.qty = Math.max(0.5, Math.min(10, UI.pick.qty + parseFloat(el.dataset.d))); refreshSheet(); break;
+    case 'addFood': {
+      const f = findFood(UI.pick.id); addMeal(f, UI.pick.qty, UI.meal);
+      closeSheet(); render(); toast(`✓ ${f.name} ditambah (${fmt(f.kcal * UI.pick.qty)} kcal)`); break;
+    }
+    case 'delMeal': { const d = day(); const m = d.meals.find(x => x.id === el.dataset.id);
+      if (m) { const f = findFood(m.foodId); if (f?.water) d.water = Math.max(0, d.water - Math.round(f.water * m.qty)); }
+      d.meals = d.meals.filter(x => x.id !== el.dataset.id); save(); render(); toast('Dipadam'); break; }
+    case 'customFood': sheetCustom(); break;
+    case 'saveCustom': {
+      const name = document.getElementById('cfName').value.trim(), kcal = parseFloat(document.getElementById('cfKcal').value);
+      if (!name || !(kcal >= 0)) { toast('Isi nama & kalori dulu'); return; }
+      const f = { id: 'c_' + uid(), name, kcal: Math.round(kcal), unit: document.getElementById('cfUnit').value.trim() || '1 hidangan', plate: document.getElementById('cfPlate').value, e: '🍽️' };
+      S.customFoods.push(f); addMeal(f, 1, UI.meal); closeSheet(); render(); toast('✓ Disimpan & dilog'); break;
+    }
+    case 'water': { const d = day(); const ml = parseInt(el.dataset.ml, 10);
+      const before = d.water; d.water = Math.max(0, d.water + ml); save(); render();
+      if (ml > 0 && before < S.profile.waterGoal && d.water >= S.profile.waterGoal) toast('🎉 Sasaran air tercapai!'); else if (ml > 0) toast(`💧 +${ml} ml`);
+      break; }
+    case 'saveWeight': {
+      const kg = parseFloat(document.getElementById('wKg').value), date = document.getElementById('wDate').value || todayKey();
+      if (!(kg > 30 && kg < 300)) { toast('Masukkan berat yang betul'); return; }
+      const before = currentWeight();
+      S.weights = S.weights.filter(w => w.date !== date); S.weights.push({ date, kg: Math.round(kg * 10) / 10 }); save();
+      const hit = S.profile.milestones.find(m => before > m.kg && currentWeight() <= m.kg);
+      render(); toast(hit ? `🏆 Tahniah! ${hit.name} (${hit.kg} kg) tercapai!` : '✓ Berat disimpan'); break;
+    }
+    case 'delWeight': if (confirm('Padam catatan berat ini?')) { S.weights = S.weights.filter(w => w.date !== el.dataset.date); save(); render(); } break;
+    case 'rescue': sheetRescue(); break;
+    case 'sym': { const k = el.dataset.s; UI.sym.has(k) ? UI.sym.delete(k) : UI.sym.add(k); refreshSheet(); break; }
+    case 'rescueGo': {
+      const d = peekDay(todayKey());
+      S.rescues.push({ t: Date.now(), symptoms: [...UI.sym], kcal: kcalOf(d), water: d.water }); save();
+      UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
+    }
+    case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`✓ ${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
+    case 'closeSheet': closeSheet(); render(); break;
+    case 'saveSettings': {
+      const num = (id, fb) => { const v = parseFloat(document.getElementById(id).value); return isFinite(v) && v > 0 ? v : fb; };
+      const p = S.profile;
+      p.name = document.getElementById('stName').value.trim();
+      p.height = num('stHeight', p.height); p.startWeight = num('stStart', p.startWeight);
+      p.waterGoal = num('stWater', p.waterGoal); p.waterIdeal = Math.max(p.waterIdeal, p.waterGoal);
+      p.kcalMin = num('stMin', p.kcalMin); p.kcalMax = Math.max(p.kcalMin, num('stMax', p.kcalMax));
+      p.milestones.forEach((m, i) => m.kg = num('stM' + i, m.kg));
+      save(); render(); toast('✓ Tetapan disimpan'); break;
+    }
+    case 'export': {
+      const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob); const link = document.createElement('a');
+      link.href = url; link.download = `dietpal-backup-${todayKey()}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); break;
+    }
+    case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) { localStorage.removeItem(KEY); S = load(); render(); toast('Data dipadam'); } break;
+    case 'install': installApp(); break;
+    case 'openSuggest': UI.sug.meal = UI.meal; sheetSuggest(); break;
+    case 'sugMeal': UI.sug.meal = el.dataset.meal; UI.sug.seed = 0; refreshSheet(); render(); break;
+    case 'sugLoc': UI.sug.loc = el.dataset.loc; UI.sug.seed = 0; S.sugPrefs = { loc: UI.sug.loc, venue: UI.sug.venue }; save(); refreshSheet(); render(); break;
+    case 'sugVenue': UI.sug.venue = el.dataset.v; UI.sug.seed = 0; S.sugPrefs = { loc: UI.sug.loc, venue: UI.sug.venue }; save(); refreshSheet(); render(); break;
+    case 'sugShuffle': UI.sug.seed++; refreshSheet(); render(); break;
+    case 'logMenu': {
+      const m = MENUS.find(x => x.id === el.dataset.id); if (!m) break;
+      const meal = UI.sug.meal;
+      menuItems(m).forEach(x => addMeal(x.f, x.qty, meal));
+      toast(`✓ ${m.name} dilog (${fmt(menuKcal(m))} kcal)`);
+      UI.sug.meal = nextMeal(meal); UI.sug.seed = 0;
+      if (sheetFn) closeSheet();
+      render(); break;
+    }
+    case 'askAI': toast('Coach AI belum disambung'); break;
+  }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'foodSearch') {
+    UI.q = e.target.value; const pos = e.target.selectionStart; render();
+    const inp = document.getElementById('foodSearch'); inp.focus(); inp.setSelectionRange(pos, pos);
+  }
+});
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'importFile' && e.target.files[0]) {
+    const r = new FileReader();
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.profile || !d.days) throw 0;
+      localStorage.setItem(KEY, JSON.stringify(d)); S = load(); render(); toast('✓ Data dipulihkan'); } catch { toast('Fail backup tak sah'); } };
+    r.readAsText(e.target.files[0]);
+  }
+});
+// Re-render when returning to the app (e.g. new day)
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheetFn) render(); });
+
+/* ============================================================
+   ICONS
+   ============================================================ */
+function iconHome(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="${a ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z"/></svg>`; }
+function iconFood(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8" ${a ? 'fill="currentColor" fill-opacity=".15"' : ''}/><path d="M12 4v16M12 12h8"/></svg>`; }
+function iconScale(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5" ${a ? 'fill="currentColor" fill-opacity=".15"' : ''}/><path d="M8.5 9.5a5 5 0 017 0M12 12l1.5-2.5"/></svg>`; }
+function iconBook(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z" ${a ? 'fill="currentColor" fill-opacity=".15"' : ''}/><path d="M4 21V5M8 7h7"/></svg>`; }
+
+/* ============================================================
+   PWA: service worker + install
+   ============================================================ */
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('installBtn').classList.remove('hidden'); });
+window.addEventListener('appinstalled', () => { document.getElementById('installBtn').classList.add('hidden'); toast('✓ App dipasang'); });
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if (isIOS && !standalone) document.getElementById('installBtn').classList.remove('hidden');
+function installApp() {
+  if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.finally(() => { deferredPrompt = null; }); return; }
+  openSheet(() => `<div class="p-5"><div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+    <div class="font-bold text-lg">Pasang di iPhone</div>
+    <ol class="mt-3 space-y-2 text-[14px] text-slate-600"><li>1. Buka page ini dalam <b>Safari</b></li><li>2. Tekan butang <b>Share</b> (kotak dengan anak panah ↑)</li><li>3. Pilih <b>Add to Home Screen</b></li></ol>
+    <button data-act="closeSheet" class="tap mt-5 w-full bg-brand-700 text-white font-bold py-3 rounded-2xl">Faham</button></div>`);
+}
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(err => console.info('SW not registered:', err.message)); });
+}
+if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+
+render();
+</script>
+</body>
+</html>
