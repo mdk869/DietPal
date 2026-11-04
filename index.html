@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DietPal – Coach Diet Anda</title>
 <meta name="description" content="Pembantu diet & turun berat badan: kalori, air, berat badan dan bantuan bila pening.">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#1e6b4a">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -15,25 +15,43 @@
 <meta name="apple-mobile-web-app-title" content="DietPal">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   if (window.tailwind) tailwind.config = {
     theme: {
       extend: {
-        fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+        fontFamily: { sans: ['"Nunito Sans"', 'system-ui', 'sans-serif'], heading: ['Nunito', '"Nunito Sans"', 'system-ui', 'sans-serif'] },
         colors: {
-          brand: { 50:'#effaf8',100:'#d6f2ec',200:'#ade4d9',500:'#14a38f',600:'#0f8a79',700:'#0f766e',800:'#115e57',900:'#134e48' },
-          veg: '#22c55e', pro: '#f4725e', carb: '#f5b324'
+          brand: { 50:'#eef5ef',100:'#e4efe5',200:'#c9dfcc',500:'#2f8a60',600:'#24764f',700:'#1e6b4a',800:'#1e4d37',900:'#163a2a' },
+          veg: '#6ba539', pro: '#e0573f', carb: '#e9b21c', water: '#5baee0',
+          cream: '#fbf7ee', paper: '#fffdf7', sand: '#f1eadb', line: '#eadfcb', ink: '#1b2a22', mute: '#65705e'
         },
-        boxShadow: { card: '0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06)' }
+        boxShadow: { card: '0 1px 2px rgba(60,45,20,.04), 0 6px 20px rgba(60,45,20,.05)', float: '0 8px 28px rgba(27,42,34,.14)' }
       }
     }
   }
 </script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
-  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  body { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .font-heading, h1, h2, h3 { font-family: Nunito, 'Nunito Sans', system-ui, sans-serif; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .home-hero { padding-top: calc(max(12px, env(safe-area-inset-top)) + 20px); }
+  html.dark .bg-paper { background-color: #1a241f !important; }
+  html.dark .bg-sand { background-color: #26332c !important; }
+  html.dark .text-ink { color: #e2e8f0 !important; }
+  html.dark .text-mute { color: #a3b1a8 !important; }
+  html.dark .border-line { border-color: #2e3c34 !important; }
+  html.dark .bg-brand-700 { background-color: #1d4d36 !important; }
+  html.dark .home-hero .bg-white { background-color: #fff !important; }
+  html.dark .home-hero button.text-brand-700 { color: #1e6b4a !important; }
+  html.dark .plate-base { stroke: #26332c; }
+  html:not(.dark) .bg-white, html:not(.dark) #sheet { background-color: #fffdf7; }
+  html:not(.dark) .bg-slate-50 { background-color: #f6f0e3; }
+  html:not(.dark) .text-slate-800 { color: #1b2a22; }
+  html:not(.dark) .text-slate-500 { color: #65705e; }
+  html:not(.dark) .border-slate-200 { border-color: #eadfcb; }
   .safe-top { padding-top: max(12px, env(safe-area-inset-top)); }
   .safe-bottom { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .ring-anim { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1), stroke .3s; }
@@ -45,47 +63,50 @@
   input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
   /* ---------- Components: 3 button types, chips, segmented control ---------- */
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; font-weight: 600; border-radius: 12px; transition: background-color .15s, transform .1s; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; font-weight: 700; border-radius: 9999px; transition: background-color .15s, transform .1s; }
   .btn:disabled { opacity: .45; }
-  .btn-primary { background: #0f766e; color: #fff; }
-  .btn-primary:active { background: #115e57; }
-  .btn-secondary { background: #fff; color: #115e57; border: 1px solid #cfdedb; }
-  .btn-secondary:active { background: #effaf8; }
-  .btn-text { background: transparent; color: #0f766e; }
-  .btn-water { background: #0284c7; color: #fff; }
+  .btn-primary { background: #1e6b4a; color: #fff; }
+  .btn-primary:active { background: #1e4d37; }
+  .btn-secondary { background: #fbf7ee; color: #1e4d37; border: 1px solid #eadfcb; }
+  .btn-secondary:active { background: #f1eadb; }
+  .btn-text { background: transparent; color: #1e6b4a; }
+  .btn-water { background: rgba(91,174,224,.16); color: #1b2a22; }
+  .btn-water:active { background: rgba(91,174,224,.3); }
   .btn-danger { background: transparent; color: #dc2626; }
   html.dark .btn-danger { color: #f87171; }
-  .chip { display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0; padding: .45rem .9rem; border-radius: 9999px; font-size: 13px; font-weight: 600; border: 1px solid #d5dfdd; background: #fff; color: #475569; }
-  .chip-on { background: #0f766e; border-color: #0f766e; color: #fff; }
-  .seg { display: grid; gap: 4px; padding: 4px; border-radius: 12px; background: #eef2f1; }
-  .seg-btn { border-radius: 9px; padding: .5rem .25rem; font-size: 13px; font-weight: 600; color: #64748b; }
+  .chip { display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0; padding: .45rem .9rem; border-radius: 9999px; font-size: 13px; font-weight: 600; border: 1px solid #eadfcb; background: #fffdf7; color: #4a5547; }
+  .chip-on { background: #1e6b4a; border-color: #1e6b4a; color: #fff; }
+  .seg { display: grid; gap: 4px; padding: 4px; border-radius: 9999px; background: #f1eadb; }
+  .seg-btn { border-radius: 9999px; min-height: 36px; padding: .5rem .25rem; font-size: 13px; font-weight: 700; color: #65705e; }
   .seg.grid-cols-4 .seg-btn, .seg.grid-cols-5 .seg-btn { font-size: 12px; white-space: nowrap; padding-left: 0; padding-right: 0; }
-  .seg-on { background: #fff; color: #115e57; box-shadow: 0 1px 2px rgba(16,24,40,.08); }
-  html.dark .btn-secondary, html.dark .chip { background: #142120; color: #cde9e4; border-color: #2a3c3a; }
-  html.dark .chip-on { background: #0f766e; color: #fff; border-color: #0f766e; }
-  html.dark .btn-text { color: #5fd3c0; }
-  html.dark .seg { background: #1b2a29; } html.dark .seg-btn { color: #9fb0ae; } html.dark .seg-on { background: #2a3c3a; color: #e2e8f0; }
+  .seg-on { background: #1e6b4a; color: #fff; }
+  html.dark .btn-secondary, html.dark .chip { background: #1a241f; color: #cde9e4; border-color: #2e3c34; }
+  html.dark .chip-on { background: #2f8a60; color: #fff; border-color: #2f8a60; }
+  html.dark .btn-text { color: #8fd4a8; }
+  html.dark .btn-primary { background: #2f8a60; }
+  html.dark .btn-water { color: #e2e8f0; }
+  html.dark .seg { background: #202c26; } html.dark .seg-btn { color: #9fb0ae; } html.dark .seg-on { background: #2f8a60; color: #fff; }
   /* Text size */
   html.big #view, html.big #sheet { zoom: 1.1; }
   /* Dark theme (overrides for the utility classes used in the app) */
   html.dark { color-scheme: dark; }
-  html.dark body { background: #0b1514; color: #e2e8f0; }
-  html.dark header { background-color: rgba(11,21,20,.9) !important; }
-  html.dark nav { background-color: rgba(18,29,28,.96) !important; border-color: #233432 !important; }
-  html.dark .bg-white, html.dark #sheet { background-color: #142120 !important; }
-  html.dark .bg-slate-50 { background-color: #1b2a29 !important; }
-  html.dark .bg-slate-100 { background-color: #213230 !important; }
+  html.dark body { background: #101713; color: #e2e8f0; }
+  html.dark #appHdr { background-color: rgba(16,23,19,.9) !important; }
+  html.dark #nav { background-color: #1a241f !important; }
+  html.dark .bg-white, html.dark #sheet { background-color: #1a241f !important; }
+  html.dark .bg-slate-50 { background-color: #202c26 !important; }
+  html.dark .bg-slate-100 { background-color: #26332c !important; }
   html.dark .bg-slate-200, html.dark .bg-slate-300 { background-color: #334644 !important; }
   html.dark .text-slate-800, html.dark .text-slate-700 { color: #e2e8f0 !important; }
   html.dark .text-slate-600 { color: #cbd5e1 !important; }
   html.dark .text-slate-500 { color: #9fb0ae !important; }
   html.dark .text-slate-400 { color: #7d908e !important; }
   html.dark .text-slate-300 { color: #5b6e6c !important; }
-  html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-slate-300, html.dark .border-brand-100, html.dark .border-brand-200 { border-color: #2a3c3a !important; }
-  html.dark .divide-slate-100 > * + *, html.dark .divide-slate-50 > * + *, html.dark .border-slate-50 { border-color: #233432 !important; }
-  html.dark .bg-brand-50, html.dark .bg-brand-50\/40, html.dark .bg-brand-100 { background-color: #0f2f2b !important; }
-  html.dark .text-brand-900, html.dark .text-brand-800 { color: #99e9dc !important; }
-  html.dark .text-brand-700 { color: #5fd3c0 !important; }
+  html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-slate-300, html.dark .border-brand-100, html.dark .border-brand-200 { border-color: #2e3c34 !important; }
+  html.dark .divide-slate-100 > * + *, html.dark .divide-slate-50 > * + *, html.dark .border-slate-50 { border-color: #27342d !important; }
+  html.dark .bg-brand-50, html.dark .bg-brand-50\/40, html.dark .bg-brand-100 { background-color: #17301f !important; }
+  html.dark .text-brand-900, html.dark .text-brand-800 { color: #b6e3c4 !important; }
+  html.dark .text-brand-700 { color: #8fd4a8 !important; }
   html.dark .bg-brand-700 .text-brand-700, html.dark .bg-brand-700.text-white { color: #fff !important; }
   html.dark .bg-sky-50 { background-color: #0d2532 !important; } html.dark .text-sky-900, html.dark .text-sky-700 { color: #7dd3fc !important; }
   html.dark .bg-green-50 { background-color: #0e2a1b !important; } html.dark .text-green-800, html.dark .text-green-700 { color: #86efac !important; }
@@ -96,21 +117,21 @@
   html.dark .shadow-card { box-shadow: 0 1px 2px rgba(0,0,0,.3); }
 </style>
 </head>
-<body class="bg-[#f6f8f7] text-slate-800 font-sans antialiased">
+<body class="bg-cream text-ink font-sans antialiased">
 
 <!-- Header -->
-<header class="safe-top sticky top-0 z-20 bg-[#f6f8f7]/90 backdrop-blur px-4 pb-2">
+<header id="appHdr" class="safe-top sticky top-0 z-20 bg-cream/90 backdrop-blur px-4 pb-2">
   <div class="max-w-md mx-auto flex items-center justify-between">
     <div class="flex items-center gap-2.5">
       <img src="icons/icon-192.png" alt="" class="w-9 h-9 rounded-xl">
       <div>
-        <div class="text-[16px] font-extrabold leading-tight text-brand-900">DietPal</div>
+        <div class="font-heading text-[17px] font-extrabold leading-tight text-brand-900">DietPal</div>
         <div id="hdrDate" class="text-[12px] text-slate-500"></div>
       </div>
     </div>
     <div class="flex items-center gap-2">
       <button id="installBtn" data-act="install" class="hidden tap btn btn-secondary text-[13px] px-3 py-1.5">Pasang app</button>
-      <button id="avatarBtn" data-act="tab" data-tab="profile" class="hidden tap w-9 h-9 rounded-full bg-brand-700 text-white font-extrabold text-[16px] grid place-items-center" aria-label="Profil & tetapan"></button>
+      <button id="avatarBtn" data-act="tab" data-tab="profile" class="hidden tap w-10 h-10 rounded-full bg-brand-700 text-white font-heading font-extrabold text-[16px] grid place-items-center" aria-label="Profil & tetapan"></button>
     </div>
   </div>
 </header>
@@ -118,8 +139,8 @@
 <main id="view" class="max-w-md mx-auto px-4"></main>
 
 <!-- Bottom nav -->
-<nav class="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom">
-  <div class="max-w-md mx-auto grid grid-cols-4 pt-1.5" id="nav"></div>
+<nav class="fixed bottom-0 inset-x-0 z-30 px-4 safe-bottom pointer-events-none">
+  <div class="max-w-sm mx-auto mb-2 grid grid-cols-4 gap-1 p-1.5 rounded-full bg-paper shadow-float pointer-events-auto" id="nav"></div>
 </nav>
 
 <!-- Bottom sheet -->
@@ -247,9 +268,9 @@ const MEALS = [
   { id:'snek', label:'Snek' }
 ];
 const PLATE = {
-  serat:   { label:'Sayur & serat', color:'#22c55e', bg:'bg-green-50',  text:'text-green-700' },
-  protein: { label:'Protein',       color:'#f4725e', bg:'bg-rose-50',   text:'text-rose-600' },
-  karbo:   { label:'Karbo kompleks',color:'#f5b324', bg:'bg-amber-50',  text:'text-amber-700' },
+  serat:   { label:'Sayur & serat', color:'#6ba539', bg:'bg-green-50',  text:'text-green-700' },
+  protein: { label:'Protein',       color:'#e0573f', bg:'bg-rose-50',   text:'text-rose-600' },
+  karbo:   { label:'Karbo kompleks',color:'#e9b21c', bg:'bg-amber-50',  text:'text-amber-700' },
   lain:    { label:'Lain-lain',     color:'#94a3b8', bg:'bg-slate-50',  text:'text-slate-600' }
 };
 
@@ -403,7 +424,7 @@ function coach() {
   else if (!d.meals.length && h < 11) { msg = 'Mulakan hari dengan sarapan berprotein — contoh 2 biji telur rebus + 2 keping roti gandum. Jangan skip sarapan, nanti lapar teruk waktu tengah hari.'; }
   else if (!S.settings.reminders.water && d.water < expectedWater - 500) { msg = `Air baru ${fmt(d.water)} ml. Minum segelas sekarang — kurang air antara punca pening dan rasa lapar palsu.`; }
   else if (k >= p.kcalMin && k <= p.kcalMax) { msg = `Mantap! ${fmt(k)} kcal — tepat dalam sasaran. Konsisten macam ni yang bawa hasil.`; }
-  else if (pc.karbo + pc.protein >= 2 && pc.serat < 1) { msg = 'Hari ini belum ada sayur lagi. Ingat suku-suku separuh: separuh pinggan sayur — ulam pun dikira!'; }
+  else if (pc.karbo + pc.protein >= 2 && pc.serat < 1) { msg = 'Hari ini belum ada sayur lagi. Separuh pinggan sayur — ulam pun dikira!'; }
   else { msg = `Baki ${fmt(Math.max(0, p.kcalMax - k))} kcal untuk hari ini. Makan perlahan, dahulukan sayur dan protein.`; }
   return { greet: greet + name, msg, mood };
 }
@@ -413,6 +434,7 @@ function coach() {
    ============================================================ */
 function render() {
   const now = new Date();
+  document.getElementById('appHdr').classList.remove('hidden');
   if (!appAllowed()) {   // DietPal runs only as an installed app
     document.querySelector('nav').classList.add('hidden');
     document.getElementById('avatarBtn').classList.add('hidden');
@@ -440,73 +462,153 @@ function render() {
   document.getElementById('hdrDate').textContent = `${HARI[now.getDay()]}, ${now.getDate()} ${BULAN[now.getMonth()]} ${now.getFullYear()}`;
   const tabs = [ ['home','Utama',iconHome], ['food','Makan',iconFood], ['weight','Berat',iconScale], ['guide','Panduan',iconBook] ];
   document.getElementById('nav').innerHTML = tabs.map(([id, l, ic]) => `
-    <button data-act="tab" data-tab="${id}" class="flex flex-col items-center gap-0.5 py-1 tap ${UI.tab === id ? 'text-brand-700' : 'text-slate-500'}">
-      ${ic(UI.tab === id)}<span class="text-[12px] font-semibold">${l}</span>
+    <button data-act="tab" data-tab="${id}" class="tap min-h-[52px] rounded-full flex flex-col items-center justify-center gap-0.5 ${UI.tab === id ? 'bg-brand-700 text-white' : 'text-mute'}" ${UI.tab === id ? 'aria-current="page"' : ''}>
+      ${ic(UI.tab === id)}<span class="text-[12px] font-bold">${l}</span>
     </button>`).join('');
+  document.getElementById('appHdr').classList.toggle('hidden', UI.tab === 'home');
   const v = { home: viewHome, food: viewFood, weight: viewWeight, guide: viewGuide, profile: viewProfile }[UI.tab]();
   const anim = UI._last !== UI.tab ? 'fade ' : ''; UI._last = UI.tab;
-  document.getElementById('view').innerHTML = `<div class="${anim}space-y-4 pt-2 pb-6">${v}</div>`;
+  document.getElementById('view').innerHTML = `<div class="${anim}space-y-4 ${UI.tab === 'home' ? '' : 'pt-2 '}pb-6">${v}</div>`;
 }
 
 const card = (inner, cls = '') => `<section class="bg-white rounded-2xl shadow-card p-4 ${cls}">${inner}</section>`;
 
 /* ---------- HOME ---------- */
 function viewHome() {
-  const p = S.profile, d = peekDay(todayKey()), k = kcalOf(d), c = coach(), st = streak();
+  const p = S.profile, d = peekDay(todayKey()), k = kcalOf(d), c = coach(), st = streak(), now = new Date();
+  const pc = plateCounts(d);
+  const pct = Math.min(100, (k / p.kcalMax) * 100), minPct = (p.kcalMin / p.kcalMax) * 100;
+  const barColor = k > p.kcalMax ? '#d97706' : '#1e6b4a';
+  const legend = (key, label) => `<span class="flex items-center gap-1.5 ${pc[key] ? '' : 'text-mute'}"><span class="w-2.5 h-2.5 rounded-full" style="background:${PLATE[key].color};${pc[key] ? '' : 'opacity:.3'}"></span>${label} ${pc[key]}</span>`;
   return `
-  ${remindersBlock()}
-  ${card(`
-    <div class="flex gap-3">
-      <img src="icons/icon-192.png" alt="" class="w-10 h-10 shrink-0 rounded-xl">
-      <div>
-        <div class="text-[12px] font-semibold text-brand-700">Coach DietPal · ${c.greet}</div>
-        <p class="text-[14px] leading-snug mt-0.5 text-slate-700">${c.msg}</p>
+  <section class="home-hero relative overflow-hidden bg-brand-700 text-white -mx-4 px-5 pb-20 rounded-b-[2rem]">
+    <svg class="absolute inset-0 w-full h-full opacity-10" aria-hidden="true"><defs><pattern id="songket" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M16 0 L32 16 L16 32 L0 16 Z" fill="none" stroke="#fff" stroke-width="1"/><circle r="3" cx="16" cy="16" fill="#fff"/></pattern></defs><rect fill="url(#songket)" width="100%" height="100%"/></svg>
+    <div class="relative max-w-md mx-auto flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-[14px] opacity-80">${HARI[now.getDay()]}, ${now.getDate()} ${BULAN[now.getMonth()]}</p>
+        <h1 class="font-heading text-[24px] font-bold mt-0.5 leading-tight">${c.greet}</h1>
+        <span class="inline-flex items-center gap-1.5 mt-3 rounded-full bg-white/15 px-3 py-1 text-[13px] font-semibold">${ph('fire-fill', 16)}${st ? `${st} hari berturut-turut` : 'Log makan untuk mula streak'}</span>
       </div>
-    </div>`)}
-
-  <button data-act="rescue" class="w-full tap rounded-2xl bg-white border border-red-200 p-3.5 flex items-center gap-3 text-left shadow-card">
-    <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 grid place-items-center">${icon('heartPulse')}</div>
-    <div class="flex-1">
-      <div class="font-bold text-[14px] text-slate-800">Rasa tak selesa?</div>
-      <div class="text-[13px] text-slate-500">Panduan ringkas untuk rasa lebih baik</div>
+      <button data-act="tab" data-tab="profile" class="tap w-12 h-12 shrink-0 rounded-full bg-white text-brand-700 font-heading text-[20px] font-bold grid place-items-center" aria-label="Profil & tetapan">${initials()}</button>
     </div>
-    <span class="text-red-600">${icon('chevR')}</span>
-  </button>
+  </section>
 
-  ${card(`
+  <section class="relative -mt-14 bg-paper rounded-3xl p-5 shadow-card">
     <div class="flex items-center gap-4">
-      ${ring(k, p.kcalMin, p.kcalMax)}
-      <div class="flex-1 min-w-0">
-        <div class="text-[12px] text-slate-500 font-medium">Sasaran harian</div>
-        <div class="text-xl font-extrabold text-slate-800">${fmt(p.kcalMin)}–${fmt(p.kcalMax)} <span class="text-[14px] font-semibold text-slate-500">kcal</span></div>
-        <div class="mt-2 text-[13px] ${statusColor(k)} font-semibold">${statusText(k)}</div>
-        <div class="mt-3 flex gap-2">
-          <button data-act="quickMeal" data-meal="${guessMeal()}" class="tap flex-1 btn btn-primary py-2.5 text-[14px]">${icon('plus', 'w-4 h-4')}Log makan</button>
+      ${plateRing(k, pc)}
+      <div class="flex-1 min-w-0 space-y-3">
+        <div>
+          <p class="text-[13px] text-mute">Sasaran</p>
+          <p class="font-heading font-bold text-[16px] tnum whitespace-nowrap">${fmt(p.kcalMin)}–${fmt(p.kcalMax)} kcal</p>
+          <p class="text-[14px] font-bold mt-0.5 ${k > p.kcalMax ? 'text-amber-700' : 'text-brand-700'}">${statusText(k)}</p>
+          <div class="relative h-2 rounded-full bg-sand mt-2 overflow-hidden" role="img" aria-label="${fmt(k)} daripada ${fmt(p.kcalMax)} kcal">
+            <div class="absolute inset-y-0 left-0 rounded-full transition-all" style="width:${pct}%;background:${barColor}"></div>
+            <div class="absolute inset-y-0 w-0.5 bg-white/80" style="left:${minPct}%"></div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-x-3 gap-y-1 text-[13px] font-semibold">
+          ${legend('serat', 'Sayur')}${legend('protein', 'Protein')}${legend('karbo', 'Karbo')}
         </div>
       </div>
     </div>
+    <button data-act="quickMeal" data-meal="${guessMeal()}" class="tap mt-5 w-full btn btn-primary h-12 text-[15px]">${ph('plus-bold', 20)}Log makan</button>
     <div class="grid grid-cols-4 gap-2 mt-4">
       ${MEALS.map(m => { const mk = d.meals.filter(x => x.meal === m.id).reduce((a, x) => a + x.kcal, 0);
-        return `<button data-act="quickMeal" data-meal="${m.id}" class="tap rounded-xl ${mk ? 'bg-brand-50 text-brand-700' : 'bg-slate-50 text-slate-500'} py-2 flex flex-col items-center">
-          ${icon(MEAL_ICON[m.id], 'w-5 h-5')}<div class="text-[12px] text-slate-600 leading-tight mt-1">${m.short || m.label}</div>
-          <div class="text-[13px] font-bold ${mk ? 'text-brand-700' : 'text-slate-500'}">${mk ? fmt(mk) : '–'}</div></button>`; }).join('')}
-    </div>`)}
+        return `<button data-act="quickMeal" data-meal="${m.id}" class="tap rounded-2xl px-1 py-2.5 text-center ${mk ? 'bg-brand-100' : 'border-2 border-dashed border-line'}">
+          <p class="text-[12px] text-mute whitespace-nowrap">${m.short || m.label}</p>
+          <p class="font-heading font-bold tnum ${mk ? '' : 'text-mute'}">${mk ? fmt(mk) : '–'}</p></button>`; }).join('')}
+    </div>
+  </section>
 
-  ${card(suggestBlock())}
+  ${remindersBlock()}
+
+  ${homeSuggest(c)}
 
   ${waterCard()}
 
-  ${plateMini(d)}
+  ${weightCard()}
 
-  <div class="grid grid-cols-2 gap-3">
-    ${card(`<div class="text-[12px] text-slate-500 font-medium">Berat semasa</div>
-      <div class="text-2xl font-extrabold">${currentWeight().toFixed(1)}<span class="text-[14px] text-slate-500 font-semibold"> kg</span></div>
-      <div class="text-[12px] text-brand-700 font-semibold">${lostText()}</div>
-      <button data-act="tab" data-tab="weight" class="tap mt-2 text-[13px] font-semibold text-brand-700 inline-flex items-center gap-1">Log berat ${icon('chevR', 'w-4 h-4')}</button>`, 'p-4')}
-    ${card(`<div class="text-[12px] text-slate-500 font-medium">Konsisten log</div>
-      <div class="text-2xl font-extrabold">${st}<span class="text-[14px] text-slate-500 font-semibold"> hari</span></div>
-      <div class="text-[12px] text-slate-500">${st >= 7 ? 'Hebat, teruskan!' : st >= 1 ? 'Sikit-sikit, lama-lama jadi bukit' : 'Log makanan pertama hari ini'}</div>`, 'p-4')}
+  <button data-act="rescue" class="tap w-full flex items-center gap-3 rounded-3xl bg-sand p-4 text-left min-h-14">
+    <span class="text-brand-700">${ph('heart-bold', 24)}</span>
+    <span class="flex-1"><span class="block font-bold">Rasa tak selesa?</span><span class="block text-[14px] text-mute">Panduan ringkas untuk rasa lebih baik</span></span>
+    <span class="text-mute">${ph('caret-right-bold', 20)}</span>
+  </button>`;
+}
+
+// Calorie hero drawn as a top-down plate: ring split by today's food groups.
+function plateRing(k, pc) {
+  const r = 50, C = 2 * Math.PI * r, keys = ['serat', 'protein', 'karbo'];
+  const tot = keys.reduce((a, x) => a + pc[x], 0);
+  const gap = tot > 1 ? 4 : 0;
+  let off = 0;
+  const segs = tot ? keys.map(x => {
+    const len = (pc[x] / tot) * C; const el = len > 0 ? `<circle r="${r}" cx="60" cy="60" fill="none" stroke="${PLATE[x].color}" stroke-width="14" stroke-dasharray="${Math.max(0, len - gap)} ${C}" stroke-dashoffset="${-off}"/>` : '';
+    off += len; return el; }).join('') : '';
+  return `
+  <div class="relative w-[140px] h-[140px] shrink-0">
+    <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90" aria-hidden="true">
+      <circle r="${r}" cx="60" cy="60" fill="none" stroke="#f1eadb" stroke-width="14" class="plate-base"/>${segs}
+    </svg>
+    <div class="absolute inset-0 flex flex-col items-center justify-center">
+      <span class="font-heading text-[34px] font-extrabold tnum leading-none">${fmt(k)}</span>
+      <span class="text-[13px] text-mute mt-1">kcal dimakan</span>
+    </div>
   </div>`;
+}
+
+/* ---------- COACH SUGGESTION (home) ---------- */
+function homeSuggest(c) {
+  const s = UI.sug;
+  if (!UI.sugPicked) {   // default to the next meal that hasn't been logged yet
+    const logged = new Set(peekDay(todayKey()).meals.map(x => x.meal));
+    const i = MEAL_FLOW.indexOf(guessMeal());
+    const open = MEAL_FLOW.slice(Math.max(0, i)).find(m => !logged.has(m) && m !== 'snek');
+    if (open && open !== s.meal) { s.meal = open; s.seed = 0; }
+  }
+  const vs = venuesFor(s.meal);
+  const venue = vs.includes(s.venue) ? s.venue : vs[0];
+  const { list, t } = suggestMenus(venue);
+  const mealInfo = MEALS.find(m => m.id === s.meal);
+  const logged = peekDay(todayKey()).meals.some(x => x.meal === s.meal);
+  const start = list.length > 1 ? s.seed % list.length : 0;
+  const top = list[start];
+  const seg = `<div class="seg grid-cols-2">${Object.entries({ rumah: 'Di rumah', luar: 'Di luar' }).map(([k, l]) => `<button data-act="sugLoc" data-loc="${k}" class="tap seg-btn h-10 ${s.loc === k ? 'seg-on' : ''}">${l}</button>`).join('')}</div>`;
+  const mealTabs = `<div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4">${MEALS.map(m => `<button data-act="sugMeal" data-meal="${m.id}" class="tap shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-bold ${s.meal === m.id ? 'bg-brand-100 text-brand-800' : 'text-mute'}">${m.short || m.label}</button>`).join('')}</div>`;
+  let body;
+  if (!top) {
+    body = `<p class="text-[14px] text-mute text-center py-2">Tiada menu yang sesuai dengan pilihan makanan anda di sini. Cuba tempat lain atau ubah pilihan di Profil.</p>`;
+  } else {
+    const { m, kc } = top, its = menuItems(m), fit = Math.abs(kc - t.ideal) <= t.ideal * 0.2;
+    body = `
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-[13px] text-mute">${mealInfo.label} · <span class="tnum">${fmt(kc)}</span> kcal${logged ? ' · dah log' : ''}</p>
+          <h3 class="font-heading text-[18px] font-bold leading-snug">${esc(m.name)}</h3>
+        </div>
+        ${fit ? '<span class="shrink-0 mt-0.5 rounded-full bg-brand-100 text-brand-800 px-2.5 py-1 text-[12px] font-bold whitespace-nowrap">Sesuai</span>' : ''}
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[14px]">
+        ${its.map(x => `<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:${PLATE[x.f.plate || 'lain'].color}"></span>${x.qty !== 1 ? x.qty + '× ' : ''}${esc(x.f.name)}</span>`).join('')}
+      </div>
+      <p class="rounded-2xl bg-sand p-3 text-[14px]">${esc(m.tip)}</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button data-act="logMenu" data-id="${m.id}" class="tap btn btn-primary h-12 text-[14px]">Log menu ini</button>
+        <button data-act="sugShuffle" class="tap btn btn-secondary h-12 text-[14px]" ${list.length > 1 ? '' : 'disabled'}>${ph('arrows-clockwise-bold', 16)}Cadangan lain</button>
+      </div>`;
+  }
+  return `
+  <section class="space-y-3 pt-2">
+    <h2 class="font-heading text-[20px] font-bold">Cadangan Coach</h2>
+    <p class="text-[15px] leading-snug">${c.msg}</p>
+    ${mealTabs}
+    ${seg}
+    ${s.loc === 'luar' ? `<div class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">${vs.map(v => `<button data-act="sugVenue" data-v="${v}" class="tap chip ${venue === v ? 'chip-on' : ''}">${icon(VENUES[v].ic, 'w-4 h-4')}${VENUES[v].label}</button>`).join('')}</div>` : ''}
+    ${t.note ? `<p class="text-[13px] bg-amber-50 text-amber-800 rounded-2xl px-3 py-2">${t.note}</p>` : ''}
+    <div class="rounded-3xl bg-paper p-5 space-y-4 shadow-card">
+      ${body}
+      ${AI_ENDPOINT ? `<button data-act="askAI" class="tap w-full h-11 btn btn-text text-[14px]">${ph('sparkle', 18)}Tanya Coach AI</button>` : ''}
+    </div>
+  </section>`;
 }
 
 function statusText(k) {
@@ -518,29 +620,6 @@ function statusText(k) {
 }
 function statusColor(k) { const p = S.profile; return k > p.kcalMax ? 'text-amber-600' : k >= p.kcalMin ? 'text-green-600' : 'text-slate-600'; }
 
-function ring(k, min, max) {
-  const r = 50, C = 2 * Math.PI * r;
-  const scale = max * 1.15;                      // ring represents 0 → 115% of max
-  const pct = Math.min(k / scale, 1);
-  const color = k > max ? '#f59e0b' : k >= min ? '#22c55e' : '#14a38f';
-  const tick = (v) => { const a = (v / scale) * 2 * Math.PI - Math.PI / 2; return [60 + Math.cos(a) * 50, 60 + Math.sin(a) * 50]; };
-  const a0 = (min / scale) * 360, a1 = (max / scale) * 360;
-  const band = arcPath(60, 60, 50, a0, a1);
-  return `
-  <svg viewBox="0 0 120 120" class="w-[120px] h-[120px] shrink-0 text-slate-800">
-    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#eef2f1" stroke-width="11"/>
-    <path d="${band}" fill="none" stroke="#bbf7d0" stroke-width="11"/>
-    <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round"
-      stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" transform="rotate(-90 60 60)" class="ring-anim"/>
-    <text x="60" y="58" text-anchor="middle" font-size="22" font-weight="800" fill="currentColor">${fmt(k)}</text>
-    <text x="60" y="75" text-anchor="middle" font-size="10" fill="#64748b">kcal dimakan</text>
-  </svg>`;
-}
-function arcPath(cx, cy, r, a0, a1) {
-  const p = (a) => { const t = (a - 90) * Math.PI / 180; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; };
-  const [x0, y0] = p(a0), [x1, y1] = p(a1);
-  return `M${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
-}
 
 function lostText() {
   const diff = S.profile.startWeight - currentWeight();
@@ -548,28 +627,51 @@ function lostText() {
 }
 
 /* ---------- WATER ---------- */
+const litres = (ml) => String(+(ml / 1000).toFixed(2));
 function waterCard() {
   const p = S.profile, d = peekDay(todayKey()), w = d.water;
-  const glasses = Math.ceil(p.waterIdeal / 250);
-  const filled = Math.floor(w / 250);
   const pct = Math.min(100, (w / p.waterGoal) * 100);
-  return card(`
-    <div class="flex items-center justify-between">
+  const left = p.waterGoal - w;
+  return `
+  <section class="rounded-3xl bg-paper p-5 space-y-4 shadow-card">
+    <div class="flex items-end justify-between gap-3">
       <div>
-        <div class="text-[12px] text-slate-500 font-medium flex items-center gap-1"><span class="text-sky-500">${icon('droplet', 'w-4 h-4')}</span>Air hari ini</div>
-        <div class="text-xl font-extrabold">${(w / 1000).toFixed(2)} <span class="text-[14px] text-slate-500 font-semibold">/ ${(p.waterGoal / 1000).toFixed(1)}–${(p.waterIdeal / 1000).toFixed(1)} L</span></div>
+        <h2 class="font-heading text-[18px] font-bold">Air hari ini</h2>
+        <p class="text-[14px] text-mute mt-0.5">${w >= p.waterIdeal ? 'Cukup untuk hari ini' : left <= 0 ? 'Sasaran dicapai' : `${litres(left)} L lagi`}</p>
       </div>
-      <div class="text-[12px] font-semibold ${w >= p.waterGoal ? 'text-sky-600' : 'text-slate-500'}">${w >= p.waterIdeal ? 'Cukup untuk hari ini' : w >= p.waterGoal ? 'Sasaran dicapai' : fmt(p.waterGoal - w) + ' ml lagi'}</div>
+      <p class="font-heading text-[26px] font-extrabold tnum leading-none"><span class="text-water">${litres(w)}</span><span class="text-[16px] text-mute"> / ${(p.waterGoal / 1000).toFixed(1)} L</span></p>
     </div>
-    <div class="h-2 bg-sky-50 rounded-full mt-2 overflow-hidden"><div class="h-full bg-sky-400 rounded-full transition-all" style="width:${pct}%"></div></div>
-    <div class="grid gap-1 mt-3" style="grid-template-columns:repeat(${glasses},minmax(0,1fr))">
-      ${Array.from({ length: glasses }, (_, i) => `<div class="h-6 rounded-md ${i < filled ? 'bg-sky-400' : 'bg-sky-50'} transition-colors"></div>`).join('')}
+    <div class="h-2.5 rounded-full bg-sand overflow-hidden"><div class="h-full rounded-full bg-water transition-all" style="width:${pct}%"></div></div>
+    <div class="grid grid-cols-[1fr_1fr_auto] gap-2">
+      <button data-act="water" data-ml="250" class="tap btn btn-water h-11 text-[14px]">+ Gelas 250 ml</button>
+      <button data-act="water" data-ml="500" class="tap btn btn-water h-11 text-[14px]">+ Botol 500 ml</button>
+      <button data-act="water" data-ml="-250" class="tap h-11 px-2 text-[14px] font-bold text-mute disabled:opacity-40" ${w <= 0 ? 'disabled' : ''} aria-label="Undo 250 ml">Undo</button>
     </div>
-    <div class="grid grid-cols-3 gap-2 mt-3">
-      <button data-act="water" data-ml="250" class="tap btn btn-secondary py-2 text-[14px] flex-col gap-0">+ 1 gelas<span class="block text-[12px] font-medium text-slate-500">250 ml</span></button>
-      <button data-act="water" data-ml="500" class="tap btn btn-water py-2 text-[14px] flex-col gap-0">+ 1 botol<span class="block text-[12px] font-medium opacity-90">500 ml</span></button>
-      <button data-act="water" data-ml="-250" class="tap btn btn-secondary py-2 text-[14px] flex-col gap-0" ${w <= 0 ? 'disabled' : ''}>Undo<span class="block text-[12px] font-medium text-slate-500">−250 ml</span></button>
-    </div>`);
+  </section>`;
+}
+
+/* ---------- WEIGHT (home) ---------- */
+function weightCard() {
+  const p = S.profile, ws = sortedWeights().slice(-8), cur = currentWeight();
+  const diff = (p.startWeight || cur) - cur;
+  let spark = '';
+  if (ws.length >= 2) {
+    const v = ws.map(x => x.kg), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+    const pts = v.map((kg, i) => [Math.round(i / (v.length - 1) * 100), Math.round(6 + (hi - kg) / span * 38)]);
+    const [lx, ly] = pts[pts.length - 1];
+    spark = `<svg viewBox="-4 0 108 50" class="w-28 h-14 shrink-0 text-brand-700" aria-hidden="true"><polyline fill="none" points="${pts.map(x => x.join(',')).join(' ')}" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle r="4" cx="${lx}" cy="${ly}" fill="currentColor"/></svg>`;
+  }
+  return `
+  <section class="rounded-3xl bg-paper p-5 flex items-center justify-between gap-4 shadow-card">
+    <div class="space-y-1">
+      <p class="text-[14px] text-mute">Berat semasa</p>
+      <p class="font-heading text-[30px] font-extrabold tnum leading-none">${cur.toFixed(1)} <span class="text-[16px]">kg</span></p>
+      <p class="text-[14px]">${diff > 0 ? `<span class="text-brand-700 font-bold">↓ ${diff.toFixed(1)} kg</span> sejak mula` : diff < 0 ? `<span class="font-bold">+${(-diff).toFixed(1)} kg</span> dari berat mula` : 'Berat mula'}</p>
+      ${p.targetWeight ? `<p class="text-[14px] text-mute">Sasaran ${fmt(p.targetWeight)} kg</p>` : ''}
+      <button data-act="tab" data-tab="weight" class="tap min-h-11 text-[14px] font-bold text-brand-700 inline-flex items-center gap-1">Log berat ${ph('caret-right-bold', 14)}</button>
+    </div>
+    ${spark}
+  </section>`;
 }
 
 /* ---------- PLATE ---------- */
@@ -577,9 +679,9 @@ function plateSVG(size = 150) {
   return `
   <svg viewBox="0 0 200 200" width="${size}" height="${size}" class="shrink-0">
     <circle cx="100" cy="100" r="96" fill="#fff" stroke="#e2e8f0" stroke-width="4"/>
-    <path d="M100 18 A82 82 0 0 0 100 182 Z" fill="#22c55e"/>
-    <path d="M100 18 A82 82 0 0 1 182 100 L100 100 Z" fill="#f4725e"/>
-    <path d="M182 100 A82 82 0 0 1 100 182 L100 100 Z" fill="#f5b324"/>
+    <path d="M100 18 A82 82 0 0 0 100 182 Z" fill="#6ba539"/>
+    <path d="M100 18 A82 82 0 0 1 182 100 L100 100 Z" fill="#e0573f"/>
+    <path d="M182 100 A82 82 0 0 1 100 182 L100 100 Z" fill="#e9b21c"/>
     <line x1="100" y1="16" x2="100" y2="184" stroke="#fff" stroke-width="4"/>
     <line x1="100" y1="100" x2="184" y2="100" stroke="#fff" stroke-width="4"/>
     ${size >= 150 ? `
@@ -594,25 +696,6 @@ function plateSVG(size = 150) {
     <text x="139" y="142" text-anchor="middle" font-size="22" font-weight="800" fill="#fff">¼</text>`}
   </svg>`;
 }
-function plateMini(d) {
-  const c = plateCounts(d); const tot = c.serat + c.protein + c.karbo;
-  const bar = tot ? ['serat', 'protein', 'karbo'].map(k => `<div style="width:${(c[k] / tot) * 100}%;background:${PLATE[k].color}"></div>`).join('') : '';
-  return card(`
-    <div class="flex items-center gap-3">
-      ${plateSVG(84)}
-      <div class="flex-1">
-        <div class="font-bold text-[16px]">Suku-Suku Separuh</div>
-        <div class="text-[13px] text-slate-500 leading-snug">½ sayur · ¼ protein · ¼ karbo kompleks</div>
-        <div class="mt-2 text-[12px] text-slate-500 font-medium">Imbangan pinggan hari ini</div>
-        <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden flex mt-1">${bar}</div>
-        <div class="flex gap-3 mt-1 text-[12px] text-slate-500">
-          <span><b class="text-green-600">${c.serat}</b> sayur</span><span><b class="text-rose-500">${c.protein}</b> protein</span><span><b class="text-amber-600">${c.karbo}</b> karbo</span>
-        </div>
-      </div>
-    </div>
-    <button data-act="tab" data-tab="guide" class="tap mt-3 w-full btn btn-secondary py-2 text-[13px]">Lihat panduan pinggan</button>`);
-}
-
 /* ---------- FOOD ---------- */
 function foodRow(f) {
   const c = foodConflicts(f);
@@ -631,7 +714,7 @@ function foodRow(f) {
 function viewFood() {
   const d = peekDay(todayKey()), k = kcalOf(d), p = S.profile;
   const pct = Math.min(100, k / p.kcalMax * 100);
-  const barColor = k > p.kcalMax ? '#d97706' : k >= p.kcalMin ? '#16a34a' : '#0f8a79';
+  const barColor = k > p.kcalMax ? '#d97706' : k >= p.kcalMin ? '#16a34a' : '#1e6b4a';
   return `
   <div class="px-1">
     <div class="flex items-baseline justify-between">
@@ -852,13 +935,13 @@ function weightChart(ws) {
   const last = coords[coords.length - 1];
   return `
   <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14a38f" stop-opacity=".25"/><stop offset="1" stop-color="#14a38f" stop-opacity="0"/></linearGradient></defs>
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8a60" stop-opacity=".25"/><stop offset="1" stop-color="#2f8a60" stop-opacity="0"/></linearGradient></defs>
     ${ticks.map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#eef2f1"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="#94a3b8">${t}</text>`).join('')}
-    ${next && next.kg >= lo ? `<line x1="${pl}" x2="${W - pr}" y1="${y(next.kg)}" y2="${y(next.kg)}" stroke="#22c55e" stroke-dasharray="4 4"/><text x="${W - pr}" y="${y(next.kg) - 4}" text-anchor="end" font-size="10" font-weight="700" fill="#16a34a">${esc(next.name)} ${next.kg} kg</text>` : ''}
+    ${next && next.kg >= lo ? `<line x1="${pl}" x2="${W - pr}" y1="${y(next.kg)}" y2="${y(next.kg)}" stroke="#6ba539" stroke-dasharray="4 4"/><text x="${W - pr}" y="${y(next.kg) - 4}" text-anchor="end" font-size="10" font-weight="700" fill="#16a34a">${esc(next.name)} ${next.kg} kg</text>` : ''}
     <path d="${area}" fill="url(#g)"/>
-    <path d="${line}" fill="none" stroke="#0f8a79" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    ${coords.map(c => `<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="#fff" stroke="#0f8a79" stroke-width="2"/>`).join('')}
-    <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="#0f8a79"/>
+    <path d="${line}" fill="none" stroke="#1e6b4a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${coords.map(c => `<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="#fff" stroke="#1e6b4a" stroke-width="2"/>`).join('')}
+    <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="#1e6b4a"/>
     <text x="${pl}" y="${H - 6}" font-size="10" fill="#94a3b8">${niceDate(pts[0].date)}</text>
     <text x="${W - pr}" y="${H - 6}" text-anchor="end" font-size="10" fill="#94a3b8">${niceDate(pts[pts.length - 1].date)}</text>
   </svg>`;
@@ -873,9 +956,9 @@ function viewGuide() {
     <p class="text-[13px] text-slate-500">Guna pinggan biasa — tak perlu timbang makanan.</p></div>
     <div class="flex justify-center my-3">${plateSVG(200)}</div>
     <div class="space-y-2.5">
-      ${guideRow('#22c55e', '½ pinggan — Sayur & serat', 'Ulam, kangkung, kobis, bayam, timun, kacang panjang, sup sayur. Makan ini dulu supaya cepat kenyang.')}
-      ${guideRow('#f4725e', '¼ pinggan — Protein', 'Ayam (buang kulit), ikan bakar/kukus, telur, tempe, tauhu. Sebesar tapak tangan.')}
-      ${guideRow('#f5b324', '¼ pinggan — Karbo kompleks', 'Nasi 1 senduk (perang lebih baik), ubi, roti gandum, oat. Sebesar penumbuk.')}
+      ${guideRow('#6ba539', '½ pinggan — Sayur & serat', 'Ulam, kangkung, kobis, bayam, timun, kacang panjang, sup sayur. Makan ini dulu supaya cepat kenyang.')}
+      ${guideRow('#e0573f', '¼ pinggan — Protein', 'Ayam (buang kulit), ikan bakar/kukus, telur, tempe, tauhu. Sebesar tapak tangan.')}
+      ${guideRow('#e9b21c', '¼ pinggan — Karbo kompleks', 'Nasi 1 senduk (perang lebih baik), ubi, roti gandum, oat. Sebesar penumbuk.')}
     </div>`)}
 
   ${card(`
@@ -1432,7 +1515,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1508,7 +1591,7 @@ function applyTheme() {
   const dark = st.theme === 'dark' || (st.theme === 'auto' && mq.matches);
   document.documentElement.classList.toggle('dark', dark);
   document.documentElement.classList.toggle('big', st.textSize === 'big');
-  document.querySelector('meta[name=theme-color]').setAttribute('content', dark ? '#0b1514' : '#0f766e');
+  document.querySelector('meta[name=theme-color]').setAttribute('content', dark ? '#101713' : '#1e6b4a');
 }
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (S.settings.theme === 'auto') applyTheme(); });
 
@@ -1974,7 +2057,7 @@ document.addEventListener('click', (e) => {
       if (!S.profile.setupDone) { subscribePush(true).catch(() => {}); obFinish(); } else { pushCheck(); render(); }
       break;
     case 'copyLink': navigator.clipboard?.writeText(location.origin + location.pathname).then(() => toast('Link disalin'), () => toast(location.origin)); break;
-    case 'sugMeal': UI.sug.meal = el.dataset.meal; UI.sug.seed = 0; refreshSheet(); render(); break;
+    case 'sugMeal': UI.sugPicked = true; UI.sug.meal = el.dataset.meal; UI.sug.seed = 0; refreshSheet(); render(); break;
     case 'sugLoc': UI.sug.loc = el.dataset.loc; UI.sug.seed = 0; S.sugPrefs = { loc: UI.sug.loc, venue: UI.sug.venue }; save(); refreshSheet(); render(); break;
     case 'sugVenue': UI.sug.venue = el.dataset.v; UI.sug.seed = 0; S.sugPrefs = { loc: UI.sug.loc, venue: UI.sug.venue }; save(); refreshSheet(); render(); break;
     case 'sugShuffle': UI.sug.seed++; refreshSheet(); render(); break;
@@ -2024,10 +2107,13 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) retur
 /* ============================================================
    ICONS
    ============================================================ */
-function iconHome(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="${a ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z"/></svg>`; }
-function iconFood(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8" ${a ? 'fill="currentColor" fill-opacity=".15"' : ''}/><path d="M12 4v16M12 12h8"/></svg>`; }
-function iconScale(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5" ${a ? 'fill="currentColor" fill-opacity=".15"' : ''}/><path d="M8.5 9.5a5 5 0 017 0M12 12l1.5-2.5"/></svg>`; }
-function iconBook(a) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z" ${a ? 'fill="currentColor" fill-opacity=".15"' : ''}/><path d="M4 21V5M8 7h7"/></svg>`; }
+// Phosphor icons (via @iconify-json/ph), same set as the Sleek design
+const PH = {"fire-fill":"<path fill=\"currentColor\" d=\"M143.38 17.85a8 8 0 0 0-12.63 3.41l-22 60.41l-24.16-23.41a8 8 0 0 0-11.93.89C51 87.53 40 116.08 40 144a88 88 0 0 0 176 0c0-59.45-50.79-108-72.62-126.15m40.51 135.49a57.6 57.6 0 0 1-46.56 46.55a7.7 7.7 0 0 1-1.33.11a8 8 0 0 1-1.32-15.89c16.57-2.79 30.63-16.85 33.44-33.45a8 8 0 0 1 15.78 2.68Z\"/>","plus-bold":"<path fill=\"currentColor\" d=\"M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12\"/>","heart-bold":"<path fill=\"currentColor\" d=\"M178 36c-20.09 0-37.92 7.93-50 21.56C115.92 43.93 98.09 36 78 36a66.08 66.08 0 0 0-66 66c0 72.34 105.81 130.14 110.31 132.57a12 12 0 0 0 11.38 0C138.19 232.14 244 174.34 244 102a66.08 66.08 0 0 0-66-66m-5.49 142.36a328.7 328.7 0 0 1-44.51 31.8a328.7 328.7 0 0 1-44.51-31.8C61.82 159.77 36 131.42 36 102a42 42 0 0 1 42-42c17.8 0 32.7 9.4 38.89 24.54a12 12 0 0 0 22.22 0C145.3 69.4 160.2 60 178 60a42 42 0 0 1 42 42c0 29.42-25.82 57.77-47.49 76.36\"/>","caret-right-bold":"<path fill=\"currentColor\" d=\"m184.49 136.49l-80 80a12 12 0 0 1-17-17L159 128L87.51 56.49a12 12 0 1 1 17-17l80 80a12 12 0 0 1-.02 17\"/>","house-line":"<path fill=\"currentColor\" d=\"M240 208h-16v-72l2.34 2.34A8 8 0 0 0 237.66 127l-98.35-98.32a16 16 0 0 0-22.62 0L18.34 127a8 8 0 0 0 11.32 11.31L32 136v72H16a8 8 0 0 0 0 16h224a8 8 0 0 0 0-16M48 120l80-80l80 80v88h-48v-56a8 8 0 0 0-8-8h-48a8 8 0 0 0-8 8v56H48Zm96 88h-32v-48h32Z\"/>","house-line-fill":"<path fill=\"currentColor\" d=\"M240 208h-16v-72l2.34 2.34A8 8 0 0 0 237.66 127l-98.35-98.32a16 16 0 0 0-22.62 0L18.34 127a8 8 0 0 0 11.32 11.31L32 136v72H16a8 8 0 0 0 0 16h224a8 8 0 0 0 0-16m-88 0h-48v-48a4 4 0 0 1 4-4h40a4 4 0 0 1 4 4Z\"/>","bowl-food":"<path fill=\"currentColor\" d=\"M224 104h-8.37a88 88 0 0 0-175.26 0H32a8 8 0 0 0-8 8a104.35 104.35 0 0 0 56 92.28V208a16 16 0 0 0 16 16h64a16 16 0 0 0 16-16v-3.72A104.35 104.35 0 0 0 232 112a8 8 0 0 0-8-8m-24.46 0h-51.42a71.84 71.84 0 0 1 41.27-29.57A71.45 71.45 0 0 1 199.54 104m-26.06-47.77q2.75 2.25 5.27 4.75a87.92 87.92 0 0 0-49.15 43h-29.5A72.26 72.26 0 0 1 168 56c1.83 0 3.66.09 5.48.23M128 40a72 72 0 0 1 19 2.57A88.36 88.36 0 0 0 83.33 104H56.46A72.08 72.08 0 0 1 128 40m36.66 152a8 8 0 0 0-4.66 7.3v8.7H96v-8.7a8 8 0 0 0-4.66-7.3a88.29 88.29 0 0 1-51-72h175.29a88.29 88.29 0 0 1-50.97 72\"/>","bowl-food-fill":"<path fill=\"currentColor\" d=\"M224 104h-8.37a88 88 0 0 0-175.26 0H32a8 8 0 0 0-8 8a104.35 104.35 0 0 0 56 92.28V208a16 16 0 0 0 16 16h64a16 16 0 0 0 16-16v-3.72A104.35 104.35 0 0 0 232 112a8 8 0 0 0-8-8m-50.52-47.77q2.75 2.25 5.27 4.75a87.92 87.92 0 0 0-49.15 43h-29.5A72.26 72.26 0 0 1 168 56c1.83 0 3.66.09 5.48.23M148.12 104a71.84 71.84 0 0 1 41.27-29.57A71.45 71.45 0 0 1 199.54 104ZM128 40a72 72 0 0 1 19 2.57A88.36 88.36 0 0 0 83.33 104H56.46A72.08 72.08 0 0 1 128 40\"/>","scales":"<path fill=\"currentColor\" d=\"m239.43 133l-32-80a8 8 0 0 0-9.16-4.84L136 62V40a8 8 0 0 0-16 0v25.58L54.26 80.19A8 8 0 0 0 48.57 85v.06l-32 79.94a7.9 7.9 0 0 0-.57 3c0 23.31 24.54 32 40 32s40-8.69 40-32a7.9 7.9 0 0 0-.57-3L66.92 93.77L120 82v126h-16a8 8 0 0 0 0 16h48a8 8 0 0 0 0-16h-16V78.42l51-11.32l-26.43 65.9a7.9 7.9 0 0 0-.57 3c0 23.31 24.54 32 40 32s40-8.69 40-32a7.9 7.9 0 0 0-.57-3M56 184c-7.53 0-22.76-3.61-23.93-14.64L56 109.54l23.93 59.82C78.76 180.39 63.53 184 56 184m144-32c-7.53 0-22.76-3.61-23.93-14.64L200 77.54l23.93 59.82C222.76 148.39 207.53 152 200 152\"/>","scales-fill":"<path fill=\"currentColor\" d=\"m239.43 133l-32-80a8 8 0 0 0-7.43-5a8.3 8.3 0 0 0-1.73.21L136 62V40a8 8 0 0 0-16 0v25.58L54.27 80.21a8 8 0 0 0-5.7 4.79l-32 80a7.9 7.9 0 0 0-.57 3c0 23.31 24.54 32 40 32s40-8.69 40-32a7.9 7.9 0 0 0-.57-3L66.92 93.77L120 82v126h-16a8 8 0 0 0 0 16h48a8 8 0 0 0 0-16h-16V78.42l51-11.32l-26.43 65.9a7.9 7.9 0 0 0-.57 3c0 23.31 24.54 32 40 32s40-8.69 40-32a7.9 7.9 0 0 0-.57-3m-160 35H32.62L56 109.54Zm97.24-32L200 77.54L223.38 136Z\"/>","book-open-text":"<path fill=\"currentColor\" d=\"M232 48h-72a40 40 0 0 0-32 16a40 40 0 0 0-32-16H24a8 8 0 0 0-8 8v144a8 8 0 0 0 8 8h72a24 24 0 0 1 24 24a8 8 0 0 0 16 0a24 24 0 0 1 24-24h72a8 8 0 0 0 8-8V56a8 8 0 0 0-8-8M96 192H32V64h64a24 24 0 0 1 24 24v112a39.8 39.8 0 0 0-24-8m128 0h-64a39.8 39.8 0 0 0-24 8V88a24 24 0 0 1 24-24h64ZM160 88h40a8 8 0 0 1 0 16h-40a8 8 0 0 1 0-16m48 40a8 8 0 0 1-8 8h-40a8 8 0 0 1 0-16h40a8 8 0 0 1 8 8m0 32a8 8 0 0 1-8 8h-40a8 8 0 0 1 0-16h40a8 8 0 0 1 8 8\"/>","book-open-text-fill":"<path fill=\"currentColor\" d=\"M232 48h-64a32 32 0 0 0-32 32v87.73a8.17 8.17 0 0 1-7.47 8.25a8 8 0 0 1-8.53-8V80a32 32 0 0 0-32-32H24a8 8 0 0 0-8 8v144a8 8 0 0 0 8 8h72a24 24 0 0 1 24 23.94a7.9 7.9 0 0 0 5.12 7.55A8 8 0 0 0 136 232a24 24 0 0 1 24-24h72a8 8 0 0 0 8-8V56a8 8 0 0 0-8-8m-24 120h-39.73a8.17 8.17 0 0 1-8.25-7.47a8 8 0 0 1 8-8.53h39.73a8.17 8.17 0 0 1 8.25 7.47a8 8 0 0 1-8 8.53m0-32h-39.73a8.17 8.17 0 0 1-8.25-7.47a8 8 0 0 1 8-8.53h39.73a8.17 8.17 0 0 1 8.25 7.47a8 8 0 0 1-8 8.53m0-32h-39.73a8.17 8.17 0 0 1-8.27-7.47a8 8 0 0 1 8-8.53h39.73a8.17 8.17 0 0 1 8.27 7.47a8 8 0 0 1-8 8.53\"/>","arrows-clockwise-bold":"<path fill=\"currentColor\" d=\"M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z\"/>","sparkle":"<path fill=\"currentColor\" d=\"M197.58 129.06L146 110l-19-51.62a15.92 15.92 0 0 0-29.88 0L78 110l-51.62 19a15.92 15.92 0 0 0 0 29.88L78 178l19 51.62a15.92 15.92 0 0 0 29.88 0L146 178l51.62-19a15.92 15.92 0 0 0 0-29.88ZM137 164.22a8 8 0 0 0-4.74 4.74L112 223.85L91.78 169a8 8 0 0 0-4.78-4.78L32.15 144L87 123.78a8 8 0 0 0 4.78-4.78L112 64.15L132.22 119a8 8 0 0 0 4.74 4.74L191.85 144ZM144 40a8 8 0 0 1 8-8h16V16a8 8 0 0 1 16 0v16h16a8 8 0 0 1 0 16h-16v16a8 8 0 0 1-16 0V48h-16a8 8 0 0 1-8-8m104 48a8 8 0 0 1-8 8h-8v8a8 8 0 0 1-16 0v-8h-8a8 8 0 0 1 0-16h8v-8a8 8 0 0 1 16 0v8h8a8 8 0 0 1 8 8\"/>","drop-fill":"<path fill=\"currentColor\" d=\"M174 47.75a254.2 254.2 0 0 0-41.45-38.3a8 8 0 0 0-9.18 0A254.2 254.2 0 0 0 82 47.75C54.51 79.32 40 112.6 40 144a88 88 0 0 0 176 0c0-31.4-14.51-64.68-42-96.25m9.85 105.59a57.6 57.6 0 0 1-46.56 46.55a9 9 0 0 1-1.29.11a8 8 0 0 1-1.32-15.89c16.57-2.79 30.63-16.85 33.44-33.45a8 8 0 0 1 15.78 2.68Z\"/>"};
+function ph(name, size = 20, cls = '') { return `<svg class="${cls} shrink-0" width="${size}" height="${size}" viewBox="0 0 256 256" aria-hidden="true">${PH[name] || ''}</svg>`; }
+function iconHome(a) { return ph(a ? 'house-line-fill' : 'house-line', 22); }
+function iconFood(a) { return ph(a ? 'bowl-food-fill' : 'bowl-food', 22); }
+function iconScale(a) { return ph(a ? 'scales-fill' : 'scales', 22); }
+function iconBook(a) { return ph(a ? 'book-open-text-fill' : 'book-open-text', 22); }
 
 /* ============================================================
    INSTALL GATE — DietPal runs only from the home screen / installed app

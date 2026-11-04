@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.5.0
+**Versi semasa:** 1.6.0
 
 ## Ciri utama
 
@@ -15,7 +15,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Nota kesihatan (pilihan)** – kencing manis, darah tinggi, gastrik; menyesuaikan panduan "Rasa tak selesa" dan cadangan menu.
 
 **Harian**
-- **Dashboard kalori** – ring progress ikut sasaran pengguna, log ikut waktu makan (Sarapan, Tengah hari, Makan malam, Snek).
+- **Home baru (v1.6)** – reka bentuk dari Sleek: header hijau pandan dengan streak, ring kalori berbentuk pinggan (imbangan sayur/protein/karbo) + bar kemajuan ke sasaran, chip waktu makan, *Cadangan Coach* (mesej coach + satu menu), kad air & berat ringkas, dan pautan *Rasa tak selesa?* yang tenang.
 - **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
 - **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
@@ -35,7 +35,8 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 
 ## Teknologi
 - HTML5 + Vanilla JS + Tailwind CSS (CDN) – tiada build step.
-- Ikon garis SVG terbina dalam kod (tiada emoji, tiada pustaka ikon luaran).
+- Ikon SVG terbina dalam kod: ikon garis sendiri + ikon Phosphor (dibenam terus, tiada pustaka ikon luaran, tiada emoji).
+- Fon Nunito (tajuk) + Nunito Sans (teks); palet krim hangat, hijau pandan, warna pinggan tetap (sayur #6ba539, protein #e0573f, karbo #e9b21c).
 - `localStorage` (kunci `dietpal.v1`) – data v1.0 di bawah kunci lama dipindahkan secara automatik.
 - `manifest.json` + `sw.js` – boleh dipasang (Android/iOS) dan berfungsi offline selepas buka kali pertama.
 
@@ -43,7 +44,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v12, terima & buka notifikasi)
+sw.js           Service worker (cache dietpal-v13, terima & buka notifikasi)
 vercel.json     Tetapan fungsi Vercel (maxDuration 60 s)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
