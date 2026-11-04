@@ -297,11 +297,81 @@ function load() {
         if (!op.milestones?.length) op.milestones = [ { name: 'Fasa 1', kg: 87 }, { name: 'Fasa 2', kg: 77 }, { name: 'Berat ideal', kg: 65 } ];
         op.targetWeight = op.targetWeight || op.milestones[op.milestones.length - 1].kg;
       }
-      delete out.rescues;   // "Rasa tak selesa" no longer keeps a history
-      return out;
+      return sanitizeState(out);
     }
   } catch (e) { console.warn('load failed', e); }
   return structuredClone(DEFAULTS);   // new user → onboarding
+}
+
+// Rebuild the saved data from known fields only (types, ranges, lengths), so a damaged or
+// tampered backup can never break the app or inject markup. Unknown fields are dropped.
+// Runs before the later `const` tables exist, so allowed values are listed here.
+function sanitizeState(d) {
+  const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  const arr = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
+  const s = (v, max = 80) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max) : '');
+  const n = (v, lo, hi, dflt = null) => { const x = Number(v); return v !== null && v !== '' && Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : dflt; };
+  const oneOf = (v, list, dflt) => (list.includes(v) ? v : dflt);
+  const keys = (v, list) => [...new Set(arr(v, 20).filter(k => list.includes(k)))];
+  const DATE = /^\d{4}-\d{2}-\d{2}$/, ID = /^[\w-]{1,40}$/, HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const PLATES = ['serat', 'protein', 'karbo', 'lain'], MEAL_IDS = ['sarapan', 'tengahari', 'malam', 'snek'];
+  const base = structuredClone(DEFAULTS), src = obj(d);
+
+  const p = obj(src.profile), bp = base.profile;
+  const profile = {
+    setupDone: p.setupDone === true, setupAt: n(p.setupAt, 0, 9e15) ?? undefined, name: s(p.name, 40), sex: oneOf(p.sex, ['L', 'P'], ''),
+    age: n(p.age, 18, 90), height: n(p.height, 100, 250), startWeight: n(p.startWeight, 30, 300), targetWeight: n(p.targetWeight, 30, 300),
+    activity: oneOf(p.activity, ['rendah', 'sederhana', 'aktif'], bp.activity), pace: oneOf(String(p.pace), ['0.25', '0.5', '0.75'], bp.pace),
+    kcalMode: oneOf(p.kcalMode, ['auto', 'manual'], bp.kcalMode), waterMode: oneOf(p.waterMode, ['auto', 'manual'], bp.waterMode),
+    kcalMin: n(p.kcalMin, 800, 6000, bp.kcalMin), kcalMax: n(p.kcalMax, 800, 6000, bp.kcalMax),
+    waterGoal: n(p.waterGoal, 500, 10000, bp.waterGoal), waterIdeal: n(p.waterIdeal, 500, 10000, bp.waterIdeal),
+    milestones: arr(p.milestones, 20).map(m => ({ name: s(obj(m).name, 40) || 'Milestone', kg: n(obj(m).kg, 30, 300) })).filter(m => m.kg !== null),
+    avoid: keys(p.avoid, ['daging', 'ayam', 'ikan', 'laut']), allergies: keys(p.allergies, ['kacang', 'telur', 'susu']),
+    noSpicy: p.noSpicy === true, health: keys(p.health, ['diabetes', 'bp', 'gastrik'])
+  };
+
+  const st = obj(src.settings), mt = obj(st.mealTimes), rm = obj(st.reminders), bs = base.settings;
+  const settings = {
+    theme: oneOf(st.theme, ['light', 'dark', 'auto'], bs.theme), textSize: oneOf(st.textSize, ['normal', 'big'], bs.textSize),
+    mealTimes: Object.fromEntries(Object.entries(bs.mealTimes).map(([k, v]) => [k, HHMM.test(mt[k]) ? mt[k] : v])),
+    reminders: { water: rm.water !== false, meals: rm.meals !== false, weigh: rm.weigh !== false, summary: rm.summary !== false,
+      weighDay: Math.round(n(rm.weighDay, 0, 6, bs.reminders.weighDay)) }
+  };
+
+  const pu = obj(src.push);
+  const push = {
+    on: pu.on === true, asked: pu.asked === true, cardDone: pu.cardDone === true,
+    endpoint: typeof pu.endpoint === 'string' && /^https:\/\//.test(pu.endpoint) && pu.endpoint.length < 1000 ? pu.endpoint : '' };
+
+  const meal = m => {
+    m = obj(m);
+    const name = s(m.name, 80), kcal = n(m.kcal, 0, 10000);
+    if (!name || kcal === null) return null;
+    return { id: ID.test(m.id) ? m.id : uid(), foodId: ID.test(m.foodId) ? m.foodId : '', name, unit: s(m.unit, 40) || '1 hidangan',
+      qty: n(m.qty, 0.1, 50, 1), kcal: Math.round(kcal), plate: oneOf(m.plate, PLATES, 'lain'), meal: oneOf(m.meal, MEAL_IDS, 'snek'), t: n(m.t, 0, 9e15, 0) };
+  };
+  const days = {};
+  for (const [k, v] of Object.entries(obj(src.days)).slice(-3660)) {
+    if (!DATE.test(k)) continue;
+    days[k] = { meals: arr(obj(v).meals, 100).map(meal).filter(Boolean), water: Math.round(n(obj(v).water, 0, 20000, 0)) };
+  }
+  const weights = arr(src.weights, 3000).map(w => ({ date: DATE.test(obj(w).date) ? w.date : '', kg: n(obj(w).kg, 30, 300) }))
+    .filter(w => w.date && w.kg !== null).map(w => ({ ...w, kg: Math.round(w.kg * 10) / 10 }));
+  const customFoods = arr(src.customFoods, 500).map(f => {
+    f = obj(f);
+    const name = s(f.name, 60), kcal = n(f.kcal, 0, 5000);
+    if (!ID.test(f.id) || !name || kcal === null) return null;
+    const out = { id: f.id, name, kcal: Math.round(kcal), unit: s(f.unit, 40) || '1 hidangan', plate: oneOf(f.plate, PLATES, 'lain') };
+    const water = n(f.water, 0, 5000); if (water) out.water = Math.round(water);
+    return out;
+  }).filter(Boolean);
+  const dm = obj(src.dismissed);
+  const out = { profile, settings, push, days, weights, customFoods,
+    dismissed: { date: DATE.test(dm.date) ? dm.date : '', ids: arr(dm.ids, 50).filter(x => typeof x === 'string' && ID.test(x)) } };
+  const sp = obj(src.sugPrefs);
+  if (src.sugPrefs) out.sugPrefs = { loc: oneOf(sp.loc, ['rumah', 'luar'], 'rumah'),
+    venue: oneOf(sp.venue, ['gerai', 'mamak', 'campur', 'kopitiam', 'segera', 'kenduri', 'kedai'], 'mamak') };
+  return out;
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -432,7 +502,21 @@ function coach() {
 /* ============================================================
    VIEWS
    ============================================================ */
+// If saved data ever makes a screen fail, show a way out (save a copy / clear) instead of a blank app.
 function render() {
+  try { renderApp(); }
+  catch (e) {
+    console.error('render failed', e);
+    document.querySelector('nav')?.classList.add('hidden');
+    document.getElementById('avatarBtn')?.classList.add('hidden');
+    document.getElementById('view').innerHTML = `<div class="pt-8 pb-10 text-center">
+      <h1 class="text-xl font-extrabold">Ada masalah dengan data DietPal</h1>
+      <p class="text-[14px] text-slate-500 mt-2">Simpan salinan data dulu, kemudian padam dan mula semula (anda boleh pulihkan dari backup lain).</p>
+      <button data-act="export" class="tap mt-5 w-full btn btn-secondary py-3">Simpan data saya</button>
+      <button data-act="reset" class="tap mt-2 w-full btn btn-primary py-3">Padam data & mula semula</button></div>`;
+  }
+}
+function renderApp() {
   const now = new Date();
   document.getElementById('appHdr').classList.remove('hidden');
   if (!appAllowed()) {   // DietPal runs only as an installed app
@@ -700,12 +784,12 @@ function plateSVG(size = 150) {
 function foodRow(f) {
   const c = foodConflicts(f);
   return `
-    <button data-act="pickFood" data-id="${f.id}" class="tap w-full flex items-center gap-3 py-2.5 text-left">
+    <button data-act="pickFood" data-id="${esc(f.id)}" class="tap w-full flex items-center gap-3 py-2.5 text-left">
       <div class="flex-1 min-w-0">
         <div class="text-[14px] font-semibold truncate">${esc(f.name)}</div>
         <div class="text-[12px] text-slate-500 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[f.plate || 'lain'].color}"></span>${esc(f.unit)}${c.length ? ` · <span class="text-amber-700 font-semibold">Ada ${c.map(t => TAG_LABEL[t]).join(', ')}</span>` : ''}</div>
       </div>
-      <div class="text-[14px] font-bold text-slate-700">${f.kcal}<span class="text-[12px] text-slate-500 font-medium"> kcal</span></div>
+      <div class="text-[14px] font-bold text-slate-700">${esc(f.kcal)}<span class="text-[12px] text-slate-500 font-medium"> kcal</span></div>
       <div class="w-8 h-8 rounded-full border border-slate-200 text-brand-700 grid place-items-center">${icon('plus', 'w-4 h-4', 2.5)}</div>
     </button>`;
 }
@@ -738,7 +822,7 @@ function viewFood() {
           <span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[x.plate || 'lain'].color}"></span>
           <div class="flex-1 min-w-0 text-[14px] text-slate-700 leading-snug">${esc(x.name)} <span class="text-slate-500 text-[13px]">· ${x.qty !== 1 ? x.qty + ' × ' : ''}${esc(x.unit || '')}</span></div>
           <div class="text-[14px] font-semibold">${fmt(x.kcal)}</div>
-          <button data-act="delMeal" data-id="${x.id}" class="tap w-8 h-8 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Padam">${icon('x', 'w-4 h-4')}</button>
+          <button data-act="delMeal" data-id="${esc(x.id)}" class="tap w-8 h-8 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Padam">${icon('x', 'w-4 h-4')}</button>
         </div>`).join('')}</div>` : ''}
       <div class="flex items-center gap-2 mt-2">
         <button data-act="openAdd" data-meal="${m.id}" class="tap btn btn-secondary py-2 px-4 text-[14px]">${icon('plus', 'w-4 h-4')}Tambah</button>
@@ -780,8 +864,8 @@ function addSheetBody() {
     ${showFreq ? `<div id="addFreq">
       <div class="text-[12px] font-semibold text-slate-500 mt-3 mb-2">Kerap dimakan</div>
       <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5">
-        ${freq.map(f => `<button data-act="pickFood" data-id="${f.id}" class="tap shrink-0 bg-white rounded-xl border border-slate-200 px-3 py-2 text-left">
-          <div class="text-[13px] font-semibold whitespace-nowrap">${esc(f.name)}</div><div class="text-[12px] text-slate-500">${f.kcal} kcal</div></button>`).join('')}
+        ${freq.map(f => `<button data-act="pickFood" data-id="${esc(f.id)}" class="tap shrink-0 bg-white rounded-xl border border-slate-200 px-3 py-2 text-left">
+          <div class="text-[13px] font-semibold whitespace-nowrap">${esc(f.name)}</div><div class="text-[12px] text-slate-500">${esc(f.kcal)} kcal</div></button>`).join('')}
       </div></div>` : ''}
     <div id="addResults" class="mt-2">${addResultsHtml()}</div>
     <button data-act="customFood" class="tap mt-3 w-full btn btn-secondary border-dashed py-3 text-[14px]">${icon('plus', 'w-4 h-4')}Tambah makanan sendiri</button>
@@ -809,7 +893,7 @@ function sheetFood(id) {
       <div>
         <div class="text-[12px] font-semibold text-brand-700">Tambah ke ${MEALS.find(m => m.id === UI.meal).label}</div>
         <div class="font-bold text-xl leading-tight">${esc(f.name)}</div>
-        <div class="text-[14px] text-slate-500">${esc(f.unit)} · ${f.kcal} kcal</div>
+        <div class="text-[14px] text-slate-500">${esc(f.unit)} · ${esc(f.kcal)} kcal</div>
         <div class="text-[12px] font-semibold mt-1 flex items-center gap-1.5 text-slate-600"><span class="w-2 h-2 rounded-full" style="background:${PLATE[f.plate || 'lain'].color}"></span>${PLATE[f.plate || 'lain'].label}</div>
       </div>
       <div class="mt-5 flex items-center justify-between bg-slate-50 rounded-xl p-2">
@@ -885,7 +969,7 @@ function viewWeight() {
         return `<div class="flex items-center py-2.5 text-[14px]"><div class="flex-1 text-slate-600">${niceDate(w.date)}</div>
         <div class="w-16 text-right text-[12px] ${dlt < 0 ? 'text-green-600' : dlt > 0 ? 'text-amber-600' : 'text-slate-500'}">${prev ? (dlt > 0 ? '+' : '') + dlt.toFixed(1) : ''}</div>
         <div class="w-20 text-right font-bold">${w.kg.toFixed(1)} kg</div>
-        <button data-act="delWeight" data-date="${w.date}" class="tap w-8 h-8 grid place-items-center text-slate-500 hover:text-red-600" aria-label="Padam">${icon('x', 'w-4 h-4')}</button></div>`; }).join('')}
+        <button data-act="delWeight" data-date="${esc(w.date)}" class="tap w-8 h-8 grid place-items-center text-slate-500 hover:text-red-600" aria-label="Padam">${icon('x', 'w-4 h-4')}</button></div>`; }).join('')}
     </div>`) : ''}`;
 }
 
@@ -909,7 +993,7 @@ function milestoneRow(m, i) {
   <div class="${!done && !active ? 'opacity-60' : ''}">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full grid place-items-center text-[14px] ${done ? 'bg-green-500 text-white' : active ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-500'}">${done ? icon('check', 'w-4 h-4', 3) : i + 1}</div>
-      <div><div class="font-semibold text-[14px]">${esc(m.name)}: ${m.kg} kg</div>
+      <div><div class="font-semibold text-[14px]">${esc(m.name)}: ${esc(m.kg)} kg</div>
       <div class="text-[12px] text-slate-500">${done ? 'Tercapai' : `${left.toFixed(1)} kg lagi · anggaran ${Math.ceil(left / 1)}–${Math.ceil(left / 0.5)} minggu`}</div></div></div>
       <div class="text-[13px] font-bold ${done ? 'text-green-600' : 'text-slate-500'}">${Math.round(done ? 100 : pct)}%</div>
     </div>
@@ -1397,6 +1481,7 @@ const AI_ERRORS = {
   offline: 'Tiada internet. Coach AI perlukan sambungan — cadangan menu biasa masih berfungsi offline.',
   not_configured: 'Coach AI belum disediakan di server.',
   rate_limited: 'Terlalu banyak soalan dalam masa singkat. Cuba lagi dalam beberapa minit.',
+  quota_unavailable: 'Coach AI rehat sekejap. Cuba lagi dalam beberapa minit — cadangan menu biasa masih boleh digunakan.',
   default: 'Coach AI tak dapat dihubungi sekarang. Cuba lagi sekejap lagi.'
 };
 // Coach AI has a usage limit per phone (checked on the server). The id is random and holds no personal data.
@@ -1536,7 +1621,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1600,7 +1685,7 @@ function autoMilestones(cur, target) {
   out.push({ name: 'Berat sasaran', kg: target });
   return out;
 }
-function initials() { const n = (S.profile.name || '').trim(); return n ? n[0].toUpperCase() : icon('user', 'w-5 h-5'); }
+function initials() { const n = (S.profile.name || '').trim(); return n ? esc(n[0].toUpperCase()) : icon('user', 'w-5 h-5'); }
 
 // ---------- meal times ----------
 function mins(t) { const [h, m] = String(t || '00:00').split(':').map(Number); return h * 60 + (m || 0); }
@@ -1645,7 +1730,7 @@ function remindersBlock() {
       <span class="text-amber-700">${icon(x.icon)}</span>
       <div class="flex-1 text-[13px] text-slate-700 leading-snug">${x.text}</div>
       <button ${x.act} class="tap shrink-0 btn btn-primary text-[13px] px-3 py-1.5">${x.btn}</button>
-      <button data-act="dismissRem" data-id="${x.id}" class="tap shrink-0 w-8 h-8 grid place-items-center text-slate-500" aria-label="Tutup">${icon('x', 'w-4 h-4')}</button>
+      <button data-act="dismissRem" data-id="${esc(x.id)}" class="tap shrink-0 w-8 h-8 grid place-items-center text-slate-500" aria-label="Tutup">${icon('x', 'w-4 h-4')}</button>
     </div>`).join('');
 }
 const remShown = new Set();
@@ -1724,7 +1809,7 @@ function viewOnboard() {
     ${t.floorHit ? `<div class="mt-3 text-[13px] bg-amber-50 text-amber-800 rounded-xl px-3 py-2">Sasaran dinaikkan ke had minimum selamat ${fmt(kcalFloor(d))} kcal. Jangan makan lebih rendah dari ini tanpa nasihat doktor.</div>` : ''}
     <div class="bg-white rounded-2xl shadow-card p-3 mt-2">
       <div class="text-[12px] text-slate-500 mb-1">Milestone</div>
-      ${ms.map((m, i) => `<div class="flex justify-between text-[14px] py-1"><span>${i + 1}. ${m.name}</span><b>${m.kg} kg</b></div>`).join('')}
+      ${ms.map((m, i) => `<div class="flex justify-between text-[14px] py-1"><span>${i + 1}. ${esc(m.name)}</span><b>${esc(m.kg)} kg</b></div>`).join('')}
       <div class="text-[12px] text-slate-500 mt-1">Anggaran ${Math.ceil((d.weight - d.target) / parseFloat(d.pace))} minggu pada kadar ${PACE[d.pace].d.split(' ·')[0]}.</div>
     </div>
     ${nav()}`;
@@ -1851,7 +1936,7 @@ function viewProfileTab() {
     <div class="space-y-2">
       ${ms.map((m, i) => `<div class="flex gap-2 items-center">
         <input id="msName${i}" value="${esc(m.name)}" class="flex-1 min-w-0 bg-slate-50 rounded-xl px-3 py-2.5 text-[14px] outline-none focus:ring-2 focus:ring-brand-500">
-        <div class="relative w-24"><input id="msKg${i}" type="number" step="0.1" inputmode="decimal" value="${m.kg}" class="w-full bg-slate-50 rounded-xl px-3 py-2.5 pr-8 text-[14px] font-bold outline-none focus:ring-2 focus:ring-brand-500"><span class="absolute right-2.5 top-3 text-[12px] text-slate-500">kg</span></div>
+        <div class="relative w-24"><input id="msKg${i}" type="number" step="0.1" inputmode="decimal" value="${esc(m.kg)}" class="w-full bg-slate-50 rounded-xl px-3 py-2.5 pr-8 text-[14px] font-bold outline-none focus:ring-2 focus:ring-brand-500"><span class="absolute right-2.5 top-3 text-[12px] text-slate-500">kg</span></div>
         <button data-act="msDel" data-i="${i}" class="tap w-8 h-8 grid place-items-center text-slate-500 hover:text-red-600" aria-label="Padam">${icon('x', 'w-4 h-4')}</button></div>`).join('') || '<p class="text-[13px] text-slate-500">Tiada milestone.</p>'}
     </div>
     <div class="grid grid-cols-2 gap-2 mt-3">
@@ -2068,7 +2153,10 @@ document.addEventListener('click', (e) => {
       const url = URL.createObjectURL(blob); const link = document.createElement('a');
       link.href = url; link.download = `dietpal-backup-${todayKey()}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); break;
     }
-    case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) { localStorage.removeItem(KEY); S = load(); UI.tab = 'home'; UI.ob.step = 0; render(); toast('Data dipadam'); } break;
+    case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) {
+      // Stop server reminders first, otherwise the old subscription keeps sending them after the reset
+      disablePush().finally(() => { localStorage.removeItem(KEY); S = load(); UI.tab = 'home'; UI.ob.step = 0; render(); toast('Data dipadam'); });
+    } break;
     case 'install': installApp(); break;
     case 'pushOn': enablePush(true).then(ok => { if (ok) toast('Peringatan dihidupkan'); render(); }); break;
     case 'pushTest': pushPost({ action: 'test', endpoint: S.push.endpoint }).then(r => toast(r.result === 'ok' ? 'Notifikasi ujian dihantar' : 'Tak dapat hantar — cuba hidupkan semula')).catch(() => toast('Tiada sambungan')); break;
@@ -2117,9 +2205,24 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   if (e.target.id === 'importFile' && e.target.files[0]) {
     const r = new FileReader();
-    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.profile || !d.days) throw 0;
-      localStorage.setItem(KEY, JSON.stringify(d)); S = load(); if (S.profile.setupDone) recalcTargets(); save(); render(); toast('Data dipulihkan'); } catch { toast('Fail backup tak sah'); } };
-    r.readAsText(e.target.files[0]);
+    const file = e.target.files[0]; e.target.value = '';
+    if (file.size > 5e6) { toast('Fail backup terlalu besar'); return; }
+    r.onload = () => {
+      let d;
+      try { d = JSON.parse(r.result); } catch { d = null; }
+      if (!d || typeof d !== 'object' || !d.profile || typeof d.profile !== 'object' || !d.days || typeof d.days !== 'object') { toast('Fail backup tak sah'); return; }
+      delete d.push;   // the backup's push address belongs to the old phone; pushCheck() subscribes this one
+      const prev = localStorage.getItem(KEY);
+      try {
+        localStorage.setItem(KEY, JSON.stringify(d)); S = load();   // load() keeps only known, checked fields
+        if (S.profile.setupDone) recalcTargets(); save(); render(); pushCheck(); toast('Data dipulihkan');
+      } catch (err) {
+        console.warn('restore failed', err);
+        if (prev) localStorage.setItem(KEY, prev); else localStorage.removeItem(KEY);
+        S = load(); render(); toast('Fail backup tak sah');
+      }
+    };
+    r.readAsText(file);
   }
 });
 // Re-render when returning to the app (e.g. new day)
@@ -2231,9 +2334,13 @@ async function enablePush(welcome = false) {
 }
 async function disablePush() {
   try {
-    const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    // never hang (e.g. no service worker yet): give up after 5 s
+    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(new Error('sw_timeout')), 5000))]);
+    const sub = await reg.pushManager.getSubscription();
+    // If the server can't be reached, unsubscribing in the browser still ends it: the server
+    // gets 404/410 on its next send and deletes the row.
     if (sub) { await pushPost({ action: 'unsubscribe', endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
-  } catch {}
+  } catch (e) { console.warn('push off', e); }
   S.push = { ...S.push, on: false, endpoint: '' }; save();
 }
 let pushTimer = null, pushSent = '';
