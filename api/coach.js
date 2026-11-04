@@ -1,12 +1,25 @@
 // DietPal — Coach AI (Vercel serverless function)
 // Reads OPENAI_API_KEY (required) and OPENAI_MODEL (optional) from Vercel environment variables.
+// Token quota: SUPABASE_URL, SUPABASE_ANON_KEY, COACH_QUOTA_SECRET (+ optional COACH_* limits, see README).
 // The key never reaches the browser or the repo.
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const MAX_QUESTION = 300;
 const RATE_LIMIT = Number(process.env.COACH_RATE_LIMIT || 12);   // requests per IP per window
 const RATE_WINDOW_MS = 10 * 60 * 1000;                             // 10 minutes
-const hits = new Map();   // best-effort, per server instance
+const hits = new Map();   // best-effort, per server instance — used only when the Supabase quota is unavailable
+
+// Token quota (stored in Supabase table coach_usage, so it survives restarts and can't be reset from the phone).
+// Counted per device id AND per IP (hashed); the IP budget is larger because many phones can share one IP.
+const QUOTA = {
+  url: String(process.env.SUPABASE_URL || '').replace(/\/+$/, ''),
+  key: process.env.SUPABASE_ANON_KEY || '',
+  secret: process.env.COACH_QUOTA_SECRET || '',
+  windowSec: Math.round(Number(process.env.COACH_WINDOW_MIN || 15) * 60),
+  perWindow: Number(process.env.COACH_TOKENS_WINDOW || 8000),
+  perDay: Number(process.env.COACH_TOKENS_DAY || 30000),
+  ipFactor: Number(process.env.COACH_IP_FACTOR || 3)
+};
 
 const MEALS = { sarapan: 'sarapan', tengahari: 'makan tengah hari', malam: 'makan malam', snek: 'snek' };
 const VENUES = { gerai: 'gerai / warung', mamak: 'kedai mamak', campur: 'kedai nasi campur', kopitiam: 'kopitiam',
@@ -100,6 +113,50 @@ function rateLimited(ip) {
   if (hits.size > 5000) hits.clear();   // keep memory bounded
   return false;
 }
+// ---------- token quota ----------
+const crypto = require('crypto');
+const quotaEnabled = () => Boolean(QUOTA.url && QUOTA.key && QUOTA.secret);
+function quotaKeys(req, body) {
+  const keys = ['ip:' + crypto.createHash('sha256').update(QUOTA.secret + '|' + clientIp(req)).digest('hex').slice(0, 32)];
+  const dev = typeof body.device === 'string' ? body.device.trim().toLowerCase() : '';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(dev)) keys.unshift('d:' + dev);
+  return keys;
+}
+// Adds `tokens` to every key (0 = just read) and returns the rows, or null if Supabase can't be reached.
+async function quotaAdd(keys, tokens) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const headers = { 'Content-Type': 'application/json', apikey: QUOTA.key };
+    if (!QUOTA.key.startsWith('sb_')) headers.Authorization = `Bearer ${QUOTA.key}`;   // legacy anon JWT
+    const r = await fetch(`${QUOTA.url}/rest/v1/rpc/coach_usage_add`, {
+      method: 'POST', signal: ctrl.signal, headers,
+      body: JSON.stringify({ p_secret: QUOTA.secret, p_keys: keys, p_add: Math.max(0, Math.round(tokens) || 0), p_window: QUOTA.windowSec })
+    });
+    if (!r.ok) { console.error('Quota error', r.status, (await r.text().catch(() => '')).slice(0, 200)); return null; }
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch (e) { console.error('Quota error', e?.name, e?.message); return null; }
+  finally { clearTimeout(timer); }
+}
+const secsToMidnightMY = (now = Date.now()) => {
+  const my = new Date(now + 8 * 3600e3);   // Malaysia = UTC+8, no DST
+  return 86400 - (my.getUTCHours() * 3600 + my.getUTCMinutes() * 60 + my.getUTCSeconds());
+};
+// Which budget is used up (if any), and how much of the tightest window budget is left.
+function quotaState(rows, now = Date.now()) {
+  let blocked = null, left = 1, resetIn = QUOTA.windowSec;
+  for (const r of rows || []) {
+    const f = String(r.o_key).startsWith('ip:') ? QUOTA.ipFactor : 1;
+    const winMax = QUOTA.perWindow * f, dayMax = QUOTA.perDay * f;
+    if (r.o_day >= dayMax) blocked = { scope: 'day', retry_after: secsToMidnightMY(now) };
+    else if (r.o_win >= winMax && !blocked) blocked = { scope: 'window', retry_after: Math.max(1, r.o_reset) };
+    const lw = 1 - r.o_win / winMax, ld = 1 - r.o_day / dayMax, l = Math.max(0, Math.min(lw, ld));
+    if (l < left) { left = l; resetIn = ld < lw ? secsToMidnightMY(now) : r.o_reset; }
+  }
+  return { blocked, left: Math.round(left * 100) / 100, reset_in: resetIn };
+}
+
 function originAllowed(req) {
   const origin = req.headers.origin;
   if (!origin) return true;   // same-origin fetches from some browsers omit Origin
@@ -256,7 +313,7 @@ async function callOpenAI(messages) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: MODEL,
-        max_completion_tokens: 2000,
+        max_completion_tokens: 1200,
         messages,
         response_format: { type: 'json_schema', json_schema: { name: 'coach_reply', strict: true, schema: SCHEMA } }
       })
@@ -268,9 +325,10 @@ async function callOpenAI(messages) {
     }
     const data = await r.json();
     const msg = data?.choices?.[0]?.message;
-    if (msg?.refusal) return { refusal: true };
-    try { return { parsed: JSON.parse(msg?.content || '{}') }; }
-    catch { throw new Error('bad_output'); }
+    const tokens = Number(data?.usage?.total_tokens) || 0;
+    if (msg?.refusal) return { refusal: true, tokens };
+    try { return { parsed: JSON.parse(msg?.content || '{}'), tokens }; }
+    catch { const err = new Error('bad_output'); err.tokens = tokens; throw err; }
   } finally { clearTimeout(timer); }
 }
 
@@ -279,19 +337,36 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'method' }); }
   if (!originAllowed(req)) return res.status(403).json({ error: 'origin' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'not_configured' });
-  if (rateLimited(clientIp(req))) return res.status(429).json({ error: 'rate_limited' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'bad_request' });
   if (JSON.stringify(body).length > 16000) return res.status(413).json({ error: 'too_large' });
-  if (redFlag(body.question)) return res.status(200).json(EMERGENCY);
+  if (redFlag(body.question)) return res.status(200).json(EMERGENCY);   // emergencies never count against the quota
+
+  // Token quota: check before calling OpenAI, charge the real usage after.
+  // If Supabase is not configured or unreachable, fall back to the in-memory request limit (fail open).
+  const keys = quotaKeys(req, body);
+  const before = quotaEnabled() ? await quotaAdd(keys, 0) : null;
+  if (before) {
+    const st = quotaState(before);
+    if (st.blocked) { res.setHeader('Retry-After', String(st.blocked.retry_after)); return res.status(429).json({ error: 'quota', ...st.blocked }); }
+  } else if (rateLimited(clientIp(req))) return res.status(429).json({ error: 'rate_limited' });
+  const charge = async tokens => {
+    if (!before || !tokens) return null;
+    const rows = await quotaAdd(keys, tokens);
+    if (!rows) return null;
+    const st = quotaState(rows);
+    return { left: st.left, reset_in: st.reset_in };
+  };
 
   const c = body.context || {};
   const catalog = cleanCatalog(c.catalog), targets = mealTargets(c);
   try {
     const ai = await callOpenAI([{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(body) }]);
-    if (ai.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', meal: null, menus: [] });
+    console.log('Coach tokens', ai.tokens);
+    const quota = await charge(ai.tokens);
+    if (ai.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', meal: null, menus: [], quota });
     const out = clean(ai.parsed, catalog);
 
     // The meal the menus are for: what the AI understood from the question, else the app setting.
@@ -305,9 +380,11 @@ module.exports = async function handler(req, res) {
       });
       out.range = [lo, hi];
     }
+    out.quota = quota;
     return res.status(200).json(out);
   } catch (e) {
     console.error('Coach error', e?.name, e?.message, e?.status);
+    if (e?.tokens) await charge(e.tokens);
     if (e?.status) return res.status(502).json({ error: e.status === 429 ? 'upstream_busy' : 'upstream' });
     if (e?.name === 'AbortError') return res.status(504).json({ error: 'timeout' });
     return res.status(502).json({ error: e?.message === 'bad_output' ? 'bad_output' : 'failed' });
@@ -315,4 +392,4 @@ module.exports = async function handler(req, res) {
 };
 
 // exported for local tests
-module.exports._test = { buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
+module.exports._test = { quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };

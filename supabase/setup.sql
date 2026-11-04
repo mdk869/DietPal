@@ -1,4 +1,4 @@
--- DietPal push reminders — Supabase setup (already applied to project "dietpal", ref jlbdtmzccrebjmlrjvgh).
+-- DietPal — Supabase setup (already applied to project "dietpal", ref jlbdtmzccrebjmlrjvgh): push reminders + Coach AI quota.
 -- Kept here for reference / re-creating the project.
 
 create extension if not exists pg_cron;
@@ -37,3 +37,57 @@ select cron.schedule('dietpal-push', '*/15 * * * *', $$
       'x-cron-secret', (select value from public.push_config where key = 'cron_secret')),
     timeout_milliseconds := 30000);
 $$);
+
+-- ============================================================
+-- Coach AI token quota (applied as migration "coach_quota").
+-- The Vercel function api/coach.js calls coach_usage_add with the anon/publishable key + COACH_QUOTA_SECRET.
+-- ============================================================
+create table public.coach_usage (
+  key        text primary key,                 -- 'd:<device uuid>' or 'ip:<hashed ip>'
+  win_start  timestamptz not null default now(),
+  win_tokens integer not null default 0,
+  day        date not null,
+  day_tokens integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+alter table public.coach_usage enable row level security;
+revoke all on public.coach_usage from anon, authenticated;
+
+insert into public.push_config (key, value) values ('coach_secret', encode(extensions.gen_random_bytes(32), 'hex'))
+on conflict (key) do nothing;
+
+-- Adds p_add tokens to each key (0 = read only). Resets the window after p_window seconds and the day at midnight MYT.
+create or replace function public.coach_usage_add(p_secret text, p_keys text[], p_add integer, p_window integer)
+returns table (o_key text, o_win integer, o_reset integer, o_day integer)
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_today date := (now() at time zone 'Asia/Kuala_Lumpur')::date;
+  v_win interval := make_interval(secs => p_window);
+begin
+  if p_secret is null or p_secret is distinct from (select value from public.push_config where key = 'coach_secret') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if coalesce(array_length(p_keys, 1), 0) not between 1 and 4 or p_add not between 0 and 100000
+     or p_window not between 60 and 86400 then
+    raise exception 'bad_args' using errcode = '22023';
+  end if;
+  return query
+  insert into public.coach_usage as u (key, win_start, win_tokens, day, day_tokens)
+  select distinct k, now(), p_add, v_today, p_add from unnest(p_keys) as k
+  on conflict (key) do update set
+    win_tokens = case when u.win_start + v_win <= now() then p_add else u.win_tokens + p_add end,
+    win_start  = case when u.win_start + v_win <= now() then now() else u.win_start end,
+    day_tokens = case when u.day = v_today then u.day_tokens + p_add else p_add end,
+    day        = v_today,
+    updated_at = now()
+  returning u.key, u.win_tokens,
+    greatest(0, ceil(extract(epoch from (u.win_start + v_win - now()))))::integer, u.day_tokens;
+end $$;
+
+revoke all on function public.coach_usage_add(text, text[], integer, integer) from public, authenticated;
+grant execute on function public.coach_usage_add(text, text[], integer, integer) to anon;
+
+-- Daily 03:00 MYT: drop rows not used for 2 days.
+select cron.schedule('dietpal-coach-cleanup', '0 19 * * *',
+  $$ delete from public.coach_usage where updated_at < now() - interval '2 days' $$);
