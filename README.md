@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.6.0
+**Versi semasa:** 1.6.1
 
 ## Ciri utama
 
@@ -44,7 +44,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v13, terima & buka notifikasi)
+sw.js           Service worker (cache dietpal-v14, terima & buka notifikasi)
 vercel.json     Tetapan fungsi Vercel (maxDuration 60 s)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
@@ -61,7 +61,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS. App diseka
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v12` → `dietpal-v13`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v13` → `dietpal-v14`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
@@ -88,7 +88,14 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
 | `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
-| `COACH_RATE_LIMIT` | Tidak | Had permintaan setiap IP dalam 10 minit (lalai: 12). |
+| `SUPABASE_URL` | Ya (untuk had) | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
+| `SUPABASE_ANON_KEY` | Ya (untuk had) | Publishable key projek Supabase **dietpal** (bukan rahsia). |
+| `COACH_QUOTA_SECRET` | Ya (untuk had) | Rahsia `coach_secret` dalam jadual `push_config` (lihat di bawah). |
+| `COACH_TOKENS_WINDOW` | Tidak | Bajet token setiap telefon dalam satu tempoh (lalai: 8000). |
+| `COACH_WINDOW_MIN` | Tidak | Panjang tempoh dalam minit (lalai: 15). |
+| `COACH_TOKENS_DAY` | Tidak | Bajet token setiap telefon sehari, reset 12 tengah malam waktu Malaysia (lalai: 30000). |
+| `COACH_IP_FACTOR` | Tidak | Bajet setiap IP = bajet telefon × nilai ini (lalai: 3). |
+| `COACH_RATE_LIMIT` | Tidak | Sandaran jika had token tidak aktif: had permintaan setiap IP dalam 10 minit (lalai: 12). |
 | `ALLOWED_ORIGINS` | Tidak | Domain tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). |
 
 **Cara AI menjawab**
@@ -104,7 +111,9 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 - Had kalori minimum harian, tiada skip makan atau potong nasi/garam terus, patuhi pantang & alahan, tiada diagnosis/ubat/dos.
 - Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
 - Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
-- Had kadar setiap IP, semakan origin, had saiz permintaan, tamat masa 30 saat.
+- **Had penggunaan (token)** – dikira di server dalam Supabase, jadi tak boleh di-reset dari telefon. Setiap telefon (ID rawak dalam `localStorage`, kunci `dietpal.device`) dapat 8,000 token setiap 15 minit dan 30,000 token sehari; setiap IP dapat 3× ganda (ramai telefon boleh berkongsi satu IP). Kiraan guna `usage.total_tokens` sebenar dari OpenAI. Bila habis, server pulangkan 429 `quota` dengan masa menunggu dan app papar "Coach AI rehat sekejap…". Bila baki ≤ 30%, app papar amaran kecil. Soalan kecemasan tidak dikira. Satu soalan biasa ≈ 3,000 token (prompt sistem + senarai preset makanan + jawapan), jadi ≈ 2–3 soalan setiap 15 minit dan ≈ 10 sehari. Jika Supabase tak dapat dihubungi atau env belum diset, server guna had permintaan lama (`COACH_RATE_LIMIT`) supaya Coach terus berfungsi.
+- Jawapan dihadkan kepada 1,200 token output.
+- Semakan origin, had saiz permintaan, tamat masa 30 saat.
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
 - Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, nota kesihatan. **Nama dan berat tidak dihantar.**
 - Tanpa internet atau jika AI gagal, app terus guna cadangan menu Enjin A.
@@ -123,5 +132,7 @@ Notifikasi dihantar dengan *Web Push* dari projek Supabase **dietpal** (`jlbdtmz
 | `pg_cron` `dietpal-push` | Setiap 15 minit memanggil `push` (`run`) dengan rahsia `cron_secret`. |
 
 **Data yang dihantar ke server:** alamat push, zon waktu, waktu makan & pilihan peringatan, dan status hari ini (waktu makan yang dah dilog — ya/tidak, jumlah air, jumlah kalori, tarikh timbang terakhir). **Nama, berat dan senarai makanan tidak dihantar.** Langganan yang tamat (404/410) dipadam secara automatik.
+
+**Had Coach AI** juga guna projek ini: jadual `coach_usage` (kiraan token setiap telefon/IP — IP disimpan sebagai hash) dan fungsi `coach_usage_add`, yang hanya boleh dipanggil dengan rahsia `coach_secret`. Dapatkan rahsia untuk `COACH_QUOTA_SECRET` di SQL Editor: `select value from push_config where key = 'coach_secret';`. Baris lama (> 2 hari) dipadam setiap hari oleh `pg_cron` `dietpal-coach-cleanup`.
 
 Skema penuh: [`supabase/setup.sql`](supabase/setup.sql). Kod fungsi: [`supabase/functions/push/index.ts`](supabase/functions/push/index.ts).
