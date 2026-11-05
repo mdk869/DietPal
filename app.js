@@ -395,7 +395,7 @@ function viewHome() {
     </div>
   </section>
 
-  <section class="relative -mt-14 bg-paper rounded-3xl p-5 shadow-card">
+  <section class="relative !-mt-14 bg-paper rounded-3xl p-5 shadow-card">
     <div class="flex items-center gap-4">
       ${plateRing(k, pc)}
       <div class="flex-1 min-w-0 space-y-3">
@@ -1817,7 +1817,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.8.3';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
