@@ -24,6 +24,8 @@ const QUOTA = {
   perWindow: Number(process.env.COACH_TOKENS_WINDOW || 8000),
   perDay: Number(process.env.COACH_TOKENS_DAY || 30000),
   ipFactor: Number(process.env.COACH_IP_FACTOR || 3),
+  // Cached prompt tokens cost ~1/10 of fresh input, so they count at this weight (1 = count fully).
+  cachedWeight: Math.min(1, Math.max(0, Number(process.env.COACH_CACHED_WEIGHT ?? 0.1))),
   // Tokens booked before calling OpenAI (≈ one question), settled to the real usage afterwards.
   // Booking first is atomic in Postgres, so many requests sent at once can't all slip past the limit.
   reserve: Number(process.env.COACH_RESERVE || 3500)
@@ -349,6 +351,14 @@ function fitPortions(menu, lo, hi, catalog, meal) {
   return { ...menu, items, kcal: total, adjusted };
 }
 
+// Tokens charged against the quota: fresh input + output in full, cached input at QUOTA.cachedWeight.
+function quotaTokens(u = {}) {
+  const input = Number(u.prompt_tokens) || 0, out = Number(u.completion_tokens) || 0;
+  const cached = Math.min(input, Number(u.prompt_tokens_details?.cached_tokens) || 0);
+  if (!input && !out) return Number(u.total_tokens) || 0;
+  return Math.ceil((input - cached) + cached * QUOTA.cachedWeight + out);
+}
+
 async function callOpenAI(messages) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
@@ -373,9 +383,9 @@ async function callOpenAI(messages) {
     const data = await r.json();
     const msg = data?.choices?.[0]?.message;
     const u = data?.usage || {};
-    const tokens = Number(u.total_tokens) || 0;
+    const tokens = quotaTokens(u);
     console.log('Coach usage', JSON.stringify({ model: data?.model || MODEL, in: u.prompt_tokens, cached: u.prompt_tokens_details?.cached_tokens,
-      out: u.completion_tokens, reasoning: u.completion_tokens_details?.reasoning_tokens, finish: data?.choices?.[0]?.finish_reason }));
+      out: u.completion_tokens, reasoning: u.completion_tokens_details?.reasoning_tokens, counted: tokens, finish: data?.choices?.[0]?.finish_reason }));
     // Some newer small models occasionally leak stray non-Latin text into JSON strings — log it so it can be spotted.
     if (new RegExp(ODD_SCRIPT.source).test(data?.choices?.[0]?.message?.content || '')) console.warn('Coach odd script in output');
     if (msg?.refusal) return { refusal: true, tokens };
@@ -457,4 +467,4 @@ module.exports = async function handler(req, res) {
 };
 
 // exported for local tests
-module.exports._test = { plateSummary, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
+module.exports._test = { plateSummary, quotaTokens, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
