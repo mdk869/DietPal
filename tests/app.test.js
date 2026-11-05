@@ -1,6 +1,6 @@
 const test = require('node:test'), assert = require('node:assert');
 const { load } = require('./helpers');
-const { FOODS } = require('../foods.js');
+const { FOODS, isSweetMeal } = require('../foods.js');
 
 test('sanitizeState: strips markup, junk and unknown fields', () => {
   const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
@@ -103,4 +103,24 @@ test('mixed-dish presets count by their make-up', () => {
   assert.equal(plateGap(log(['ncampur'], ['ncampur'])), '');               // nasi campur already has lauk + sayur
   assert.equal(plateCounts(log(['pisang'])).serat, 1);                     // fruit counts with sayur & buah
   for (const f of FOODS) if (f.mix) assert(Object.keys(f.mix).every(k => ['serat', 'protein', 'karbo'].includes(k)), f.id);
+});
+
+test('isSweetMeal: presets by flag, own foods / AI menus by name', () => {
+  assert(isSweetMeal({ foodId: 'tehtarik', name: 'Teh tarik' }));
+  assert(!isSweetMeal({ foodId: 'kopio', name: 'Kopi O / teh O kosong' }));
+  assert(!isSweetMeal({ foodId: 'kopisusu', name: 'Kopi / teh susu kurang manis' }));
+  assert(isSweetMeal({ foodId: 'c_1', name: 'Milo ais kaw' }));
+  assert(isSweetMeal({ name: 'Jus oren' }));
+  assert(!isSweetMeal({ name: 'Teh tarik kurang manis' }));
+  assert(!isSweetMeal({ name: 'Teh O kosong' }));
+  assert(!isSweetMeal({ name: 'Nasi lemak' }));
+  assert(!isSweetMeal({ name: 'Ayam masak kicap' }));
+});
+
+test('coach: nudges about sugary drinks after plate gaps', () => {
+  const meals = [{ foodId: 'ncampur', plate: 'lain', kcal: 550, qty: 1 }, { foodId: 'ncampur', plate: 'lain', kcal: 550, qty: 1 }, { foodId: 'milo', name: 'Milo ais', plate: 'lain', kcal: 190, qty: 1 }];
+  const { coach } = load(['mealMix', 'plateCounts', 'plateGap', 'coach'], { FOODS, isSweetMeal,
+    S: { profile: { kcalMin: 1200, kcalMax: 1400, waterGoal: 2000, name: '' }, settings: { reminders: { water: true } } },
+    peekDay: () => ({ meals, water: 0 }), todayKey: () => 'x', kcalOf: d => d.meals.reduce((a, m) => a + m.kcal, 0), fmt: String, esc: x => x });
+  assert.match(coach().msg, /dalam sasaran, pinggan pun seimbang\. Air manis hari ini ~190 kcal/);
 });

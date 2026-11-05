@@ -275,19 +275,23 @@ function coach() {
   const name = p.name ? ', ' + esc(p.name) : '';
   const expectedWater = Math.max(0, Math.min(1, (h - 7) / 14)) * p.waterGoal;
   const pc = plateCounts(d), gap = plateGap(d, pc);
+  const sweet = d.meals.filter(isSweetMeal).reduce((a, m) => a + (m.kcal || 0), 0);   // kcal from sugary drinks today
+  const sweetTip = sweet >= 100 ? ` Air manis hari ini ~${fmt(sweet)} kcal — tukar ke kurang manis atau kosong, cara paling mudah jimat kalori.` : '';
   let msg, mood = '';
 
-  if (k > p.kcalMax) { msg = `Hari ini lebih ${fmt(k - p.kcalMax)} kcal dari sasaran. Tak apa — ini bahagian "20" dalam 80/20. Esok sambung macam biasa, tak perlu ganti dengan makan terlalu sikit.`; }
+  if (k > p.kcalMax) { msg = `Hari ini lebih ${fmt(k - p.kcalMax)} kcal dari sasaran. Tak apa — ini bahagian "20" dalam 80/20. Esok sambung macam biasa, tak perlu ganti dengan makan terlalu sikit.${sweetTip}`; }
   else if (h >= 19 && k > 0 && k < 1200) { msg = `Kalori hari ini baru ${fmt(k)} kcal — terlalu rendah boleh buat pening. Makan malam yang cukup ya: nasi 1 senduk + lauk + sayur.`; }
   else if (!d.meals.length && h < 11) { msg = 'Mulakan hari dengan sarapan berprotein — contoh 2 biji telur rebus + 2 keping roti gandum. Jangan skip sarapan, nanti lapar teruk waktu tengah hari.'; }
   else if (!S.settings.reminders.water && d.water < expectedWater - 500) { msg = `Air baru ${fmt(d.water)} ml. Minum segelas sekarang — kurang air antara punca pening dan rasa lapar palsu.`; }
   else if (k >= p.kcalMin && k <= p.kcalMax) {
     msg = gap === 'sayur' ? `${fmt(k)} kcal — dalam sasaran. Tapi hari ini belum ada sayur lagi. ${h < 19 ? 'Tambah sayur atau ulam waktu makan seterusnya — kalorinya rendah.' : 'Esok cuba isi separuh pinggan dengan sayur, ulam pun dikira!'}`
       : gap === 'protein' ? `${fmt(k)} kcal — dalam sasaran. Tapi protein hari ini masih kurang. Esok pilih lauk protein — telur, ikan, ayam atau tauhu — supaya lebih kenyang.`
+      : sweetTip ? `${fmt(k)} kcal — dalam sasaran, pinggan pun seimbang.${sweetTip}`
       : `Mantap! ${fmt(k)} kcal — tepat dalam sasaran, pinggan pun seimbang. Konsisten macam ni yang bawa hasil.`;
   }
   else if (gap === 'sayur') { msg = 'Hari ini belum ada sayur lagi. Separuh pinggan sayur — ulam pun dikira!'; }
   else if (gap === 'protein') { msg = 'Protein hari ini masih kurang. Waktu makan seterusnya, tambah telur, ikan, ayam atau tauhu — lebih kenyang dan jaga otot.'; }
+  else if (sweetTip) { msg = sweetTip.trim(); }
   else { msg = `Baki ${fmt(Math.max(0, p.kcalMax - k))} kcal untuk hari ini. Makan perlahan, dahulukan sayur dan protein.`; }
   return { greet: greet + name, msg, mood };
 }
@@ -580,7 +584,7 @@ function foodRow(f) {
     <button data-act="pickFood" data-id="${esc(f.id)}" class="tap w-full flex items-center gap-3 py-2.5 text-left">
       <div class="flex-1 min-w-0">
         <div class="text-[14px] font-semibold truncate">${esc(f.name)}</div>
-        <div class="text-[12px] text-slate-500 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[f.plate || 'lain'].color}"></span>${esc(f.unit)}${c.length ? ` · <span class="text-amber-700 font-semibold">Ada ${c.map(t => TAG_LABEL[t]).join(', ')}</span>` : ''}</div>
+        <div class="text-[12px] text-slate-500 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[f.plate || 'lain'].color}"></span>${esc(f.unit)}${isSweetMeal({ foodId: f.id, name: f.name }) ? ' · <span class="text-amber-700 font-semibold">Manis</span>' : ''}${c.length ? ` · <span class="text-amber-700 font-semibold">Ada ${c.map(t => TAG_LABEL[t]).join(', ')}</span>` : ''}</div>
       </div>
       <div class="text-[14px] font-bold text-slate-700">${esc(f.kcal)}<span class="text-[12px] text-slate-500 font-medium"> kcal</span></div>
       <div class="w-8 h-8 rounded-full border border-slate-200 text-brand-700 grid place-items-center">${icon('plus', 'w-4 h-4', 2.5)}</div>
@@ -694,6 +698,7 @@ function sheetFood(id) {
         <div class="text-center"><div class="text-2xl font-extrabold">${q}</div><div class="text-[12px] text-slate-500">hidangan</div></div>
         <button data-act="qty" data-d="0.5" class="tap w-12 h-12 rounded-xl bg-white border border-slate-200 grid place-items-center" aria-label="Tambah">${icon('plus')}</button>
       </div>
+      ${isSweetMeal({ foodId: f.id, name: f.name }) ? `<div class="mt-4 text-[13px] bg-amber-50 text-amber-800 rounded-xl p-3"><b>Tip:</b> Minuman manis cepat tambah kalori tapi tak buat kenyang. Minta <b>kurang manis</b> atau <b>kosong</b> — jimat ~100 kcal setiap gelas.</div>` : ''}
       ${f.plate === 'karbo' && /nasi/i.test(f.name) ? `<div class="mt-4 text-[13px] bg-amber-50 text-amber-800 rounded-xl p-3"><b>Tip:</b> Nasi tak perlu dipotong terus — 1 senduk (¼ pinggan) cukup untuk tenaga & elak pening.</div>` : ''}
       <button data-act="addFood" class="tap mt-5 w-full btn btn-primary py-3.5 text-[16px]">Tambah · ${fmt(f.kcal * q)} kcal</button>
     </div>`;
@@ -1466,7 +1471,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.7';
+const APP_VERSION = '1.6.8';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },

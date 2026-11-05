@@ -1,4 +1,5 @@
 // DietPal — Malaysian food presets (anggaran kalori). plate: serat | protein | karbo | lain
+// sweet: minuman bergula (teguran Coach & tip "kurang manis").
 // mix: anggaran komposisi pinggan hidangan campur (bilangan hidangan setiap kumpulan) — untuk ring pinggan & teguran Coach.
 // Loaded by the app (<script src="foods.js">) and by api/coach.js (require), so both use the same list.
 const FOODS = [
@@ -39,10 +40,10 @@ const FOODS = [
   { id:'tosai', name:'Tosai kosong', unit:'1 keping', kcal:170, cat:'Hidangan', plate:'lain', mix:{ karbo:1 } },
   // Minuman
   { id:'kopio', name:'Kopi O / teh O kosong', unit:'1 cawan', kcal:5, cat:'Minuman', plate:'lain' },
-  { id:'tehtarik',name:'Teh tarik', unit:'1 cawan', kcal:150, cat:'Minuman', plate:'lain' },
+  { id:'tehtarik',name:'Teh tarik', unit:'1 cawan', kcal:150, cat:'Minuman', plate:'lain', sweet:true },
   { id:'kopisusu',name:'Kopi / teh susu kurang manis', unit:'1 cawan', kcal:90, cat:'Minuman', plate:'lain' },
-  { id:'milo',  name:'Milo ais', unit:'1 gelas', kcal:190, cat:'Minuman', plate:'lain' },
-  { id:'sirap', name:'Air sirap / sirap bandung', unit:'1 gelas', kcal:180, cat:'Minuman', plate:'lain' },
+  { id:'milo',  name:'Milo ais', unit:'1 gelas', kcal:190, cat:'Minuman', plate:'lain', sweet:true },
+  { id:'sirap', name:'Air sirap / sirap bandung', unit:'1 gelas', kcal:180, cat:'Minuman', plate:'lain', sweet:true },
   { id:'p100z', name:'Minuman isotonik tanpa gula', unit:'1 tin / botol kecil', kcal:0, cat:'Minuman', plate:'lain', water:325 },
   { id:'airkosong', name:'Air kosong', unit:'1 gelas', kcal:0, cat:'Minuman', plate:'lain', water:250 },
   { id:'susu',  name:'Susu rendah lemak', unit:'1 gelas', kcal:110, cat:'Minuman', plate:'protein' },
@@ -79,4 +80,13 @@ const FOODS = [
   { id:'burger', name:'Burger ayam grill', unit:'1 biji', kcal:400, cat:'Hidangan', plate:'lain', mix:{ karbo:1, protein:1 } },
   { id:'chickenchop', name:'Chicken chop grill (sos asing)', unit:'1 pinggan', kcal:520, cat:'Hidangan', plate:'lain', mix:{ karbo:0.5, protein:1, serat:0.5 } }
 ];
-if (typeof module !== 'undefined') module.exports = { FOODS };
+// Sugary drink / dessert? Presets use their `sweet` flag; own foods and AI menus are matched by name.
+const SWEET_RE = /(^|[^a-z])(teh tarik|teh ais|kopi ais|teh c|milo|neslo|horlicks|sirap|bandung|air manis|jus|juice|soda|cola|coke|boba|bubble tea|air tin|air berkarbonat|cendol|ais kacang|ABC)(?=$|[^a-z])/i;
+const NOT_SWEET_RE = /(^|[^a-z])(kosong|tanpa gula|kurang manis|zero|no sugar|less sugar|sugar free)(?=$|[^a-z])/i;
+function isSweetMeal(m) {
+  const f = m && m.foodId ? FOODS.find(x => x.id === m.foodId) : null;
+  if (f) return !!f.sweet;
+  const n = String((m && m.name) || '');
+  return SWEET_RE.test(n) && !NOT_SWEET_RE.test(n);
+}
+if (typeof module !== 'undefined') module.exports = { FOODS, isSweetMeal };
