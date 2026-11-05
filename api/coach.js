@@ -43,7 +43,7 @@ UTAMAKAN SOALAN PENGGUNA
 - Jangan ulang nota kesihatan atau pantang pengguna dalam setiap jawapan — patuhi secara senyap. Sebut hanya jika ia memang berkait dengan soalan.
 - Jangan sebut "di luar" atau "di rumah" melainkan soalan atau tetapan app menyatakannya. Tetapan "di rumah" → cadang masakan rumah, bukan kedai.
 - Soalan tentang data hari ini (cth: "berapa kalori saya makan hari ini?") → guna angka dari konteks app sahaja, jangan kira semula.
-- Kalori bukan satu-satunya ukuran. Jika imbangan pinggan hari ini kurang sayur atau protein, sebut ringkas dalam "reply" (satu ayat) walaupun kalori dalam sasaran, dan utamakan menu yang menampung kekurangan itu. Jangan tegur jika kebanyakan makanan ialah hidangan campur — isinya tidak diketahui.
+- Kalori bukan satu-satunya ukuran. Jika imbangan pinggan hari ini kurang sayur atau protein, sebut ringkas dalam "reply" (satu ayat) walaupun kalori dalam sasaran, dan utamakan menu yang menampung kekurangan itu. Hidangan campur app (nasi lemak, mee goreng…) sudah dipecah anggaran ke kumpulan pinggan; "lain-lain" = isi tidak diketahui atau minuman — jangan tegur jika kebanyakan makanan dalam "lain-lain".
 
 CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
 - Beri 2–3 hidangan SEBENAR yang memang biasa dipesan atau dimasak di tempat itu di Malaysia (cth di mamak: "Nasi kandar ikan bakar", "Roti telur + dal", "Mee hoon sup"). Nama menu = nama hidangan yang orang kenal.
@@ -208,10 +208,15 @@ const EMERGENCY = {
 };
 
 // Servings per plate group from the phone's log; "lain" = mixed dishes and drinks (contents unknown).
-const PLATE_LABEL = { serat: 'sayur & buah', protein: 'protein', karbo: 'karbo', lain: 'hidangan campur / minuman' };
+const PLATE_LABEL = { serat: 'sayur & buah', protein: 'protein', karbo: 'karbo', lain: 'lain-lain / minuman' };
 function plateSummary(list) {
   const c = { serat: 0, protein: 0, karbo: 0, lain: 0 };
-  list.forEach(x => { const k = PLATE_LABEL[x?.plate] ? x.plate : 'lain'; const q = Number(x?.qty); c[k] += Number.isFinite(q) ? Math.min(10, Math.max(0.25, q)) : 1; });
+  list.forEach(x => {
+    const q = Number(x?.qty), qty = Number.isFinite(q) ? Math.min(10, Math.max(0.25, q)) : 1;
+    const f = typeof x?.foodId === 'string' ? FOODS.find(p => p.id === x.foodId) : null;   // presets: same make-up as the app
+    const mix = f ? (f.mix || { [f.plate || 'lain']: 1 }) : { [PLATE_LABEL[x?.plate] ? x.plate : 'lain']: 1 };
+    Object.entries(mix).forEach(([k, v]) => { if (k in c) c[k] += v * qty; });
+  });
   return Object.entries(c).map(([k, v]) => `${PLATE_LABEL[k]} ${Math.round(v * 10) / 10}`).join(', ') + ' (bilangan hidangan)';
 }
 

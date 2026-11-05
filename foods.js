@@ -1,4 +1,5 @@
 // DietPal — Malaysian food presets (anggaran kalori). plate: serat | protein | karbo | lain
+// mix: anggaran komposisi pinggan hidangan campur (bilangan hidangan setiap kumpulan) — untuk ring pinggan & teguran Coach.
 // Loaded by the app (<script src="foods.js">) and by api/coach.js (require), so both use the same list.
 const FOODS = [
   // Karbohidrat
@@ -27,15 +28,15 @@ const FOODS = [
   { id:'salad', name:'Salad / timun & tomato', unit:'1 mangkuk', kcal:30, cat:'Sayur', plate:'serat' },
   { id:'dal',   name:'Kuah dal / sayur lodeh', unit:'1 senduk', kcal:70, cat:'Sayur', plate:'serat' },
   // Hidangan penuh
-  { id:'nlemak',name:'Nasi lemak biasa (bungkus)', unit:'1 bungkus', kcal:400, cat:'Hidangan', plate:'lain' },
-  { id:'ncampur',name:'Nasi campur (1 lauk + sayur)', unit:'1 pinggan', kcal:550, cat:'Hidangan', plate:'lain' },
-  { id:'nayam', name:'Nasi ayam', unit:'1 pinggan', kcal:600, cat:'Hidangan', plate:'lain' },
-  { id:'mgoreng',name:'Mee goreng mamak', unit:'1 pinggan', kcal:550, cat:'Hidangan', plate:'lain' },
-  { id:'ktgoreng',name:'Kuey teow goreng', unit:'1 pinggan', kcal:650, cat:'Hidangan', plate:'lain' },
-  { id:'msup',  name:'Mee sup / mee hoon sup', unit:'1 mangkuk', kcal:350, cat:'Hidangan', plate:'lain' },
-  { id:'rcanai',name:'Roti canai kosong', unit:'1 keping', kcal:300, cat:'Hidangan', plate:'lain' },
-  { id:'rtelur',name:'Roti telur', unit:'1 keping', kcal:380, cat:'Hidangan', plate:'lain' },
-  { id:'tosai', name:'Tosai kosong', unit:'1 keping', kcal:170, cat:'Hidangan', plate:'lain' },
+  { id:'nlemak',name:'Nasi lemak biasa (bungkus)', unit:'1 bungkus', kcal:400, cat:'Hidangan', plate:'lain', mix:{ karbo:1, protein:0.5 } },
+  { id:'ncampur',name:'Nasi campur (1 lauk + sayur)', unit:'1 pinggan', kcal:550, cat:'Hidangan', plate:'lain', mix:{ karbo:1, protein:1, serat:1 } },
+  { id:'nayam', name:'Nasi ayam', unit:'1 pinggan', kcal:600, cat:'Hidangan', plate:'lain', mix:{ karbo:1.5, protein:1 } },
+  { id:'mgoreng',name:'Mee goreng mamak', unit:'1 pinggan', kcal:550, cat:'Hidangan', plate:'lain', mix:{ karbo:1.5, protein:0.5, serat:0.5 } },
+  { id:'ktgoreng',name:'Kuey teow goreng', unit:'1 pinggan', kcal:650, cat:'Hidangan', plate:'lain', mix:{ karbo:1.5, protein:0.5 } },
+  { id:'msup',  name:'Mee sup / mee hoon sup', unit:'1 mangkuk', kcal:350, cat:'Hidangan', plate:'lain', mix:{ karbo:1, protein:0.5, serat:0.5 } },
+  { id:'rcanai',name:'Roti canai kosong', unit:'1 keping', kcal:300, cat:'Hidangan', plate:'lain', mix:{ karbo:1 } },
+  { id:'rtelur',name:'Roti telur', unit:'1 keping', kcal:380, cat:'Hidangan', plate:'lain', mix:{ karbo:1, protein:0.5 } },
+  { id:'tosai', name:'Tosai kosong', unit:'1 keping', kcal:170, cat:'Hidangan', plate:'lain', mix:{ karbo:1 } },
   // Minuman
   { id:'kopio', name:'Kopi O / teh O kosong', unit:'1 cawan', kcal:5, cat:'Minuman', plate:'lain' },
   { id:'tehtarik',name:'Teh tarik', unit:'1 cawan', kcal:150, cat:'Minuman', plate:'lain' },
@@ -46,7 +47,7 @@ const FOODS = [
   { id:'airkosong', name:'Air kosong', unit:'1 gelas', kcal:0, cat:'Minuman', plate:'lain', water:250 },
   { id:'susu',  name:'Susu rendah lemak', unit:'1 gelas', kcal:110, cat:'Minuman', plate:'protein' },
   // Snek
-  { id:'pisang',name:'Pisang', unit:'1 biji', kcal:100, cat:'Snek', plate:'lain' },
+  { id:'pisang',name:'Pisang', unit:'1 biji', kcal:100, cat:'Snek', plate:'serat' },
   { id:'epal',  name:'Epal / oren', unit:'1 biji', kcal:80, cat:'Snek', plate:'serat' },
   { id:'buah',  name:'Buah-buahan', unit:'1 hidangan', kcal:80, cat:'Snek', plate:'serat' },
   { id:'betik', name:'Betik / tembikai', unit:'1 piring', kcal:60, cat:'Snek', plate:'serat' },
@@ -74,8 +75,8 @@ const FOODS = [
   { id:'coleslaw', name:'Coleslaw', unit:'1 cawan kecil', kcal:120, cat:'Sayur', plate:'serat' },
   { id:'kuahkacang', name:'Kuah kacang', unit:'2 sudu', kcal:90, cat:'Hidangan', plate:'lain' },
   { id:'kuahkari', name:'Kuah kari campur', unit:'2 sudu', kcal:60, cat:'Hidangan', plate:'lain' },
-  { id:'rotibakar', name:'Roti bakar kaya', unit:'2 keping', kcal:280, cat:'Hidangan', plate:'lain' },
-  { id:'burger', name:'Burger ayam grill', unit:'1 biji', kcal:400, cat:'Hidangan', plate:'lain' },
-  { id:'chickenchop', name:'Chicken chop grill (sos asing)', unit:'1 pinggan', kcal:520, cat:'Hidangan', plate:'lain' }
+  { id:'rotibakar', name:'Roti bakar kaya', unit:'2 keping', kcal:280, cat:'Hidangan', plate:'lain', mix:{ karbo:1 } },
+  { id:'burger', name:'Burger ayam grill', unit:'1 biji', kcal:400, cat:'Hidangan', plate:'lain', mix:{ karbo:1, protein:1 } },
+  { id:'chickenchop', name:'Chicken chop grill (sos asing)', unit:'1 pinggan', kcal:520, cat:'Hidangan', plate:'lain', mix:{ karbo:0.5, protein:1, serat:0.5 } }
 ];
 if (typeof module !== 'undefined') module.exports = { FOODS };
