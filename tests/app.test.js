@@ -106,6 +106,16 @@ test('mixed-dish presets count by their make-up', () => {
   for (const f of FOODS) if (f.mix) assert(Object.keys(f.mix).every(k => ['serat', 'protein', 'karbo'].includes(k)), f.id);
 });
 
+test('scanned mixed dishes count by their saved make-up', () => {
+  const { plateCounts } = load(['mealMix', 'plateCounts'], { FOODS });
+  const d = { meals: [
+    { foodId: 'scan_x1', plate: 'lain', mix: { karbo: 1, protein: 0.5 }, qty: 0.5, kcal: 150 },
+    { foodId: 'scan_x2', plate: 'lain', mix: { karbo: 1, protein: 0.5, serat: 0.5 }, qty: 1, kcal: 320 },
+    { foodId: 'scan_x3', plate: 'lain', qty: 1, kcal: 200 }                       // older logs without mix
+  ] };
+  assert.deepEqual({ ...plateCounts(d) }, { serat: 0.5, protein: 0.75, karbo: 1.5, lain: 1 });
+});
+
 test('isSweetMeal: presets by flag, own foods / AI menus by name', () => {
   assert(isSweetMeal({ foodId: 'tehtarik', name: 'Teh tarik' }));
   assert(!isSweetMeal({ foodId: 'kopio', name: 'Kopi O / teh O kosong' }));

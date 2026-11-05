@@ -41,6 +41,7 @@ CARA MENGANGGAR
 - Anggar saiz portion berpandukan pinggan, mangkuk, sudu atau tangan dalam gambar. Ambil kira minyak, santan, gula dan kuah yang biasa dalam masakan Malaysia — jangan anggar terlalu rendah.
 - "confidence": tinggi / sederhana / rendah — rendah jika hidangan atau saiznya sukar dipastikan.
 - "plate": serat (sayur & buah) / protein / karbo / lain (hidangan campur, minuman, kuih).
+- "mix": untuk hidangan campur (plate "lain") — anggaran bilangan hidangan setiap kumpulan dalam SATU sukatan: karbo (1 = 1 senduk nasi / 2 keping roti / 1 keping roti canai), protein (1 = 1 ketul ayam / 1 tapak tangan ikan atau daging / 2 biji telur), serat (1 = 1 senduk sayur / 1 biji buah). Contoh: sandwic telur roti putih → karbo 1, protein 0.5, serat 0. Minuman, kuih dan makanan satu kumpulan → semua 0.
 - "note": satu ayat ringkas jika berguna (cth "Kuah lemak santan menambah kalori — ambil isi lebih dari kuah."). Kosong jika tiada. Tiada nasihat perubatan, tiada teguran.
 
 LABEL MAKANAN (panel "Maklumat Pemakanan" / "Nutrition Information" pada bungkusan)
@@ -77,7 +78,7 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['source', 'preset', 'name', 'unit', 'kcal', 'qty', 'plate', 'confidence'],
+        required: ['source', 'preset', 'name', 'unit', 'kcal', 'qty', 'plate', 'mix', 'confidence'],
         properties: {
           source: { type: 'string', enum: SOURCES, description: '"label" jika kcal dibaca dari label nutrisi, selain itu "gambar".' },
           preset: { type: 'string', enum: ['', ...PRESET_IDS], description: 'id preset app jika sepadan, atau "".' },
@@ -86,6 +87,11 @@ const SCHEMA = {
           kcal: { type: 'integer', description: 'kcal untuk satu sukatan.' },
           qty: { type: 'number', description: 'Berapa kali sukatan itu.' },
           plate: { type: 'string', enum: PLATES },
+          mix: {
+            type: 'object', additionalProperties: false, required: ['karbo', 'protein', 'serat'],
+            description: 'Komposisi hidangan campur (bilangan hidangan setiap kumpulan untuk satu sukatan). Semua 0 jika bukan hidangan campur.',
+            properties: { karbo: { type: 'number' }, protein: { type: 'number' }, serat: { type: 'number' } }
+          },
           confidence: { type: 'string', enum: CONFIDENCE }
         }
       }
@@ -127,7 +133,15 @@ function clean(out) {
     const name = source === 'label' ? str(i?.name, 60) : sentenceCase(str(i?.name, 60));   // keep brand names as printed
     const kcal = num(i?.kcal, 0, 2000);
     if (!name || kcal === null) return null;
-    return { foodId: '', name, unit: str(i?.unit, 40) || '1 hidangan', kcal, plate: PLATES.includes(i?.plate) ? i.plate : 'lain', qty: qtyOf(i?.qty), confidence, source };
+    const plate = PLATES.includes(i?.plate) ? i.plate : 'lain';
+    const out = { foodId: '', name, unit: str(i?.unit, 40) || '1 hidangan', kcal, plate, qty: qtyOf(i?.qty), confidence, source };
+    // Mixed dish: keep its make-up so the plate ring counts karbo / protein / sayur inside it.
+    if (plate === 'lain') {
+      const mix = {};
+      ['karbo', 'protein', 'serat'].forEach(k => { const x = Number(i?.mix?.[k]); if (Number.isFinite(x) && x > 0) mix[k] = Math.min(3, Math.round(x * 4) / 4); });
+      if (Object.keys(mix).length) out.mix = mix;
+    }
+    return out;
   }).filter(Boolean);
   return { is_food: items.length > 0, items, note: str(out?.note, 200), kcal: Math.round(items.reduce((a, i) => a + i.kcal * i.qty, 0)) };
 }
