@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.7.1
+**Versi semasa:** 1.8.0
 
 ## Ciri utama
 
@@ -20,6 +20,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Scan makanan (v1.7)** – dalam sheet *Tambah*, ambil gambar atau pilih dari galeri; AI anggar item & kalori, padankan dengan preset app bila boleh. Pengguna **semak dan betulkan** (portion ½–5×, buang item) sebelum simpan — tiada apa dilog terus. Lihat bahagian *Scan makanan* di bawah.
 - **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
+- **Tips hari ini (v1.8)** – satu tip sehari di Utama (bawah peringatan), dipilih dalam telefon ikut log 3 hari lepas, berat dan musim perayaan. Tekan untuk sheet penuh: sebab tip dipilih, *Tip ni membantu?* (👍/👎 dihantar ke Supabase), simpan, dan *Tanya Coach* dengan soalan siap. Semua tips ada di Panduan → *Koleksi tips*. Lihat bahagian *Tips hari ini* di bawah.
 - **Penjejak air** – tekan untuk tambah gelas/botol, sasaran ikut berat badan.
 - **Rasa tak selesa** – panduan ringkas untuk pening, sakit kepala, kembung, lemah, loya & kejang otot: langkah bernombor, semakan data hari ini, log segera, dan amaran bila perlu hubungi 999.
 - **Notifikasi peringatan** – sampai walaupun app ditutup: log makan (lepas waktu makan biasa, jika belum log), minum air (setiap 2 jam, 9 pagi–7 malam, jika kurang), timbang berat mingguan, dan ringkasan kalori malam (~9.30 malam). Waktu senyap 10 malam–7 pagi, jarak minimum 45 minit. **Wajib:** setup tidak selesai dan app tidak boleh digunakan selagi notifikasi tidak dibenarkan. Jika pengguna tekan *Block / Don't Allow*, app papar langkah untuk hidupkan semula di tetapan telefon (iPhone, Android, komputer) dan butang *Saya dah hidupkan — teruskan*. Jika kebenaran ditarik balik kemudian, app disekat semula sehingga dibenarkan. Peranti yang tidak menyokong notifikasi (cth. iOS bawah 16.4) diminta kemas kini. Peringatan dalam app masih dipaparkan bila app dibuka.
@@ -50,6 +51,7 @@ app.js          Logik app: data menu, enjin cadangan, profil & tetapan, ikon, Co
 foods.js        69 preset makanan Malaysia — dikongsi app & api/coach.js
 app.css         CSS Tailwind yang dijana (jangan edit terus)
 tailwind.config.js, src/app.input.css   Sumber untuk jana app.css
+tips.js         47 tips diet & kesihatan + logik pilih tip harian
 tests/          Ujian unit (node --test): data backup, pengesanan pantang, kuota & origin Coach AI
 .github/workflows/test.yml   CI: sintaks, ujian, app.css terkini, deno check fungsi push
 manifest.json   Konfigurasi PWA
@@ -169,6 +171,24 @@ Butang **Scan makanan dengan kamera** dalam sheet *Tambah*. Gambar dikecilkan da
 | `SCAN_REASONING_EFFORT` | Lalai `low` (kenal pasti hidangan & portion). |
 | `SCAN_IMAGE_DETAIL` | `low` / `high` / `auto` (lalai: `high`, supaya tulisan kecil pada label boleh dibaca). |
 
+## Tips hari ini
+Tips ditulis siap dalam [`tips.js`](tips.js) — tiada AI, tiada kos. Setiap tip ada kategori, tajuk, teks ringkas (kad & notifikasi), teks penuh, soalan untuk Coach AI, dan pilihan `on` (isyarat), `tags` (makanan yang disebut) dan `season`.
+
+**Cara pilih (sekali sehari, tetap sepanjang hari):**
+1. Isyarat dari 3 hari lepas (hanya hari dengan ≥ 2 item dilog): kalori bawah minimum, terlebih, protein/sayur rendah, air manis, air kurang; tiada log 2 hari; hujung minggu lepas terlebih (Jumaat/Sabtu); berat naik ≥ 1 kg atau tak berubah 2 minggu; minggu pertama.
+2. Ikut keutamaan: keselamatan & berat dulu (`under`, `lapse`, `gain`, `plateau`), kemudian musim perayaan, kemudian tabiat harian. Sebab yang sama tidak diulang dua hari berturut jika ada isyarat lain.
+3. Tip tidak berulang dalam 30 hari; tip yang ditanda *tak membantu* tidak dipilih lagi; tip yang menyebut makanan dalam pantang/alahan disorok.
+4. Tiada isyarat → giliran umum (tip yang belum pernah dilihat dulu).
+
+Tip esok dipilih awal dan dihantar bersama status notifikasi, jadi notifikasi tengah hari dan kad Utama esok ialah tip yang sama. **Musim perayaan:** tarikh dalam `TIP_SEASONS` — kemas kini setiap tahun selepas tarikh cuti umum diumumkan.
+
+**Notifikasi:** 15–60 minit sebelum waktu makan tengah hari pengguna (tajuk + teks ringkas, buka terus ke tip). Boleh dimatikan di Tetapan → Peringatan → *Tips hari ini*. Hanya tajuk & teks tip dihantar ke server — bukan sebab tip dipilih.
+
+**Maklum balas (👍/👎):** dihantar ke fungsi `push` (action `tipfb`) dan disimpan dalam jadual `tip_feedback`: tip, undian, sebab dipaparkan, hash ID telefon & IP. Satu baris setiap telefon setiap tip; tekan sekali lagi = tarik balik. Jika tiada internet, undian disimpan dalam telefon dan dihantar kemudian. Lihat ringkasan di SQL Editor:
+```sql
+select * from tip_feedback_summary;
+```
+
 ## Notifikasi (Supabase)
 Notifikasi dihantar dengan *Web Push* dari projek Supabase **dietpal** (`jlbdtmzccrebjmlrjvgh`, Singapura). Tiada tetapan Vercel diperlukan.
 
@@ -184,6 +204,6 @@ Notifikasi dihantar dengan *Web Push* dari projek Supabase **dietpal** (`jlbdtmz
 
 **Skala:** fungsi `run` jawab penjadual serta-merta (`EdgeRuntime.waitUntil`) dan teruskan di latar: baca langganan 1,000 sebaris (keyset), hantar 20 serentak, berhenti mula hantaran baru selepas ~110 s (baki diambil larian seterusnya). Langganan baru dihadkan 20 setiap IP (hash) sehari; notifikasi ujian 1 seminit.
 
-**Deploy perubahan fungsi `push`:** pasang migration [`supabase/migrations/20261105_push_ip_limit.sql`](supabase/migrations/20261105_push_ip_limit.sql) dulu (lajur `ip_hash`), kemudian deploy fungsi.
+**Deploy perubahan fungsi `push`:** pasang migration dulu, kemudian deploy fungsi: [`20261105_push_ip_limit.sql`](supabase/migrations/20261105_push_ip_limit.sql) (lajur `ip_hash`) dan, untuk v1.8, [`20261105_tip_feedback.sql`](supabase/migrations/20261105_tip_feedback.sql) (jadual `tip_feedback`).
 
 Skema penuh: [`supabase/setup.sql`](supabase/setup.sql). Kod fungsi: [`supabase/functions/push/index.ts`](supabase/functions/push/index.ts).
