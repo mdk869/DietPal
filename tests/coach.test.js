@@ -77,3 +77,8 @@ test('Coach AI sees today\'s plate balance', () => {
     /sayur & buah 0, protein 1, karbo 2, lain-lain \/ minuman 0/);
   assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Imbangan pinggan/);
 });
+
+test('Coach AI is told about sugary drinks', () => {
+  const msg = buildUserMessage({ question: 'x', context: { eatenToday: [{ foodId: 'tehtarik', name: 'Teh tarik', kcal: 150 }, { name: 'Jus tembikai', kcal: 120 }, { foodId: 'kopio', name: 'Kopi O', kcal: 5 }] } });
+  assert.match(msg, /Minuman manis hari ini: Teh tarik, Jus tembikai \(270 kcal\)/);
+});

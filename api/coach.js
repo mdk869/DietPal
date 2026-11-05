@@ -4,7 +4,7 @@
 // The key never reaches the browser or the repo.
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-const { FOODS } = require('../foods.js');   // same presets the app uses
+const { FOODS, isSweetMeal } = require('../foods.js');   // same presets the app uses
 const MAX_QUESTION = 300;
 const RATE_LIMIT = Number(process.env.COACH_RATE_LIMIT || 12);   // requests per IP per window
 const RATE_WINDOW_MS = 10 * 60 * 1000;                             // 10 minutes
@@ -43,6 +43,7 @@ UTAMAKAN SOALAN PENGGUNA
 - Jangan ulang nota kesihatan atau pantang pengguna dalam setiap jawapan — patuhi secara senyap. Sebut hanya jika ia memang berkait dengan soalan.
 - Jangan sebut "di luar" atau "di rumah" melainkan soalan atau tetapan app menyatakannya. Tetapan "di rumah" → cadang masakan rumah, bukan kedai.
 - Soalan tentang data hari ini (cth: "berapa kalori saya makan hari ini?") → guna angka dari konteks app sahaja, jangan kira semula.
+- Jika ada minuman manis hari ini dan ia berkaitan dengan soalan (kalori, berat, cadangan minuman), cadang versi kurang manis atau kosong — sekali sahaja, tanpa menghukum.
 - Kalori bukan satu-satunya ukuran. Jika imbangan pinggan hari ini kurang sayur atau protein, sebut ringkas dalam "reply" (satu ayat) walaupun kalori dalam sasaran, dan utamakan menu yang menampung kekurangan itu. Hidangan campur app (nasi lemak, mee goreng…) sudah dipecah anggaran ke kumpulan pinggan; "lain-lain" = isi tidak diketahui atau minuman — jangan tegur jika kebanyakan makanan dalam "lain-lain".
 
 CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
@@ -242,6 +243,8 @@ function buildUserMessage(body) {
   if (range[0] && range[1]) lines.push(`Sasaran kalori harian: ${range[0]}–${range[1]} kcal.`);
   lines.push(`Sudah dimakan hari ini: ${eaten.length ? `${eaten.join(', ')}. JUMLAH: ${total} kcal` : 'belum ada'}.`);
   if (list.length) lines.push(`Imbangan pinggan hari ini: ${plateSummary(list)}.`);
+  const sweet = list.filter(x => isSweetMeal({ foodId: typeof x?.foodId === 'string' ? x.foodId : '', name: str(x?.name, 50) }));
+  if (sweet.length) lines.push(`Minuman manis hari ini: ${sweet.map(x => str(x.name, 50)).join(', ')} (${sweet.reduce((a, x) => a + (num(x.kcal, 0, 3000) || 0), 0)} kcal).`);
   const avoid = [...pick(c.avoid, AVOID), ...pick(c.allergies, ALLERGY), ...(c.noSpicy ? ['makanan pedas'] : [])];
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
