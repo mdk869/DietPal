@@ -106,7 +106,8 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | Nama | Wajib | Keterangan |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
-| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
+| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`, kini *deprecated* oleh OpenAI). Calon pengganti: `gpt-6-luna` — murah ($0.10 / $0.50 setiap 1M token), menyokong Chat Completions & Structured Outputs. |
+| `OPENAI_REASONING_EFFORT` | Tidak | Hanya untuk model reasoning (`gpt-5.x`, `gpt-6…`). Lalai `none` — jawapan Coach ringkas, jadi tiada token "berfikir". Cuba `low` jika kualiti kurang. |
 | `SUPABASE_URL` | Ya | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
 | `SUPABASE_SECRET_KEY` | Disyorkan | *Secret key* projek Supabase **dietpal** (`sb_secret_…`, Project Settings → API Keys). Bila diset, fungsi kuota tak perlu akses awam — lepas itu pasang migration `supabase/migrations/20261105_coach_usage_private.sql`. |
 | `SUPABASE_ANON_KEY` | Jika tiada secret key | Publishable key (cara lama). Diabaikan bila `SUPABASE_SECRET_KEY` diset. |
@@ -115,6 +116,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | `COACH_WINDOW_MIN` | Tidak | Panjang tempoh dalam minit (lalai: 15). |
 | `COACH_TOKENS_DAY` | Tidak | Bajet token setiap telefon sehari, reset 12 tengah malam waktu Malaysia (lalai: 30000). |
 | `COACH_IP_FACTOR` | Tidak | Bajet setiap IP = bajet telefon × nilai ini (lalai: 3). |
+| `COACH_CACHED_WEIGHT` | Tidak | Berat token input *cached* dalam kiraan had (lalai: 0.1 — sepadan harga cache ~1/10). Set `1` untuk kira penuh. |
 | `COACH_RESERVE` | Tidak | Token yang ditempah sebelum setiap panggilan OpenAI (lalai: 3500). |
 | `COACH_QUOTA_OPTIONAL` | Tidak | Untuk ujian lokal sahaja: `1` = benarkan Coach tanpa env had token, guna had permintaan setiap IP (`COACH_RATE_LIMIT`, lalai 12 dalam 10 minit). Jangan set di production. |
 | `ALLOWED_ORIGINS` | Tidak | Origin tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). Lalai: domain deploy itu sendiri, `dietpal-blond.vercel.app` dan preview projek ini. |
@@ -132,7 +134,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 - Had kalori minimum harian, tiada skip makan atau potong nasi/garam terus, patuhi pantang & alahan, tiada diagnosis/ubat/dos.
 - Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
 - Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
-- **Had penggunaan (token)** – dikira di server dalam Supabase, jadi tak boleh di-reset dari telefon. Setiap telefon (ID rawak dalam `localStorage`, kunci `dietpal.device`) dapat 8,000 token setiap 15 minit dan 30,000 token sehari; setiap IP dapat 3× ganda (ramai telefon boleh berkongsi satu IP). Kiraan guna `usage.total_tokens` sebenar dari OpenAI. Bila habis, server pulangkan 429 `quota` dengan masa menunggu dan app papar "Coach AI rehat sekejap…". Bila baki ≤ 30%, app papar amaran kecil. Soalan kecemasan tidak dikira. Satu soalan biasa ≈ 3,000 token (prompt sistem + senarai preset makanan + jawapan), jadi ≈ 2–3 soalan setiap 15 minit dan ≈ 10 sehari. Server **menempah** ~3,500 token dulu (atomik dalam Postgres) sebelum memanggil OpenAI, kemudian melaraskan ikut penggunaan sebenar — jadi permintaan serentak tak boleh melepasi had. Jika Supabase tak dapat dihubungi atau env belum diset, Coach AI **berhenti sementara** (503) dan tidak berjalan tanpa had.
+- **Had penggunaan (token)** – dikira di server dalam Supabase, jadi tak boleh di-reset dari telefon. Setiap telefon (ID rawak dalam `localStorage`, kunci `dietpal.device`) dapat 8,000 token setiap 15 minit dan 30,000 token sehari; setiap IP dapat 3× ganda (ramai telefon boleh berkongsi satu IP). Kiraan ikut kos sebenar dari `usage` OpenAI: input baru dan output dikira penuh, input *cached* (prompt sistem + preset yang sama setiap soalan) dikira 1/10. Bila habis, server pulangkan 429 `quota` dengan masa menunggu dan app papar "Coach AI rehat sekejap…". Bila baki ≤ 30%, app papar amaran kecil. Soalan kecemasan tidak dikira. Dengan gpt-6-luna, soalan pertama ≈ 2,900 token dikira dan soalan susulan (cache aktif) ≈ 600–700, jadi ≈ 8–9 soalan setiap 15 minit. Server **menempah** ~3,500 token dulu (atomik dalam Postgres) sebelum memanggil OpenAI, kemudian melaraskan ikut penggunaan sebenar — jadi permintaan serentak tak boleh melepasi had. Jika Supabase tak dapat dihubungi atau env belum diset, Coach AI **berhenti sementara** (503) dan tidak berjalan tanpa had.
 - Jawapan dihadkan kepada 1,200 token output.
 - Semakan origin (wajib ada header Origin, senarai tepat), had saiz permintaan, tamat masa 30 saat. Origin hanya menyekat laman web lain — had token ialah perlindungan sebenar.
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
