@@ -19,7 +19,7 @@ const DEFAULTS = {
     theme: 'light', textSize: 'normal',
     mealTimes: { sarapan: '07:30', tengahari: '13:00', malam: '20:00' },
     reminders: { water: true, meals: true, weigh: true, summary: true, weighDay: 1 },
-    ai: { consent: false, consentAt: 0, health: true }   // Coach AI: asked once before the first question
+    ai: { consent: false, consentAt: 0, health: true, scanConsent: false }   // Coach AI / Scan makanan: each asked once before first use
   },
   push: { on: false, asked: false, cardDone: false, endpoint: '' },
   dismissed: { date: '', ids: [] },
@@ -106,7 +106,8 @@ function sanitizeState(d) {
     mealTimes: Object.fromEntries(Object.entries(bs.mealTimes).map(([k, v]) => [k, HHMM.test(mt[k]) ? mt[k] : v])),
     reminders: { water: rm.water !== false, meals: rm.meals !== false, weigh: rm.weigh !== false, summary: rm.summary !== false,
       weighDay: Math.round(n(rm.weighDay, 0, 6, bs.reminders.weighDay)) },
-    ai: { consent: obj(st.ai).consent === true, consentAt: n(obj(st.ai).consentAt, 0, 9e15, 0), health: obj(st.ai).health !== false }
+    ai: { consent: obj(st.ai).consent === true, consentAt: n(obj(st.ai).consentAt, 0, 9e15, 0), health: obj(st.ai).health !== false,
+      scanConsent: obj(st.ai).scanConsent === true }
   };
 
   const pu = obj(src.push);
@@ -172,6 +173,7 @@ const IC = {
   chevD: '<path d="m6 9 6 6 6-6"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.7L21 8"/><path d="M21 3v5h-5"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/>',
   droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
   sunrise: '<path d="M12 2v6M4.9 10.9l1.4 1.4M2 18h2M20 18h2M19.1 10.9l-1.4 1.4M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
@@ -653,6 +655,7 @@ function addSheetBody() {
       <input id="addSearch" value="${esc(UI.q)}" placeholder="Cari makanan… (cth: nasi, ayam, teh)" autocomplete="off" class="w-full bg-slate-50 rounded-xl px-4 py-3 pl-10 text-[16px] outline-none focus:ring-2 focus:ring-brand-500">
       <span class="absolute left-3.5 top-3.5 text-slate-500">${icon('search', 'w-5 h-5')}</span>
     </div>
+    ${SCAN_ENDPOINT ? `<button data-act="scanOpen" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">${icon('camera', 'w-4 h-4')}Scan makanan dengan kamera</button>` : ''}
     <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mt-3">
       ${CATS.map(c => `<button data-act="addCat" data-cat="${c}" class="tap chip ${UI.cat === c ? 'chip-on' : ''}">${c}</button>`).join('')}
     </div>
@@ -1363,9 +1366,10 @@ function privacyBody() {
     ${sec('Dalam telefon anda', '<p>Profil, makanan, air, berat dan tetapan disimpan dalam telefon ini sahaja. DietPal tiada akaun dan tiada salinan di server. Padam bila-bila masa: Tetapan → <b>Padam semua data</b>.</p>')}
     ${sec('Notifikasi (Supabase, Singapura)', '<p>Untuk hantar peringatan pada masa yang betul: alamat notifikasi telefon, zon waktu, waktu makan & pilihan peringatan, dan status hari ini (waktu makan yang dah dilog — ya/tidak, jumlah air, jumlah kalori, tarikh timbang terakhir).</p><p>Nama, berat dan senarai makanan <b>tidak</b> dihantar. Data ini dipadam bila notifikasi dimatikan atau data dipadam.</p>')}
     ${sec('Coach AI (OpenAI, Amerika Syarikat)', `<p>Hanya bila anda bertanya: soalan, makanan yang dilog hari ini, sasaran kalori, pantang & alahan, makanan sendiri${(S.profile.health || []).length ? ', dan nota kesihatan jika dibenarkan' : ''}. Nama dan berat tidak dihantar.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>`)}
-    ${sec('Had penggunaan Coach AI', '<p>Untuk had soalan, server simpan ID rawak telefon (bukan nama atau nombor telefon) dan alamat IP dalam bentuk hash, bersama kiraan token. Rekod dipadam selepas 2 hari tidak digunakan.</p>')}
+    ${sec('Scan makanan (OpenAI, Amerika Syarikat)', '<p>Hanya bila anda scan: gambar makanan (dikecilkan dalam telefon dulu) dihantar ke OpenAI untuk anggaran kalori. DietPal <b>tidak</b> menyimpan gambar itu — ia tidak disimpan di server kami dan tidak dimasukkan ke backup.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>')}
+    ${sec('Had penggunaan Coach AI', '<p>Untuk had soalan dan had scan, server simpan ID rawak telefon (bukan nama atau nombor telefon) dan alamat IP dalam bentuk hash, bersama kiraan token. Rekod dipadam selepas 2 hari tidak digunakan.</p>')}
     ${sec('Hosting (Vercel)', '<p>Seperti laman web biasa, pelayan mencatat log akses teknikal (cth alamat IP) untuk keselamatan.</p>')}
-    ${sec('Pilihan anda', `<p>Tukar atau tarik balik persetujuan Coach AI dan perkongsian nota kesihatan di Tetapan → Privasi. Matikan jenis peringatan di Tetapan → Peringatan.</p>`)}
+    ${sec('Pilihan anda', `<p>Tukar atau tarik balik persetujuan Coach AI, scan makanan dan perkongsian nota kesihatan di Tetapan → Privasi. Matikan jenis peringatan di Tetapan → Peringatan.</p>`)}
     <p class="text-[12px] text-slate-500 mt-5">DietPal ialah panduan gaya hidup, bukan perkhidmatan perubatan.</p>
     </div>`;
 }
@@ -1479,6 +1483,160 @@ function aiLog(i, meal = UI.ai.result?.meal || UI.ai.meal) {
   toast(`${m.name} dilog ke ${MEALS.find(x => x.id === meal).label}`);
 }
 
+/* ---------- SCAN MAKANAN (gambar → anggaran kcal, pengguna semak dulu sebelum log) ---------- */
+// Vercel function api/scan.js. Set to '' to hide the scan button.
+const SCAN_ENDPOINT = '/api/scan';
+const SCAN_ERRORS = {
+  offline: 'Tiada internet. Scan perlukan sambungan — boleh cari makanan dalam senarai.',
+  bad_image: 'Gambar tak dapat dibaca. Cuba ambil gambar semula.',
+  read: 'Gambar ini tak dapat dibuka. Cuba ambil gambar baru dengan kamera.',
+  paused: 'Scan makanan ditutup sementara. Boleh cari makanan dalam senarai.',
+  not_configured: 'Scan makanan belum disediakan di server.',
+  quota_unavailable: 'Scan rehat sekejap. Cuba lagi dalam beberapa minit.',
+  timeout: 'Scan ambil masa terlalu lama. Cuba lagi.',
+  default: 'Scan tak berjaya sekarang. Cuba lagi sekejap lagi, atau cari dalam senarai.'
+};
+UI.scan = { img: '', loading: false, result: null, error: '' };
+function sheetScan() {
+  UI.scan = { img: '', loading: false, result: null, error: '' };
+  openSheet(scanBody, true);
+}
+// Phone photo → small JPEG data URL (~768 px). Keeps upload fast and cheap; the original never leaves the phone.
+async function scanPrepImage(file) {
+  if (file.size > 30e6) throw new Error('read');
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch {
+    // Older Safari: decode through a data: URL (blob: images are blocked by the CSP)
+    const url = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(file); });
+    src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = url; }).catch(() => null);
+    if (!src) throw new Error('read');
+  }
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
+  if (!w || !h) throw new Error('read');
+  for (const [max, q] of [[768, 0.72], [640, 0.6], [512, 0.5]]) {
+    const s = Math.min(1, max / Math.max(w, h)), c = document.createElement('canvas');
+    c.width = Math.round(w * s); c.height = Math.round(h * s);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(src, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/jpeg', q);
+    if (url.startsWith('data:image/jpeg') && url.length < 600000) return url;
+  }
+  throw new Error('read');
+}
+async function scanFile(file) {
+  if (!file || UI.scan.loading) return;
+  if (!navigator.onLine) { UI.scan.error = SCAN_ERRORS.offline; refreshSheet(); return; }
+  UI.scan = { img: '', loading: true, result: null, error: '' }; refreshSheet();
+  try {
+    UI.scan.img = await scanPrepImage(file); if (sheetFn === scanBody) refreshSheet();
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 55000);
+    const r = await fetch(SCAN_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+      body: JSON.stringify({ image: UI.scan.img, device: deviceId() }) });
+    clearTimeout(timer);
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 429 && data.error === 'quota') UI.scan.error = data.scope === 'day'
+      ? 'Had scan untuk hari ini dah habis. Boleh scan lagi esok — atau cari dalam senarai.'
+      : `Scan rehat sekejap. Boleh scan lagi ${waitText(data.retry_after)}.`;
+    else if (!r.ok) throw new Error(data.error || 'default');
+    else UI.scan.result = { ...data, items: (data.items || []).map(x => ({ ...x })) };
+  } catch (e) {
+    UI.scan.error = SCAN_ERRORS[e.name === 'AbortError' ? 'timeout' : e.message] || SCAN_ERRORS.default;
+  }
+  UI.scan.loading = false;
+  if (sheetFn === scanBody) refreshSheet();
+}
+const scanTotal = items => Math.round(items.reduce((a, x) => a + x.kcal * x.qty, 0));
+// Allergy / avoid check: presets use their tags, other dishes are checked by name (same as Coach AI).
+function scanConflicts(x) { const f = x.foodId ? findFood(x.foodId) : null; return f ? foodConflicts(f) : aiConflicts(x.name); }
+function scanPickLabel(again) {
+  return `<label class="tap ${again ? 'flex-1 btn btn-secondary py-3 text-[14px]' : 'w-full rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/40 py-8 flex flex-col items-center gap-2 text-brand-700'} cursor-pointer">
+    <input id="scanFile" type="file" accept="image/*" class="sr-only">
+    ${again ? `${icon('camera', 'w-4 h-4')}Scan semula` : `${icon('camera', 'w-9 h-9', 1.75)}<span class="font-bold text-[16px]">Ambil gambar makanan</span><span class="text-[13px] text-slate-500 font-normal">atau pilih dari galeri</span>`}
+  </label>`;
+}
+function scanBody() {
+  const sc = UI.scan, m = MEALS.find(x => x.id === UI.meal), r = sc.result;
+  const head = `<div class="sticky top-0 bg-white z-10 px-5 pt-4 pb-3 border-b border-slate-100">
+    <div class="flex items-center justify-between">
+      <button data-act="backToAdd" class="tap btn btn-text text-[14px] -ml-1">${icon('chevL', 'w-4 h-4')}Kembali</button>
+      <button data-act="closeSheet" class="tap w-9 h-9 grid place-items-center rounded-xl text-slate-500" aria-label="Tutup">${icon('x')}</button>
+    </div>
+    <div class="font-bold text-xl">Scan makanan</div>
+    <div class="text-[13px] text-slate-500">Untuk ${m.label} · kalori ialah anggaran</div>
+  </div>`;
+  if (!S.settings.ai?.scanConsent) return head + `<div class="px-5 pb-6 pt-4">
+    <div class="font-bold text-[16px]">Sebelum scan</div>
+    <p class="text-[14px] text-slate-600 mt-1 leading-relaxed">Gambar makanan dihantar ke <b>OpenAI</b> (Amerika Syarikat) untuk dianggar kalorinya.</p>
+    <ul class="mt-2 space-y-1.5 text-[14px] text-slate-700">
+      <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}Gambar dikecilkan dalam telefon dulu</li>
+      <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}DietPal tidak simpan gambar ini</li>
+      <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}Anda semak dan betulkan dulu sebelum disimpan</li>
+    </ul>
+    <p class="text-[13px] text-slate-500 mt-2">OpenAI tidak guna data ini untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan. Elak gambar yang ada muka orang atau maklumat peribadi.</p>
+    <button data-act="scanConsent" class="tap mt-4 w-full btn btn-primary py-3 text-[16px]">Setuju & teruskan</button>
+    <button data-act="privacy" class="tap mt-2 w-full btn btn-text py-2 text-[14px]">Baca notis privasi</button>
+  </div>`;
+  const thumb = sc.img ? `<img src="${sc.img}" alt="Gambar makanan" class="w-full max-h-56 object-cover rounded-2xl bg-slate-100">` : '';
+  if (sc.loading) return head + `<div class="px-5 pb-6 pt-4">${thumb}
+    <div class="mt-4 text-[14px] font-semibold text-slate-600">${sc.img ? 'Sedang menganggar kalori…' : 'Menyediakan gambar…'}</div>
+    <div class="mt-2 space-y-2">${[1, 2, 3].map(() => '<div class="h-12 rounded-xl bg-slate-100 animate-pulse"></div>').join('')}</div></div>`;
+  if (sc.error) return head + `<div class="px-5 pb-6 pt-4">${thumb}
+    <div class="mt-4 text-[14px] bg-amber-50 text-amber-800 rounded-xl p-3">${esc(sc.error)}</div>
+    <div class="flex gap-2 mt-3">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div></div>`;
+  if (!r) return head + `<div class="px-5 pb-6 pt-4">
+    ${scanPickLabel(false)}
+    <div class="mt-4 text-[13px] text-slate-600 bg-slate-50 rounded-xl p-3 space-y-1">
+      <div class="font-semibold text-slate-700">Untuk anggaran lebih tepat</div>
+      <div>• Ambil dari atas, nampak seluruh pinggan atau mangkuk</div>
+      <div>• Cahaya cukup, satu hidangan setiap gambar</div>
+      <div>• Ambil sebelum mula makan</div>
+    </div></div>`;
+  if (!r.items.length) return head + `<div class="px-5 pb-6 pt-4">${thumb}
+    <div class="mt-4 text-[14px] bg-slate-50 text-slate-700 rounded-xl p-3">${r.is_food === false && !r.note ? 'Tak nampak makanan dalam gambar ini.' : 'Tiada makanan untuk disimpan.'}${r.note ? ' ' + esc(r.note) : ''} Cuba ambil semula dengan cahaya cukup, atau cari dalam senarai.</div>
+    <div class="flex gap-2 mt-3">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div></div>`;
+  const total = scanTotal(r.items);
+  return head + `<div class="px-5 pb-6 pt-4">${thumb}
+    <div class="mt-4 flex items-baseline justify-between">
+      <div class="font-bold text-[16px]">Semak & betulkan</div>
+      <div class="font-extrabold text-[18px]">~${fmt(total)} <span class="text-[13px] font-semibold text-slate-500">kcal</span></div>
+    </div>
+    <p class="text-[13px] text-slate-500">Ubah portion ikut apa yang anda makan. Buang item yang salah.</p>
+    <div class="mt-2 divide-y divide-slate-100">${r.items.map((x, i) => { const c = scanConflicts(x); return `
+      <div class="py-2.5">
+        <div class="flex items-start gap-2">
+          <span class="w-2 h-2 rounded-full shrink-0 mt-2" style="background:${PLATE[x.plate || 'lain'].color}"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[14px] font-semibold leading-snug">${esc(x.name)}</div>
+            <div class="text-[12px] text-slate-500">${esc(x.unit)} · ${fmt(x.kcal)} kcal${x.confidence === 'rendah' ? ' · <span class="text-amber-700 font-semibold">kurang pasti</span>' : ''}</div>
+            ${c.length ? `<div class="text-[12px] font-semibold text-amber-700 flex items-center gap-1 mt-0.5">${icon('alert', 'w-3.5 h-3.5')}Ada ${c.map(t => TAG_LABEL[t]).join(', ')}</div>` : ''}
+          </div>
+          <button data-act="scanDel" data-i="${i}" class="tap w-8 h-8 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Buang">${icon('x', 'w-4 h-4')}</button>
+        </div>
+        <div class="flex items-center justify-between mt-1.5 pl-4">
+          <div class="flex items-center gap-2">
+            <button data-act="scanQty" data-i="${i}" data-d="-0.5" class="tap w-9 h-9 rounded-xl bg-white border border-slate-200 grid place-items-center" aria-label="Kurang">${icon('minus', 'w-4 h-4')}</button>
+            <div class="w-10 text-center font-bold text-[15px]">${x.qty}×</div>
+            <button data-act="scanQty" data-i="${i}" data-d="0.5" class="tap w-9 h-9 rounded-xl bg-white border border-slate-200 grid place-items-center" aria-label="Tambah">${icon('plus', 'w-4 h-4')}</button>
+          </div>
+          <div class="text-[14px] font-bold">${fmt(x.kcal * x.qty)} kcal</div>
+        </div>
+      </div>`; }).join('')}</div>
+    ${r.note ? `<div class="mt-2 text-[13px] bg-slate-50 text-slate-700 rounded-xl p-3">${esc(r.note)}</div>` : ''}
+    <button data-act="scanLog" class="tap mt-4 w-full btn btn-primary py-3.5 text-[16px]">Simpan ke ${m.label} · ~${fmt(total)} kcal</button>
+    <div class="flex gap-2 mt-2">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div>
+    <p class="text-[12px] text-slate-500 mt-3">Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.${r.left !== null && r.left !== undefined ? ` Baki scan hari ini: ${r.left}.` : ''}</p>
+  </div>`;
+}
+function scanLog() {
+  const r = UI.scan.result; if (!r || !r.items.length) return;
+  // Presets are logged as the preset itself (plate make-up, water from drinks); other dishes as one-off items.
+  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId)) || { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate }, x.qty, UI.meal));
+  const m = MEALS.find(x => x.id === UI.meal);
+  toast(`Disimpan ke ${m.label} (~${fmt(scanTotal(r.items))} kcal)`);
+  closeSheet(); render();
+}
+
 function sheetSuggest() {
   openSheet(() => `<div class="p-5"><div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>${suggestBlock(true)}</div>`);
 }
@@ -1486,7 +1644,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.9';
+const APP_VERSION = '1.7.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1856,9 +2014,10 @@ function viewSettings() {
       ${toggleRow('aiToggle', 'health', st.ai?.health !== false, 'Kongsi nota kesihatan dengan Coach AI', 'Supaya cadangan elak gula, garam atau pedas ikut keadaan anda')}
     </div>
     <div class="text-[13px] text-slate-600 mt-2">${st.ai?.consent ? `Persetujuan Coach AI: diberi${st.ai.consentAt ? ' pada ' + niceDate(todayKey(new Date(st.ai.consentAt))) : ''}.` : 'Persetujuan Coach AI: belum diberi (akan ditanya sebelum soalan pertama).'}</div>
+    <div class="text-[13px] text-slate-600 mt-1">${st.ai?.scanConsent ? 'Persetujuan scan makanan: diberi.' : 'Persetujuan scan makanan: belum diberi (akan ditanya sebelum scan pertama).'}</div>
     <div class="grid grid-cols-2 gap-2 mt-3">
       <button data-act="privacy" class="tap btn btn-secondary py-2.5 text-[14px]">Notis privasi</button>
-      <button data-act="aiRevoke" class="tap btn btn-secondary py-2.5 text-[14px]" ${st.ai?.consent ? '' : 'disabled'}>Tarik balik</button>
+      <button data-act="aiRevoke" class="tap btn btn-secondary py-2.5 text-[14px]" ${st.ai?.consent || st.ai?.scanConsent ? '' : 'disabled'}>Tarik balik</button>
     </div>`)}
 
   ${card(`<div class="font-bold text-[16px] mb-3">Data</div>
@@ -2080,12 +2239,18 @@ document.addEventListener('click', (e) => {
     case 'aiLog': aiLog(Number(el.dataset.i)); break;
     case 'aiLogTo': aiLog(Number(el.dataset.i), el.dataset.meal); break;
     case 'aiFallback': sheetSuggest(); break;
+    case 'scanOpen': sheetScan(); break;
+    case 'scanConsent': S.settings.ai = { ...S.settings.ai, scanConsent: true }; save(); refreshSheet(); break;
+    case 'scanQty': { const x = UI.scan.result?.items?.[Number(el.dataset.i)];
+      if (x) { x.qty = Math.max(0.5, Math.min(5, x.qty + parseFloat(el.dataset.d))); refreshSheet(); } break; }
+    case 'scanDel': UI.scan.result?.items?.splice(Number(el.dataset.i), 1); refreshSheet(); break;
+    case 'scanLog': scanLog(); break;
     case 'privacy': openPrivacy(); break;
     case 'privacyBack': { const back = sheetBack; sheetBack = null; back ? openSheet(back, true) : closeSheet(); break; }
     case 'aiConsent': S.settings.ai = { ...S.settings.ai, consent: true, consentAt: Date.now() }; save(); refreshSheet(); break;
     case 'aiToggle': S.settings.ai = { ...S.settings.ai, health: S.settings.ai?.health === false }; save(); render(); refreshSheet(); break;
-    case 'aiRevoke': if (confirm('Tarik balik persetujuan Coach AI? Anda akan ditanya semula sebelum soalan seterusnya.')) {
-      S.settings.ai = { ...S.settings.ai, consent: false, consentAt: 0 }; save(); render(); toast('Persetujuan ditarik balik'); } break;
+    case 'aiRevoke': if (confirm('Tarik balik persetujuan Coach AI dan scan makanan? Anda akan ditanya semula sebelum guna lagi.')) {
+      S.settings.ai = { ...S.settings.ai, consent: false, consentAt: 0, scanConsent: false }; save(); render(); toast('Persetujuan ditarik balik'); } break;
   }
 });
 
@@ -2098,6 +2263,7 @@ document.addEventListener('input', (e) => {
   }
 });
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'scanFile') { const f = e.target.files?.[0]; e.target.value = ''; if (f) scanFile(f); return; }
   if (e.target.id === 'importFile' && e.target.files[0]) {
     const r = new FileReader();
     const file = e.target.files[0]; e.target.value = '';
