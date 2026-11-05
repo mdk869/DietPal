@@ -4,6 +4,9 @@
 // The key never reaches the browser or the repo.
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+// Newer reasoning models (gpt-5.1+, gpt-6…): Coach answers are short lookups, so reasoning is off by default.
+// Override with OPENAI_REASONING_EFFORT (e.g. "low"). Older models (gpt-4.1-mini) don't take this parameter.
+const REASONING = /^gpt-(5\.\d|[6-9])/.test(MODEL) ? (process.env.OPENAI_REASONING_EFFORT || 'none') : null;
 const { FOODS, isSweetMeal } = require('../foods.js');   // same presets the app uses
 const MAX_QUESTION = 300;
 const RATE_LIMIT = Number(process.env.COACH_RATE_LIMIT || 12);   // requests per IP per window
@@ -114,7 +117,9 @@ const SCHEMA = {
 };
 
 // ---------- helpers ----------
-const str = (v, max = 80) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max) : '');
+// Strips control chars and scripts that never belong in BM/English answers (guards against stray tokens from small models).
+const ODD_SCRIPT = /[\u0400-\u04ff\u0590-\u05ff\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]+/g;
+const str = (v, max = 80) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').replace(ODD_SCRIPT, '').replace(/\s{2,}/g, ' ').trim().slice(0, max) : '');
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : null; };
 const pick = (arr, dict) => (Array.isArray(arr) ? arr.filter(k => dict[k]).map(k => dict[k]) : []);
 const norm = t => String(t).toLowerCase().replace(/\s+/g, ' ').trim();
@@ -354,6 +359,7 @@ async function callOpenAI(messages) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: MODEL,
+        ...(REASONING ? { reasoning_effort: REASONING } : {}),
         max_completion_tokens: 1200,
         messages,
         response_format: { type: 'json_schema', json_schema: { name: 'coach_reply', strict: true, schema: SCHEMA } }
@@ -366,7 +372,12 @@ async function callOpenAI(messages) {
     }
     const data = await r.json();
     const msg = data?.choices?.[0]?.message;
-    const tokens = Number(data?.usage?.total_tokens) || 0;
+    const u = data?.usage || {};
+    const tokens = Number(u.total_tokens) || 0;
+    console.log('Coach usage', JSON.stringify({ model: data?.model || MODEL, in: u.prompt_tokens, cached: u.prompt_tokens_details?.cached_tokens,
+      out: u.completion_tokens, reasoning: u.completion_tokens_details?.reasoning_tokens, finish: data?.choices?.[0]?.finish_reason }));
+    // Some newer small models occasionally leak stray non-Latin text into JSON strings — log it so it can be spotted.
+    if (new RegExp(ODD_SCRIPT.source).test(data?.choices?.[0]?.message?.content || '')) console.warn('Coach odd script in output');
     if (msg?.refusal) return { refusal: true, tokens };
     try { return { parsed: JSON.parse(msg?.content || '{}'), tokens }; }
     catch { const err = new Error('bad_output'); err.tokens = tokens; throw err; }
@@ -419,7 +430,6 @@ module.exports = async function handler(req, res) {
   const catalog = [...cleanCatalog(c.catalog), ...PRESETS], targets = mealTargets(c);   // user's own foods win on name match
   try {
     const ai = await callOpenAI([{ role: 'system', content: SYSTEM_MESSAGE }, { role: 'user', content: buildUserMessage(body) }]);
-    console.log('Coach tokens', ai.tokens);
     const quota = await charge(ai.tokens);
     if (ai.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', meal: null, menus: [], quota });
     const out = clean(ai.parsed, catalog);

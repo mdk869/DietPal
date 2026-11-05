@@ -106,7 +106,8 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | Nama | Wajib | Keterangan |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
-| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
+| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`, kini *deprecated* oleh OpenAI). Calon pengganti: `gpt-6-luna` — murah ($0.10 / $0.50 setiap 1M token), menyokong Chat Completions & Structured Outputs. |
+| `OPENAI_REASONING_EFFORT` | Tidak | Hanya untuk model reasoning (`gpt-5.x`, `gpt-6…`). Lalai `none` — jawapan Coach ringkas, jadi tiada token "berfikir". Cuba `low` jika kualiti kurang. |
 | `SUPABASE_URL` | Ya | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
 | `SUPABASE_SECRET_KEY` | Disyorkan | *Secret key* projek Supabase **dietpal** (`sb_secret_…`, Project Settings → API Keys). Bila diset, fungsi kuota tak perlu akses awam — lepas itu pasang migration `supabase/migrations/20261105_coach_usage_private.sql`. |
 | `SUPABASE_ANON_KEY` | Jika tiada secret key | Publishable key (cara lama). Diabaikan bila `SUPABASE_SECRET_KEY` diset. |
