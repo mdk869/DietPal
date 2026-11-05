@@ -69,6 +69,19 @@ test('clean: label values kept as read, never swapped for a preset', () => {
   assert.equal(out.items[1].foodId, 'rotig'); assert.equal(out.items[1].source, 'gambar');
 });
 
+test('clean: mixed dishes keep their plate make-up, capped; single-group items have none', () => {
+  const out = clean({ is_food: true, note: '', items: [
+    { source: 'gambar', preset: '', name: 'Sandwic telur', unit: '1 sandwic', kcal: 300, qty: 1, plate: 'lain', mix: { karbo: 1, protein: 0.5, serat: 0 }, confidence: 'tinggi' },
+    { source: 'gambar', preset: '', name: 'Kuih', unit: '1 biji', kcal: 120, qty: 1, plate: 'lain', mix: { karbo: 0, protein: 0, serat: 0 }, confidence: 'tinggi' },
+    { source: 'gambar', preset: '', name: 'Ayam bakar', unit: '1 ketul', kcal: 250, qty: 1, plate: 'protein', mix: { karbo: 2, protein: 0, serat: 0 }, confidence: 'tinggi' },
+    { source: 'gambar', preset: '', name: 'Nasi besar', unit: '1 pinggan', kcal: 900, qty: 1, plate: 'lain', mix: { karbo: 9, protein: -1, serat: 'x' }, confidence: 'tinggi' }
+  ] });
+  assert.deepEqual(out.items[0].mix, { karbo: 1, protein: 0.5 });
+  assert.equal(out.items[1].mix, undefined);
+  assert.equal(out.items[2].mix, undefined);
+  assert.deepEqual(out.items[3].mix, { karbo: 3 });
+});
+
 test('scan works, sends image to OpenAI with strict schema, never logged in the response', async () => {
   const r = await call();
   assert.equal(r.code, 200);

@@ -85,6 +85,9 @@ function sanitizeState(d) {
   const keys = (v, list) => [...new Set(arr(v, 20).filter(k => list.includes(k)))];
   const DATE = /^\d{4}-\d{2}-\d{2}$/, ID = /^[\w-]{1,40}$/, HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
   const PLATES = ['serat', 'protein', 'karbo', 'lain'], MEAL_IDS = ['sarapan', 'tengahari', 'malam', 'snek'];
+  // Plate make-up of a mixed dish from scan (servings per group, 0–3); empty → none.
+  const mixOf = v => { const o = {}; ['serat', 'protein', 'karbo'].forEach(k => { const x = Number(obj(v)[k]); if (Number.isFinite(x) && x > 0) o[k] = Math.min(3, Math.round(x * 4) / 4); });
+    return Object.keys(o).length ? o : null; };
   const base = structuredClone(DEFAULTS), src = obj(d);
 
   const p = obj(src.profile), bp = base.profile;
@@ -120,7 +123,8 @@ function sanitizeState(d) {
     const name = s(m.name, 80), kcal = n(m.kcal, 0, 10000);
     if (!name || kcal === null) return null;
     return { id: ID.test(m.id) ? m.id : uid(), foodId: ID.test(m.foodId) ? m.foodId : '', name, unit: s(m.unit, 40) || '1 hidangan',
-      qty: n(m.qty, 0.1, 50, 1), kcal: Math.round(kcal), plate: oneOf(m.plate, PLATES, 'lain'), meal: oneOf(m.meal, MEAL_IDS, 'snek'), t: n(m.t, 0, 9e15, 0) };
+      qty: n(m.qty, 0.1, 50, 1), kcal: Math.round(kcal), plate: oneOf(m.plate, PLATES, 'lain'), meal: oneOf(m.meal, MEAL_IDS, 'snek'), t: n(m.t, 0, 9e15, 0),
+      ...(mixOf(m.mix) ? { mix: mixOf(m.mix) } : {}) };
   };
   const days = {};
   for (const [k, v] of Object.entries(obj(src.days)).slice(-3660)) {
@@ -261,10 +265,11 @@ function toast(msg) {
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.add('hidden'); t.classList.remove('flex'); }, 2200);
 }
 // Plate groups of one logged item. App presets are looked up so mixed dishes (nasi lemak, mee goreng…)
-// count by their estimated make-up (foods.js `mix`); own foods & AI menus use the plate saved with the log.
+// count by their estimated make-up (foods.js `mix`); scanned mixed dishes carry their own `mix`;
+// own foods & AI menus use the plate saved with the log.
 function mealMix(m) {
   const f = m.foodId ? FOODS.find(x => x.id === m.foodId) : null;
-  return f ? (f.mix || { [f.plate || 'lain']: 1 }) : { [m.plate || 'lain']: 1 };
+  return f ? (f.mix || { [f.plate || 'lain']: 1 }) : (m.mix || { [m.plate || 'lain']: 1 });
 }
 function plateCounts(d) {
   const c = { serat: 0, protein: 0, karbo: 0, lain: 0 };
@@ -1799,7 +1804,7 @@ function scanBody() {
 function scanLog() {
   const r = UI.scan.result; if (!r || !r.items.length) return;
   // Presets are logged as the preset itself (plate make-up, water from drinks); other dishes as one-off items.
-  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId)) || { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate }, x.qty, UI.meal));
+  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId)) || { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix }, x.qty, UI.meal));
   const m = MEALS.find(x => x.id === UI.meal);
   toast(`Disimpan ke ${m.label} (~${fmt(scanTotal(r.items))} kcal)`);
   closeSheet(); render();
@@ -1812,7 +1817,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2312,7 +2317,9 @@ function closeSheet() { sheetFn = null; document.getElementById('sheetWrap').cla
    ============================================================ */
 function addMeal(f, qty, meal) {
   const d = day();
-  d.meals.push({ id: uid(), foodId: f.id, name: f.name, unit: f.unit, qty, kcal: Math.round(f.kcal * qty), plate: f.plate || 'lain', meal, t: Date.now() });
+  const own = f.mix && !FOODS.some(x => x.id === f.id);   // presets keep their mix in foods.js
+  d.meals.push({ id: uid(), foodId: f.id, name: f.name, unit: f.unit, qty, kcal: Math.round(f.kcal * qty), plate: f.plate || 'lain', meal, t: Date.now(),
+    ...(own ? { mix: f.mix } : {}) });
   if (f.water) d.water += Math.round(f.water * qty);
   save();
 }

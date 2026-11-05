@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.8.1
+**Versi semasa:** 1.8.2
 
 ## Ciri utama
 
@@ -154,6 +154,7 @@ Disyorkan: tetapkan had perbelanjaan bulanan di dashboard OpenAI.
 Butang **Scan makanan dengan kamera** dalam sheet *Tambah*. Gambar dikecilkan dalam telefon (≈1024 px JPEG, biasanya 100–250 KB — cukup untuk baca label), dihantar ke `api/scan.js`, yang memanggil OpenAI (model yang sama dengan Coach AI, input gambar) dengan *Structured Outputs*: senarai item dengan `preset` (id dalam `foods.js` atau kosong), `qty`, `kcal`, `plate` dan `confidence`.
 
 - **Label nutrisi (v1.7.1):** gambar panel *Maklumat Pemakanan* → AI baca kcal sehidangan (atau setiap 100 g/ml jika itu sahaja yang ada; kJ ditukar ke kcal). Item ditanda *dari label* dan tidak ditukar ke preset.
+- **Komposisi pinggan (v1.8.2):** hidangan campur yang bukan preset (cth sandwic, nasi bujang) disimpan dengan `mix` anggaran AI (karbo / protein / serat, maks 3 setiap kumpulan), jadi ring pinggan di Utama turut mengiranya.
 - **Padanan preset:** jika AI pilih preset, nama/sukatan/kcal/jenis pinggan diambil dari `foods.js` — bukan nombor AI. Item lain disimpan sebagai item sekali guna.
 - **Pengguna semak dulu:** ubah portion, buang item salah, kemudian *Simpan ke …*. Item "kurang pasti" dan item yang bercanggah dengan pantang/alahan ditanda.
 - **Persetujuan berasingan** sebelum scan pertama (gambar ialah data baru). Tarik balik di Tetapan → Privasi bersama Coach AI.
