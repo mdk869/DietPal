@@ -71,3 +71,13 @@ test('backupDue: after a week, every 30 days, snooze 7 days', () => {
   ctx.S.backup = { lastAt: now - 40 * day, snoozeAt: now - 8 * day };
   assert.equal(ctx.backupDue(now), true);
 });
+
+test('CSP connect-src allows every host the service worker fetches (it runs under the same CSP)', () => {
+  const fs = require('fs'), path = require('path');
+  const root = path.join(__dirname, '..');
+  const csp = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'))).headers.flatMap(h => h.headers).find(h => h.key === 'Content-Security-Policy').value;
+  const connect = csp.split(';').map(s => s.trim()).find(s => s.startsWith('connect-src'));
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const hosts = [...html.matchAll(/https:\/\/(fonts\.[a-z.]+)/g)].map(m => m[1]);
+  for (const h of new Set([...hosts, 'fonts.gstatic.com'])) assert(connect.includes('https://' + h), `connect-src missing ${h}`);
+});
