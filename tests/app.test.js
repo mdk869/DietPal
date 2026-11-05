@@ -39,7 +39,7 @@ test('sanitizeState: keeps a normal backup exactly', () => {
   const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
   const good = {
     profile: { setupDone: true, setupAt: 1, name: 'Siti', sex: 'P', age: 40, height: 155, startWeight: 80, targetWeight: 60, activity: 'aktif', pace: '0.25', kcalMode: 'manual', waterMode: 'auto', kcalMin: 1300, kcalMax: 1500, waterGoal: 2400, waterIdeal: 2600, milestones: [{ name: 'Fasa 1', kg: 70 }], avoid: ['daging'], allergies: ['susu'], noSpicy: true, health: ['diabetes'] },
-    settings: { theme: 'dark', textSize: 'big', mealTimes: { sarapan: '08:00', tengahari: '13:00', malam: '20:00' }, reminders: { water: false, meals: true, weigh: true, summary: false, weighDay: 3 }, ai: { consent: true, consentAt: 5, health: false, scanConsent: true } },
+    settings: { theme: 'dark', textSize: 'big', mealTimes: { sarapan: '08:00', tengahari: '13:00', malam: '20:00' }, reminders: { water: false, meals: true, weigh: true, summary: false, tips: false, weighDay: 3 }, ai: { consent: true, consentAt: 5, health: false, scanConsent: true } },
     push: { on: true, asked: true, cardDone: true, endpoint: 'https://fcm.googleapis.com/x' }, dismissed: { date: '2026-11-05', ids: ['water-6'] },
     days: { '2026-11-05': { meals: [{ id: 'a1', foodId: 'nasi', name: 'Nasi', unit: '1 senduk', qty: 1.5, kcal: 195, plate: 'karbo', meal: 'sarapan', t: 5 }], water: 750 } },
     weights: [{ date: '2026-11-05', kg: 79.5 }], customFoods: [{ id: 'c_x', name: 'Air', kcal: 0, unit: '1 gelas', plate: 'lain', water: 250 }],
