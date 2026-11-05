@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/coach.js": { "maxDuration": 60 }
+    "api/coach.js": { "maxDuration": 60 },
+    "api/scan.js": { "maxDuration": 60 }
   },
   "headers": [
     {

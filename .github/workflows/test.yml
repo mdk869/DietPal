@@ -12,9 +12,9 @@ jobs:
         with: { node-version: 22 }
 
       - name: Semak sintaks JS
-        run: for f in app.js foods.js sw.js api/coach.js; do node --check "$f"; done
+        run: for f in app.js foods.js sw.js api/coach.js api/scan.js; do node --check "$f"; done
 
-      - name: Ujian unit (app & Coach AI)
+      - name: Ujian unit (app, Coach AI & scan)
         run: node --test tests/*.test.js
 
       - name: app.css sepadan dengan kelas dalam kod

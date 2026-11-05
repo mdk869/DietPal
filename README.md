@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.6.9
+**Versi semasa:** 1.7.0
 
 ## Ciri utama
 
@@ -17,6 +17,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 **Harian**
 - **Home baru (v1.6)** – reka bentuk dari Sleek: header hijau pandan dengan streak, ring kalori berbentuk pinggan (imbangan sayur/protein/karbo) + bar kemajuan ke sasaran, chip waktu makan, *Cadangan Coach* (mesej coach + satu menu), kad air & berat ringkas, dan pautan *Rasa tak selesa?* yang tenang.
 - **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
+- **Scan makanan (v1.7)** – dalam sheet *Tambah*, ambil gambar atau pilih dari galeri; AI anggar item & kalori, padankan dengan preset app bila boleh. Pengguna **semak dan betulkan** (portion ½–5×, buang item) sebelum simpan — tiada apa dilog terus. Lihat bahagian *Scan makanan* di bawah.
 - **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
 - **Penjejak air** – tekan untuk tambah gelas/botol, sasaran ikut berat badan.
@@ -56,6 +57,7 @@ sw.js           Service worker (cache dietpal-v18, terima & buka notifikasi)
 vercel.json     Fungsi Vercel (maxDuration 60 s) + header keselamatan (CSP dll.)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
+api/scan.js     Fungsi Vercel untuk Scan makanan (OpenAI, input gambar)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
 
@@ -145,6 +147,26 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 Disyorkan: tetapkan had perbelanjaan bulanan di dashboard OpenAI.
 
 > Nilai kalori adalah anggaran purata. App ini panduan gaya hidup, bukan nasihat perubatan. Rujuk doktor atau pegawai dietetik untuk keadaan kesihatan tertentu.
+
+## Scan makanan
+Butang **Scan makanan dengan kamera** dalam sheet *Tambah*. Gambar dikecilkan dalam telefon (≈768 px JPEG, biasanya 60–150 KB), dihantar ke `api/scan.js`, yang memanggil OpenAI (model yang sama dengan Coach AI, input gambar) dengan *Structured Outputs*: senarai item dengan `preset` (id dalam `foods.js` atau kosong), `qty`, `kcal`, `plate` dan `confidence`.
+
+- **Padanan preset:** jika AI pilih preset, nama/sukatan/kcal/jenis pinggan diambil dari `foods.js` — bukan nombor AI. Item lain disimpan sebagai item sekali guna.
+- **Pengguna semak dulu:** ubah portion, buang item salah, kemudian *Simpan ke …*. Item "kurang pasti" dan item yang bercanggah dengan pantang/alahan ditanda.
+- **Persetujuan berasingan** sebelum scan pertama (gambar ialah data baru). Tarik balik di Tetapan → Privasi bersama Coach AI.
+- **Gambar tidak disimpan** oleh DietPal — tidak di server, tidak dalam log Vercel (hanya kiraan token dilog), tidak dalam backup.
+- **Had scan** dikira setiap scan (bukan token) dalam jadual `coach_usage` yang sama, tetapi kunci berasingan (`sd:` / `sip:`), jadi tidak makan bajet Coach AI. Lalai: 5 scan setiap 10 minit dan 10 sehari setiap telefon; IP dapat 3×. Scan yang gagal (ralat OpenAI) dipulangkan. Fail closed seperti Coach AI.
+- Tiada migration Supabase diperlukan.
+
+**Environment variables (semua pilihan)**
+| Nama | Keterangan |
+| --- | --- |
+| `SCAN_DISABLED` | `1` = tutup scan serta-merta (app papar "ditutup sementara"). Tak perlu ubah kod. |
+| `SCAN_PER_DAY` | Scan setiap telefon sehari (lalai: 10). |
+| `SCAN_PER_WINDOW` / `SCAN_WINDOW_MIN` | Scan dalam satu tempoh (lalai: 5 setiap 10 minit). |
+| `SCAN_MODEL` | Model untuk scan (lalai: `OPENAI_MODEL`, kemudian `gpt-6-luna`). Mesti menyokong input gambar. |
+| `SCAN_REASONING_EFFORT` | Lalai `low` (kenal pasti hidangan & portion). |
+| `SCAN_IMAGE_DETAIL` | `low` / `high` / `auto` (lalai: `auto`). |
 
 ## Notifikasi (Supabase)
 Notifikasi dihantar dengan *Web Push* dari projek Supabase **dietpal** (`jlbdtmzccrebjmlrjvgh`, Singapura). Tiada tetapan Vercel diperlukan.
