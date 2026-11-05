@@ -20,8 +20,8 @@ const LIMIT = {
   key: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || '',
   secret: process.env.COACH_QUOTA_SECRET || '',
   windowSec: Math.round(Number(process.env.SCAN_WINDOW_MIN || 10) * 60),
-  perWindow: Number(process.env.SCAN_PER_WINDOW || 3),
-  perDay: Number(process.env.SCAN_PER_DAY || 8),
+  perWindow: Number(process.env.SCAN_PER_WINDOW || 5),
+  perDay: Number(process.env.SCAN_PER_DAY || 10),
   ipFactor: Number(process.env.COACH_IP_FACTOR || 3)
 };
 

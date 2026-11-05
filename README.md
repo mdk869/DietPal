@@ -155,15 +155,15 @@ Butang **Scan makanan dengan kamera** dalam sheet *Tambah*. Gambar dikecilkan da
 - **Pengguna semak dulu:** ubah portion, buang item salah, kemudian *Simpan ke …*. Item "kurang pasti" dan item yang bercanggah dengan pantang/alahan ditanda.
 - **Persetujuan berasingan** sebelum scan pertama (gambar ialah data baru). Tarik balik di Tetapan → Privasi bersama Coach AI.
 - **Gambar tidak disimpan** oleh DietPal — tidak di server, tidak dalam log Vercel (hanya kiraan token dilog), tidak dalam backup.
-- **Had scan** dikira setiap scan (bukan token) dalam jadual `coach_usage` yang sama, tetapi kunci berasingan (`sd:` / `sip:`), jadi tidak makan bajet Coach AI. Lalai: 3 scan setiap 10 minit dan 8 sehari setiap telefon; IP dapat 3×. Scan yang gagal (ralat OpenAI) dipulangkan. Fail closed seperti Coach AI.
+- **Had scan** dikira setiap scan (bukan token) dalam jadual `coach_usage` yang sama, tetapi kunci berasingan (`sd:` / `sip:`), jadi tidak makan bajet Coach AI. Lalai: 5 scan setiap 10 minit dan 10 sehari setiap telefon; IP dapat 3×. Scan yang gagal (ralat OpenAI) dipulangkan. Fail closed seperti Coach AI.
 - Tiada migration Supabase diperlukan.
 
 **Environment variables (semua pilihan)**
 | Nama | Keterangan |
 | --- | --- |
 | `SCAN_DISABLED` | `1` = tutup scan serta-merta (app papar "ditutup sementara"). Tak perlu ubah kod. |
-| `SCAN_PER_DAY` | Scan setiap telefon sehari (lalai: 8). |
-| `SCAN_PER_WINDOW` / `SCAN_WINDOW_MIN` | Scan dalam satu tempoh (lalai: 3 setiap 10 minit). |
+| `SCAN_PER_DAY` | Scan setiap telefon sehari (lalai: 10). |
+| `SCAN_PER_WINDOW` / `SCAN_WINDOW_MIN` | Scan dalam satu tempoh (lalai: 5 setiap 10 minit). |
 | `SCAN_MODEL` | Model untuk scan (lalai: `OPENAI_MODEL`, kemudian `gpt-6-luna`). Mesti menyokong input gambar. |
 | `SCAN_REASONING_EFFORT` | Lalai `low` (kenal pasti hidangan & portion). |
 | `SCAN_IMAGE_DETAIL` | `low` / `high` / `auto` (lalai: `auto`). |
