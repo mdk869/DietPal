@@ -25,17 +25,65 @@ const TIP_WHY = {
 // Checked in this order. A season tip comes after the safety/progress signals but before everyday nudges.
 const TIP_ORDER = ['under', 'lapse', 'gain', 'plateau', 'season', 'lowProtein', 'lowVeg', 'sweet', 'over', 'weekend', 'lowWater', 'newbie'];
 
-// Festive windows (tarikh cuti umum Malaysia; Ramadan/Raya/Haji/Deepavali tertakluk pengumuman). Kemas kini setiap tahun.
-// `md` = berulang setiap tahun (MM-DD).
+// Festive seasons — dates are worked out on the phone every year, so this never needs a yearly update.
+//   Tahun Baru Cina → Chinese calendar (1/1) · Ramadan, Aidilfitri, Aidiladha → Hijri calendar (Umm al-Qura: 1 Ramadan,
+//   1 Syawal, 10 Zulhijjah) — both built into the browser (Intl) · Deepavali → day before the new moon between
+//   17 Oct and 15 Nov (Malaysian time), from a moon-phase formula. Results match official Malaysian dates or differ by
+//   one day (rukyah vs calculation); each season is a window of several days, so one day doesn't matter.
+//   tests/tips.test.js checks this against official dates. A phone without these calendars simply gets no festive tips.
+// `from`/`to` = days relative to the festival day. Checked in this order (first match wins when windows overlap).
 const TIP_SEASONS = [
-  { id: 'deepavali', label: 'musim Deepavali', from: '2026-11-03', to: '2026-11-12' },
+  { id: 'deepavali', label: 'musim Deepavali', event: 'deepavali', from: -5, to: 4 },
   { id: 'hujungtahun', label: 'cuti hujung tahun', md: ['12-12', '01-02'] },
-  { id: 'cny', label: 'musim Tahun Baru Cina', from: '2027-01-30', to: '2027-02-20' },
-  { id: 'ramadan', label: 'bulan Ramadan', from: '2027-02-08', to: '2027-03-09' },
-  { id: 'raya', label: 'musim Hari Raya Aidilfitri', from: '2027-03-10', to: '2027-04-08' },
-  { id: 'haji', label: 'Hari Raya Aidiladha', from: '2027-05-14', to: '2027-05-20' },
-  { id: 'deepavali', label: 'musim Deepavali', from: '2027-10-23', to: '2027-11-01' }
+  { id: 'cny', label: 'musim Tahun Baru Cina', event: 'cny', from: -7, to: 7 },
+  { id: 'ramadan', label: 'bulan Ramadan', event: 'ramadan', from: 0, until: 'raya' },   // 1 Ramadan → eve of Raya
+  { id: 'raya', label: 'musim Hari Raya Aidilfitri', event: 'raya', from: 0, to: 29 },     // the month of Syawal
+  { id: 'haji', label: 'Hari Raya Aidiladha', event: 'haji', from: -3, to: 3 }
 ];
+// Optional: an official date that differs from the calculation, e.g. { 2027: { raya: '2027-03-10' } }. Not required.
+const TIP_FESTIVAL_OVERRIDE = {};
+
+const tipIso = d => d.toISOString().slice(0, 10);
+const tipShift = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return tipIso(d); };
+// Every Gregorian day of `year` (between days `from`–`to` of the year) whose date in `cal` is month/day → { key: [iso…] }.
+// A Hijri date can fall twice in one Gregorian year. Empty if the browser lacks that calendar.
+function tipCalendarDays(cal, wanted, year, from = 0, to = 366) {
+  let f;
+  try { f = new Intl.DateTimeFormat('en-u-ca-' + cal, { timeZone: 'UTC', month: 'numeric', day: 'numeric' }); } catch { return {}; }
+  if (f.resolvedOptions().calendar !== cal) return {};
+  const out = {};
+  for (let i = from, d = new Date(Date.UTC(year, 0, 1 + from, 12)); i <= to && d.getUTCFullYear() === year; i++, d.setUTCDate(d.getUTCDate() + 1)) {
+    const p = {}; for (const x of f.formatToParts(d)) p[x.type] = x.value;
+    for (const [k, md] of Object.entries(wanted)) if (p.month === md[0] && p.day === md[1]) (out[k] = out[k] || []).push(tipIso(d));
+  }
+  return out;
+}
+// New moons (Meeus, Astronomical Algorithms ch. 49 — accurate to a few minutes) → Deepavali.
+function tipNewMoon(k) {
+  const r = Math.PI / 180, T = k / 1236.85, E = 1 - 0.002516 * T, sin = x => Math.sin(x * r);
+  const M = 2.5534 + 29.1053567 * k, Mp = 201.5643 + 385.81693528 * k + 0.0107582 * T * T;
+  const F = 160.7108 + 390.67050284 * k - 0.0016118 * T * T, Om = 124.7746 - 1.56375588 * k;
+  const jde = 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T
+    - 0.4072 * sin(Mp) + 0.17241 * E * sin(M) + 0.01608 * sin(2 * Mp) + 0.01039 * sin(2 * F) + 0.00739 * E * sin(Mp - M)
+    - 0.00514 * E * sin(Mp + M) + 0.00208 * E * E * sin(2 * M) - 0.00111 * sin(Mp - 2 * F) - 0.00057 * sin(Mp + 2 * F)
+    + 0.00056 * E * sin(2 * Mp + M) - 0.00042 * sin(3 * Mp) + 0.00042 * E * sin(M + 2 * F) + 0.00038 * E * sin(M - 2 * F)
+    - 0.00024 * E * sin(2 * Mp - M) - 0.00017 * sin(Om);
+  return tipIso(new Date((jde - 2440587.5) * 864e5 + 8 * 36e5));   // date in Malaysian time
+}
+function tipDeepavali(year) {
+  const k0 = Math.floor((year + 0.75 - 2000) * 12.3685);
+  const moons = [-2, -1, 0, 1, 2].map(i => tipNewMoon(k0 + i)).filter(d => d >= year + '-10-17' && d <= year + '-11-15');
+  return moons.length ? tipShift(moons[moons.length - 1], -1) : null;
+}
+const tipFestCache = {};
+// { cny, ramadan, raya, haji, deepavali } → ['YYYY-MM-DD', …] for one Gregorian year (missing key = unknown).
+function tipFestivals(year) {
+  if (tipFestCache[year]) return tipFestCache[year];
+  const lunar = tipCalendarDays('chinese', { cny: ['1', '1'] }, year, 14, 56);   // CNY is always 21 Jan – 20 Feb
+  const hijri = tipCalendarDays('islamic-umalqura', { ramadan: ['9', '1'], raya: ['10', '1'], haji: ['12', '10'] }, year);
+  const dv = tipDeepavali(year), over = Object.fromEntries(Object.entries(TIP_FESTIVAL_OVERRIDE[year] || {}).map(([k, v]) => [k, [v]]));
+  return (tipFestCache[year] = { ...lunar, ...hijri, ...(dv ? { deepavali: [dv] } : {}), ...over });
+}
 
 const TIPS = [
   // ---------- Protein ----------
@@ -297,9 +345,17 @@ const TIPS = [
 const TIP_REPEAT_DAYS = 30;   // a tip shown as "Tips hari ini" won't come back for this many days
 
 function tipSeason(date) {   // date: 'YYYY-MM-DD' → season object or null
-  const md = date.slice(5);
-  return TIP_SEASONS.find(x => x.md ? (x.md[0] <= x.md[1] ? md >= x.md[0] && md <= x.md[1] : md >= x.md[0] || md <= x.md[1])
-    : date >= x.from && date <= x.to) || null;
+  const md = date.slice(5), y = Number(date.slice(0, 4));
+  const fs = [y - 1, y, y + 1].map(tipFestivals);   // windows can cross New Year
+  const all = k => fs.flatMap(f => f[k] || []).sort();
+  return TIP_SEASONS.find(x => {
+    if (x.md) return x.md[0] <= x.md[1] ? md >= x.md[0] && md <= x.md[1] : md >= x.md[0] || md <= x.md[1];
+    return all(x.event).some(e => {
+      const start = tipShift(e, x.from);
+      const end = x.until ? all(x.until).find(u => u > e) : tipShift(e, x.to);
+      return end && date >= start && date <= (x.until ? tipShift(end, -1) : end);
+    });
+  }) || null;
 }
 function tipById(id) { return TIPS.find(x => x.id === id) || null; }
 function tipDayDiff(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5); }
@@ -337,4 +393,4 @@ function tipWhyText(why, date) {
   return TIP_WHY[why] ? 'Anda nampak tip ni sebab ' + TIP_WHY[why] + '.' : '';
 }
 
-if (typeof module !== 'undefined') module.exports = { TIPS, TIP_CATS, TIP_WHY, TIP_ORDER, TIP_SEASONS, tipSeason, tipById, pickTip, tipWhyText, tipDayDiff };
+if (typeof module !== 'undefined') module.exports = { TIPS, TIP_CATS, TIP_WHY, TIP_ORDER, TIP_SEASONS, tipSeason, tipFestivals, tipDeepavali, tipById, pickTip, tipWhyText, tipDayDiff };

@@ -21,13 +21,40 @@ test('tips: data is complete and short enough for a notification', () => {
   for (const k of T.TIP_ORDER) if (k !== 'season') assert(T.TIPS.some(x => (x.on || []).includes(k)), 'no tip for signal ' + k);
 });
 
-test('tipSeason: dated windows and the year-end window that wraps into January', () => {
-  assert.equal(T.tipSeason('2026-11-08').id, 'deepavali');
+// Official Malaysian public holiday dates (first day). The calculation may differ by one day (rukyah vs Umm al-Qura).
+const OFFICIAL = {
+  cny: ['2019-02-05', '2020-01-25', '2021-02-12', '2022-02-01', '2023-01-22', '2024-02-10', '2025-01-29', '2026-02-17', '2027-02-06', '2028-01-26'],
+  raya: ['2019-06-05', '2020-05-24', '2021-05-13', '2022-05-03', '2023-04-22', '2024-04-10', '2025-03-31', '2026-03-21', '2027-03-10'],
+  haji: ['2019-08-11', '2020-07-31', '2021-07-20', '2022-07-10', '2023-06-29', '2024-06-17', '2025-06-07', '2026-05-27'],
+  deepavali: ['2018-11-06', '2019-10-27', '2020-11-14', '2021-11-04', '2022-10-24', '2023-11-12', '2024-10-31', '2025-10-20', '2026-11-08', '2027-10-28']
+};
+test('tipFestivals: calculated dates match official holidays within one day (no yearly update needed)', () => {
+  const days = (a, b) => Math.abs(T.tipDayDiff(a, b));
+  for (const [k, list] of Object.entries(OFFICIAL)) for (const off of list) {
+    const got = T.tipFestivals(Number(off.slice(0, 4)))[k] || [];
+    assert(got.some(d => days(d, off) <= 1), `${k} ${off}: got ${got.join(',') || 'nothing'}`);
+  }
+  // every future year has every festival (Hijri ones may fall twice, or move into the next/previous year)
+  for (let y = 2026; y <= 2040; y++) {
+    const f = T.tipFestivals(y), near = [y - 1, y, y + 1].map(T.tipFestivals);
+    for (const k of ['cny', 'deepavali']) assert.equal((f[k] || []).length, 1, `${k} ${y}`);
+    for (const k of ['ramadan', 'raya', 'haji']) assert(near.some(n => (n[k] || []).length), `${k} ~${y}`);
+  }
+});
+
+test('tipSeason: windows around each festival, the year-end window, and Ramadan crossing New Year', () => {
+  assert.equal(T.tipSeason('2026-11-05').id, 'deepavali');
+  assert.equal(T.tipSeason('2026-11-20'), null);
   assert.equal(T.tipSeason('2026-12-25').id, 'hujungtahun');
   assert.equal(T.tipSeason('2027-01-02').id, 'hujungtahun');
-  assert.equal(T.tipSeason('2027-02-15').id, 'cny');   // CNY window wins over the overlapping start of Ramadan
+  assert.equal(T.tipSeason('2027-02-03').id, 'cny');
+  assert.equal(T.tipSeason('2027-02-20').id, 'ramadan');   // CNY window over, still Ramadan
   assert.equal(T.tipSeason('2027-03-01').id, 'ramadan');
-  assert.equal(T.tipSeason('2026-11-20'), null);
+  assert.equal(T.tipSeason('2027-03-25').id, 'raya');
+  assert.equal(T.tipSeason('2027-05-17').id, 'haji');
+  assert.equal(T.tipSeason('2027-10-28').id, 'deepavali');
+  assert.equal(T.tipSeason('2031-01-10').id, 'ramadan');   // Ramadan 1452 starts late Dec 2030
+  assert.equal(T.tipSeason('2035-06-01'), null);
 });
 
 test('pickTip: season first, then signals, then general rotation', () => {

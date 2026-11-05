@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.8.0
+**Versi semasa:** 1.8.1
 
 ## Ciri utama
 
@@ -180,7 +180,7 @@ Tips ditulis siap dalam [`tips.js`](tips.js) — tiada AI, tiada kos. Setiap tip
 3. Tip tidak berulang dalam 30 hari; tip yang ditanda *tak membantu* tidak dipilih lagi; tip yang menyebut makanan dalam pantang/alahan disorok.
 4. Tiada isyarat → giliran umum (tip yang belum pernah dilihat dulu).
 
-Tip esok dipilih awal dan dihantar bersama status notifikasi, jadi notifikasi tengah hari dan kad Utama esok ialah tip yang sama. **Musim perayaan:** tarikh dalam `TIP_SEASONS` — kemas kini setiap tahun selepas tarikh cuti umum diumumkan.
+Tip esok dipilih awal dan dihantar bersama status notifikasi, jadi notifikasi tengah hari dan kad Utama esok ialah tip yang sama. **Musim perayaan (dikira automatik, tiada kemas kini tahunan):** Tahun Baru Cina guna kalendar Cina, Ramadan / Aidilfitri / Aidiladha guna kalendar Hijrah (Umm al-Qura) — kedua-duanya terbina dalam browser (`Intl`). Deepavali = sehari sebelum bulan baru antara 17 Okt – 15 Nov (formula fasa bulan Meeus). Tarikh yang dikira sama dengan cuti rasmi atau beza sehari (rukyah vs kiraan); setiap musim ialah tempoh beberapa hari, jadi beza sehari tak menjejaskan. Ujian membandingkan dengan tarikh rasmi 2018–2028 dan memastikan setiap perayaan wujud hingga 2040. Jika mahu tarikh rasmi tepat, isi `TIP_FESTIVAL_OVERRIDE` dalam `tips.js` (pilihan). Telefon yang tiada kalendar tersebut tidak dapat tips perayaan sahaja.
 
 **Notifikasi:** 15–60 minit sebelum waktu makan tengah hari pengguna (tajuk + teks ringkas, buka terus ke tip). Boleh dimatikan di Tetapan → Peringatan → *Tips hari ini*. Hanya tajuk & teks tip dihantar ke server — bukan sebab tip dipilih.
 
