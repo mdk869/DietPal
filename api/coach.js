@@ -7,7 +7,7 @@ const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const MAX_QUESTION = 300;
 const RATE_LIMIT = Number(process.env.COACH_RATE_LIMIT || 12);   // requests per IP per window
 const RATE_WINDOW_MS = 10 * 60 * 1000;                             // 10 minutes
-const hits = new Map();   // best-effort, per server instance — used only when the Supabase quota is unavailable
+const hits = new Map();   // best-effort, per server instance — used only when COACH_QUOTA_OPTIONAL=1 and no quota env (local dev)
 
 // Token quota (stored in Supabase table coach_usage, so it survives restarts and can't be reset from the phone).
 // Counted per device id AND per IP (hashed); the IP budget is larger because many phones can share one IP.
@@ -18,7 +18,10 @@ const QUOTA = {
   windowSec: Math.round(Number(process.env.COACH_WINDOW_MIN || 15) * 60),
   perWindow: Number(process.env.COACH_TOKENS_WINDOW || 8000),
   perDay: Number(process.env.COACH_TOKENS_DAY || 30000),
-  ipFactor: Number(process.env.COACH_IP_FACTOR || 3)
+  ipFactor: Number(process.env.COACH_IP_FACTOR || 3),
+  // Tokens booked before calling OpenAI (≈ one question), settled to the real usage afterwards.
+  // Booking first is atomic in Postgres, so many requests sent at once can't all slip past the limit.
+  reserve: Number(process.env.COACH_RESERVE || 3500)
 };
 
 const MEALS = { sarapan: 'sarapan', tengahari: 'makan tengah hari', malam: 'makan malam', snek: 'snek' };
@@ -122,7 +125,7 @@ function quotaKeys(req, body) {
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(dev)) keys.unshift('d:' + dev);
   return keys;
 }
-// Adds `tokens` to every key (0 = just read) and returns the rows, or null if Supabase can't be reached.
+// Adds `tokens` to every key (negative = give back, floored at 0) and returns the rows, or null if Supabase can't be reached.
 async function quotaAdd(keys, tokens) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 4000);
@@ -131,7 +134,7 @@ async function quotaAdd(keys, tokens) {
     if (!QUOTA.key.startsWith('sb_')) headers.Authorization = `Bearer ${QUOTA.key}`;   // legacy anon JWT
     const r = await fetch(`${QUOTA.url}/rest/v1/rpc/coach_usage_add`, {
       method: 'POST', signal: ctrl.signal, headers,
-      body: JSON.stringify({ p_secret: QUOTA.secret, p_keys: keys, p_add: Math.max(0, Math.round(tokens) || 0), p_window: QUOTA.windowSec })
+      body: JSON.stringify({ p_secret: QUOTA.secret, p_keys: keys, p_add: Math.round(tokens) || 0, p_window: QUOTA.windowSec })
     });
     if (!r.ok) { console.error('Quota error', r.status, (await r.text().catch(() => '')).slice(0, 200)); return null; }
     const rows = await r.json();
@@ -144,13 +147,14 @@ const secsToMidnightMY = (now = Date.now()) => {
   return 86400 - (my.getUTCHours() * 3600 + my.getUTCMinutes() * 60 + my.getUTCSeconds());
 };
 // Which budget is used up (if any), and how much of the tightest window budget is left.
-function quotaState(rows, now = Date.now()) {
+// `pending` = tokens this request has just booked: it is blocked only if the budget was already used up before it.
+function quotaState(rows, now = Date.now(), pending = 0) {
   let blocked = null, left = 1, resetIn = QUOTA.windowSec;
   for (const r of rows || []) {
     const f = String(r.o_key).startsWith('ip:') ? QUOTA.ipFactor : 1;
     const winMax = QUOTA.perWindow * f, dayMax = QUOTA.perDay * f;
-    if (r.o_day >= dayMax) blocked = { scope: 'day', retry_after: secsToMidnightMY(now) };
-    else if (r.o_win >= winMax && !blocked) blocked = { scope: 'window', retry_after: Math.max(1, r.o_reset) };
+    if (r.o_day - pending >= dayMax) blocked = { scope: 'day', retry_after: secsToMidnightMY(now) };
+    else if (r.o_win - pending >= winMax && !blocked) blocked = { scope: 'window', retry_after: Math.max(1, r.o_reset) };
     const lw = 1 - r.o_win / winMax, ld = 1 - r.o_day / dayMax, l = Math.max(0, Math.min(lw, ld));
     if (l < left) { left = l; resetIn = ld < lw ? secsToMidnightMY(now) : r.o_reset; }
   }
@@ -344,17 +348,31 @@ module.exports = async function handler(req, res) {
   if (JSON.stringify(body).length > 16000) return res.status(413).json({ error: 'too_large' });
   if (redFlag(body.question)) return res.status(200).json(EMERGENCY);   // emergencies never count against the quota
 
-  // Token quota: check before calling OpenAI, charge the real usage after.
-  // If Supabase is not configured or unreachable, fall back to the in-memory request limit (fail open).
+  // Token quota: book QUOTA.reserve tokens first (atomic), call OpenAI, then settle to the real usage.
+  // Fails closed: if the quota store is missing or unreachable, Coach AI pauses instead of running unmetered.
+  // COACH_QUOTA_OPTIONAL=1 (local dev only) falls back to the in-memory request limit when no quota env is set.
   const keys = quotaKeys(req, body);
-  const before = quotaEnabled() ? await quotaAdd(keys, 0) : null;
-  if (before) {
-    const st = quotaState(before);
-    if (st.blocked) { res.setHeader('Retry-After', String(st.blocked.retry_after)); return res.status(429).json({ error: 'quota', ...st.blocked }); }
+  let booked = 0;
+  if (quotaEnabled()) {
+    const rows = await quotaAdd(keys, QUOTA.reserve);
+    if (!rows) return res.status(503).json({ error: 'quota_unavailable' });
+    booked = QUOTA.reserve;
+    const st = quotaState(rows, Date.now(), booked);
+    if (st.blocked) {
+      await quotaAdd(keys, -booked);   // give the booking back
+      res.setHeader('Retry-After', String(st.blocked.retry_after));
+      return res.status(429).json({ error: 'quota', ...st.blocked });
+    }
+  } else if (process.env.COACH_QUOTA_OPTIONAL !== '1') {
+    console.error('Coach quota not configured (SUPABASE_URL / SUPABASE_ANON_KEY / COACH_QUOTA_SECRET)');
+    return res.status(503).json({ error: 'not_configured' });
   } else if (rateLimited(clientIp(req))) return res.status(429).json({ error: 'rate_limited' });
-  const charge = async tokens => {
-    if (!before || !tokens) return null;
-    const rows = await quotaAdd(keys, tokens);
+  // Settle once: charge the real tokens minus what was booked (0 tokens = full refund).
+  let settled = false;
+  const charge = async (tokens = 0) => {
+    if (!booked || settled) return null;
+    settled = true;
+    const rows = await quotaAdd(keys, (Math.round(tokens) || 0) - booked);
     if (!rows) return null;
     const st = quotaState(rows);
     return { left: st.left, reset_in: st.reset_in };
@@ -384,7 +402,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(out);
   } catch (e) {
     console.error('Coach error', e?.name, e?.message, e?.status);
-    if (e?.tokens) await charge(e.tokens);
+    await charge(e?.tokens || 0);   // real usage, or a full refund if OpenAI used nothing
     if (e?.status) return res.status(502).json({ error: e.status === 429 ? 'upstream_busy' : 'upstream' });
     if (e?.name === 'AbortError') return res.status(504).json({ error: 'timeout' });
     return res.status(502).json({ error: e?.message === 'bad_output' ? 'bad_output' : 'failed' });

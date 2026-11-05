@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.6.1
+**Versi semasa:** 1.6.2
 
 ## Ciri utama
 
@@ -31,7 +31,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 
 **Tetapan**
 - Tema cerah / gelap / ikut telefon, saiz teks, waktu makan biasa, jenis peringatan (log makan, air, timbang, ringkasan malam), status notifikasi dan butang *Hantar notifikasi ujian*.
-- Backup / restore (JSON), export CSV (makanan, air, berat), padam semua data.
+- Backup / restore (JSON), export CSV (makanan, air, berat), padam semua data. Data yang dipulihkan disemak medan demi medan (jenis, julat, panjang) dan medan asing dibuang; alamat notifikasi telefon lama tidak dibawa. *Padam semua data* turut mematikan notifikasi di server.
 
 ## Teknologi
 - HTML5 + Vanilla JS + Tailwind CSS (CDN) – tiada build step.
@@ -44,7 +44,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 ```
 index.html      UI, data makanan & menu, enjin cadangan, profil & tetapan, ikon, logik app
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v14, terima & buka notifikasi)
+sw.js           Service worker (cache dietpal-v15, terima & buka notifikasi)
 vercel.json     Tetapan fungsi Vercel (maxDuration 60 s)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
@@ -61,7 +61,7 @@ Service worker hanya berfungsi melalui `http://localhost` atau HTTPS. App diseka
 ## Deploy
 Projek statik – import repo ini ke Vercel tanpa sebarang tetapan build (Framework: Other, output: root). Setiap push ke `main` akan deploy semula.
 
-Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v13` → `dietpal-v14`) supaya telefon yang dah pasang app mendapat versi baru.
+Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v14` → `dietpal-v15`) supaya telefon yang dah pasang app mendapat versi baru.
 
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
@@ -88,14 +88,15 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
 | `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
-| `SUPABASE_URL` | Ya (untuk had) | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
-| `SUPABASE_ANON_KEY` | Ya (untuk had) | Publishable key projek Supabase **dietpal** (bukan rahsia). |
-| `COACH_QUOTA_SECRET` | Ya (untuk had) | Rahsia `coach_secret` dalam jadual `push_config` (lihat di bawah). |
+| `SUPABASE_URL` | Ya | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
+| `SUPABASE_ANON_KEY` | Ya | Publishable key projek Supabase **dietpal** (bukan rahsia). |
+| `COACH_QUOTA_SECRET` | Ya | Rahsia `coach_secret` dalam jadual `push_config` (lihat di bawah). |
 | `COACH_TOKENS_WINDOW` | Tidak | Bajet token setiap telefon dalam satu tempoh (lalai: 8000). |
 | `COACH_WINDOW_MIN` | Tidak | Panjang tempoh dalam minit (lalai: 15). |
 | `COACH_TOKENS_DAY` | Tidak | Bajet token setiap telefon sehari, reset 12 tengah malam waktu Malaysia (lalai: 30000). |
 | `COACH_IP_FACTOR` | Tidak | Bajet setiap IP = bajet telefon × nilai ini (lalai: 3). |
-| `COACH_RATE_LIMIT` | Tidak | Sandaran jika had token tidak aktif: had permintaan setiap IP dalam 10 minit (lalai: 12). |
+| `COACH_RESERVE` | Tidak | Token yang ditempah sebelum setiap panggilan OpenAI (lalai: 3500). |
+| `COACH_QUOTA_OPTIONAL` | Tidak | Untuk ujian lokal sahaja: `1` = benarkan Coach tanpa env had token, guna had permintaan setiap IP (`COACH_RATE_LIMIT`, lalai 12 dalam 10 minit). Jangan set di production. |
 | `ALLOWED_ORIGINS` | Tidak | Domain tambahan dibenarkan, dipisah koma (cth: `https://dietpal.my`). |
 
 **Cara AI menjawab**
@@ -111,7 +112,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 - Had kalori minimum harian, tiada skip makan atau potong nasi/garam terus, patuhi pantang & alahan, tiada diagnosis/ubat/dos.
 - Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
 - Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
-- **Had penggunaan (token)** – dikira di server dalam Supabase, jadi tak boleh di-reset dari telefon. Setiap telefon (ID rawak dalam `localStorage`, kunci `dietpal.device`) dapat 8,000 token setiap 15 minit dan 30,000 token sehari; setiap IP dapat 3× ganda (ramai telefon boleh berkongsi satu IP). Kiraan guna `usage.total_tokens` sebenar dari OpenAI. Bila habis, server pulangkan 429 `quota` dengan masa menunggu dan app papar "Coach AI rehat sekejap…". Bila baki ≤ 30%, app papar amaran kecil. Soalan kecemasan tidak dikira. Satu soalan biasa ≈ 3,000 token (prompt sistem + senarai preset makanan + jawapan), jadi ≈ 2–3 soalan setiap 15 minit dan ≈ 10 sehari. Jika Supabase tak dapat dihubungi atau env belum diset, server guna had permintaan lama (`COACH_RATE_LIMIT`) supaya Coach terus berfungsi.
+- **Had penggunaan (token)** – dikira di server dalam Supabase, jadi tak boleh di-reset dari telefon. Setiap telefon (ID rawak dalam `localStorage`, kunci `dietpal.device`) dapat 8,000 token setiap 15 minit dan 30,000 token sehari; setiap IP dapat 3× ganda (ramai telefon boleh berkongsi satu IP). Kiraan guna `usage.total_tokens` sebenar dari OpenAI. Bila habis, server pulangkan 429 `quota` dengan masa menunggu dan app papar "Coach AI rehat sekejap…". Bila baki ≤ 30%, app papar amaran kecil. Soalan kecemasan tidak dikira. Satu soalan biasa ≈ 3,000 token (prompt sistem + senarai preset makanan + jawapan), jadi ≈ 2–3 soalan setiap 15 minit dan ≈ 10 sehari. Server **menempah** ~3,500 token dulu (atomik dalam Postgres) sebelum memanggil OpenAI, kemudian melaraskan ikut penggunaan sebenar — jadi permintaan serentak tak boleh melepasi had. Jika Supabase tak dapat dihubungi atau env belum diset, Coach AI **berhenti sementara** (503) dan tidak berjalan tanpa had.
 - Jawapan dihadkan kepada 1,200 token output.
 - Semakan origin, had saiz permintaan, tamat masa 30 saat.
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.

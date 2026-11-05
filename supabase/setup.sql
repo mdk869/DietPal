@@ -56,7 +56,9 @@ revoke all on public.coach_usage from anon, authenticated;
 insert into public.push_config (key, value) values ('coach_secret', encode(extensions.gen_random_bytes(32), 'hex'))
 on conflict (key) do nothing;
 
--- Adds p_add tokens to each key (0 = read only). Resets the window after p_window seconds and the day at midnight MYT.
+-- Adds p_add tokens to each key (negative = give back a booking, floored at 0). Resets the window after p_window seconds
+-- and the day at midnight MYT. api/coach.js books ~3,500 tokens before calling OpenAI and settles to the real usage after
+-- (migration "coach_quota_reserve"), so a burst of parallel requests can't all pass the limit.
 create or replace function public.coach_usage_add(p_secret text, p_keys text[], p_add integer, p_window integer)
 returns table (o_key text, o_win integer, o_reset integer, o_day integer)
 language plpgsql security definer set search_path = ''
@@ -68,17 +70,17 @@ begin
   if p_secret is null or p_secret is distinct from (select value from public.push_config where key = 'coach_secret') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
-  if coalesce(array_length(p_keys, 1), 0) not between 1 and 4 or p_add not between 0 and 100000
+  if coalesce(array_length(p_keys, 1), 0) not between 1 and 4 or p_add not between -100000 and 100000
      or p_window not between 60 and 86400 then
     raise exception 'bad_args' using errcode = '22023';
   end if;
   return query
   insert into public.coach_usage as u (key, win_start, win_tokens, day, day_tokens)
-  select distinct k, now(), p_add, v_today, p_add from unnest(p_keys) as k
+  select distinct k, now(), greatest(0, p_add), v_today, greatest(0, p_add) from unnest(p_keys) as k
   on conflict (key) do update set
-    win_tokens = case when u.win_start + v_win <= now() then p_add else u.win_tokens + p_add end,
+    win_tokens = greatest(0, case when u.win_start + v_win <= now() then p_add else u.win_tokens + p_add end),
     win_start  = case when u.win_start + v_win <= now() then now() else u.win_start end,
-    day_tokens = case when u.day = v_today then u.day_tokens + p_add else p_add end,
+    day_tokens = greatest(0, case when u.day = v_today then u.day_tokens + p_add else p_add end),
     day        = v_today,
     updated_at = now()
   returning u.key, u.win_tokens,
