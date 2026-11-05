@@ -1256,7 +1256,8 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
     avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy,
     health: S.settings.ai?.health === false ? [] : (p.health || []),   // user can choose not to share health notes
     // The app presets (foods.js) already live on the server; only the user's own foods are sent.
-    catalog: S.customFoods.filter(f => !foodConflicts(f).length).slice(0, 60).map(f => ({ name: f.name, unit: f.unit, kcal: f.kcal })), ...extra
+    catalog: S.customFoods.filter(f => !foodConflicts(f).length).slice(0, 60).map(f => ({ name: f.name, unit: f.unit, kcal: f.kcal })),
+    recentMenus: recentAIMenus(), ...extra
   };
 }
 
@@ -1449,12 +1450,26 @@ async function aiAsk() {
     const data = await r.json().catch(() => ({}));
     if (r.status === 429 && data.error === 'quota') { UI.ai.error = quotaError(data); }
     else if (!r.ok) throw new Error(data.error || 'default');
-    else UI.ai.result = data;
+    else { UI.ai.result = data; rememberAIMenus(data.menus); }
   } catch (e) {
     UI.ai.error = AI_ERRORS[e.message] || AI_ERRORS.default;
   }
   UI.ai.loading = false;
   if (sheetFn === aiBody) refreshSheet();
+}
+// Last AI menu names, kept on this phone only, so the coach can avoid repeating itself.
+const AI_RECENT_KEY = 'dietpal.aiRecent', AI_RECENT_MAX = 10;
+function recentAIMenus() {
+  try { const v = JSON.parse(localStorage.getItem(AI_RECENT_KEY) || '[]');
+    return Array.isArray(v) ? v.filter(x => typeof x === 'string' && x).map(x => x.slice(0, 60)).slice(0, AI_RECENT_MAX) : []; }
+  catch { return []; }
+}
+function rememberAIMenus(menus) {
+  const names = (Array.isArray(menus) ? menus : []).map(m => String(m?.name || '').trim().slice(0, 60)).filter(Boolean);
+  if (!names.length) return;
+  const seen = new Set(names.map(n => n.toLowerCase()));
+  const next = [...names, ...recentAIMenus().filter(n => !seen.has(n.toLowerCase()))].slice(0, AI_RECENT_MAX);
+  try { localStorage.setItem(AI_RECENT_KEY, JSON.stringify(next)); } catch {}
 }
 function aiLog(i, meal = UI.ai.result?.meal || UI.ai.meal) {
   const m = UI.ai.result?.menus?.[i]; if (!m || UI.ai.logged[i]) return;
@@ -1471,7 +1486,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.8';
+const APP_VERSION = '1.6.9';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2029,7 +2044,7 @@ document.addEventListener('click', (e) => {
     }
     case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) {
       // Stop server reminders first, otherwise the old subscription keeps sending them after the reset
-      disablePush().finally(() => { localStorage.removeItem(KEY); S = load(); UI.tab = 'home'; UI.ob.step = 0; render(); toast('Data dipadam'); });
+      disablePush().finally(() => { localStorage.removeItem(KEY); localStorage.removeItem(AI_RECENT_KEY); S = load(); UI.tab = 'home'; UI.ob.step = 0; render(); toast('Data dipadam'); });
     } break;
     case 'install': installApp(); break;
     case 'pushOn': enablePush(true).then(ok => { if (ok) toast('Peringatan dihidupkan'); render(); }); break;

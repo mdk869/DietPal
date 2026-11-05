@@ -82,3 +82,13 @@ test('Coach AI is told about sugary drinks', () => {
   const msg = buildUserMessage({ question: 'x', context: { eatenToday: [{ foodId: 'tehtarik', name: 'Teh tarik', kcal: 150 }, { name: 'Jus tembikai', kcal: 120 }, { foodId: 'kopio', name: 'Kopi O', kcal: 5 }] } });
   assert.match(msg, /Minuman manis hari ini: Teh tarik, Jus tembikai \(270 kcal\)/);
 });
+
+test('variety: no example dish names in the prompt; recent AI menus are passed on to avoid', async () => {
+  await call(DEV);
+  const sys = lastOpenAI.messages[0].content.split('RUJUKAN KCAL APP')[0];
+  assert.doesNotMatch(sys, /mee hoon|nasi lemak|nasi kandar|roti telur/i);
+  assert.match(sys, /JANGAN ULANG/);
+  const msg = buildUserMessage({ question: 'x', context: { recentMenus: ['Mee hoon sup', 'Nasi lemak separuh', 42, '<x>'.repeat(40)] } });
+  assert.match(msg, /Cadangan AI terkini \(elak ulang\): Mee hoon sup; Nasi lemak separuh; <x>/);
+  assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Cadangan AI terkini/);
+});
