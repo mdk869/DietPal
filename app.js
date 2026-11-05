@@ -1501,7 +1501,7 @@ function sheetScan() {
   UI.scan = { img: '', loading: false, result: null, error: '' };
   openSheet(scanBody, true);
 }
-// Phone photo → small JPEG data URL (~768 px). Keeps upload fast and cheap; the original never leaves the phone.
+// Phone photo → small JPEG data URL (~1024 px, enough to read nutrition labels). Keeps upload fast and cheap; the original never leaves the phone.
 async function scanPrepImage(file) {
   if (file.size > 30e6) throw new Error('read');
   let src;
@@ -1514,7 +1514,7 @@ async function scanPrepImage(file) {
   }
   const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
   if (!w || !h) throw new Error('read');
-  for (const [max, q] of [[768, 0.72], [640, 0.6], [512, 0.5]]) {
+  for (const [max, q] of [[1024, 0.75], [900, 0.65], [768, 0.6]]) {
     const s = Math.min(1, max / Math.max(w, h)), c = document.createElement('canvas');
     c.width = Math.round(w * s); c.height = Math.round(h * s);
     const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
@@ -1591,6 +1591,7 @@ function scanBody() {
       <div>• Ambil dari atas, nampak seluruh pinggan atau mangkuk</div>
       <div>• Cahaya cukup, satu hidangan setiap gambar</div>
       <div>• Ambil sebelum mula makan</div>
+      <div>• Makanan bungkus? Scan label <b>Maklumat Pemakanan</b> di belakang — nilai lebih tepat</div>
     </div></div>`;
   if (!r.items.length) return head + `<div class="px-5 pb-6 pt-4">${thumb}
     <div class="mt-4 text-[14px] bg-slate-50 text-slate-700 rounded-xl p-3">${r.is_food === false && !r.note ? 'Tak nampak makanan dalam gambar ini.' : 'Tiada makanan untuk disimpan.'}${r.note ? ' ' + esc(r.note) : ''} Cuba ambil semula dengan cahaya cukup, atau cari dalam senarai.</div>
@@ -1608,7 +1609,7 @@ function scanBody() {
           <span class="w-2 h-2 rounded-full shrink-0 mt-2" style="background:${PLATE[x.plate || 'lain'].color}"></span>
           <div class="flex-1 min-w-0">
             <div class="text-[14px] font-semibold leading-snug">${esc(x.name)}</div>
-            <div class="text-[12px] text-slate-500">${esc(x.unit)} · ${fmt(x.kcal)} kcal${x.confidence === 'rendah' ? ' · <span class="text-amber-700 font-semibold">kurang pasti</span>' : ''}</div>
+            <div class="text-[12px] text-slate-500">${esc(x.unit)} · ${fmt(x.kcal)} kcal${x.source === 'label' ? ' · <span class="text-green-700 font-semibold">dari label</span>' : ''}${x.confidence === 'rendah' ? ' · <span class="text-amber-700 font-semibold">kurang pasti</span>' : ''}</div>
             ${c.length ? `<div class="text-[12px] font-semibold text-amber-700 flex items-center gap-1 mt-0.5">${icon('alert', 'w-3.5 h-3.5')}Ada ${c.map(t => TAG_LABEL[t]).join(', ')}</div>` : ''}
           </div>
           <button data-act="scanDel" data-i="${i}" class="tap w-8 h-8 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Buang">${icon('x', 'w-4 h-4')}</button>
@@ -1625,7 +1626,7 @@ function scanBody() {
     ${r.note ? `<div class="mt-2 text-[13px] bg-slate-50 text-slate-700 rounded-xl p-3">${esc(r.note)}</div>` : ''}
     <button data-act="scanLog" class="tap mt-4 w-full btn btn-primary py-3.5 text-[16px]">Simpan ke ${m.label} · ~${fmt(total)} kcal</button>
     <div class="flex gap-2 mt-2">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div>
-    <p class="text-[12px] text-slate-500 mt-3">Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.${r.left !== null && r.left !== undefined ? ` Baki scan hari ini: ${r.left}.` : ''}</p>
+    <p class="text-[12px] text-slate-500 mt-3">${r.items.every(x => x.source === 'label') ? 'Dibaca oleh AI dari label — pastikan nombor sama dengan label sebenar.' : 'Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.'}${r.left !== null && r.left !== undefined ? ` Baki scan hari ini: ${r.left}.` : ''}</p>
   </div>`;
 }
 function scanLog() {
@@ -1644,7 +1645,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
