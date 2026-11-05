@@ -244,17 +244,23 @@ function toast(msg) {
   const t = document.getElementById('toast'); t.innerHTML = `<span class="text-green-400">${icon('check', 'w-4 h-4', 2.5)}</span><span>${esc(msg)}</span>`; t.classList.remove('hidden'); t.classList.add('flex');
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.add('hidden'); t.classList.remove('flex'); }, 2200);
 }
+// Plate groups of one logged item. App presets are looked up so mixed dishes (nasi lemak, mee goreng…)
+// count by their estimated make-up (foods.js `mix`); own foods & AI menus use the plate saved with the log.
+function mealMix(m) {
+  const f = m.foodId ? FOODS.find(x => x.id === m.foodId) : null;
+  return f ? (f.mix || { [f.plate || 'lain']: 1 }) : { [m.plate || 'lain']: 1 };
+}
 function plateCounts(d) {
   const c = { serat: 0, protein: 0, karbo: 0, lain: 0 };
-  d.meals.forEach(m => { c[m.plate || 'lain'] += (m.qty || 1); });
+  d.meals.forEach(m => { const q = m.qty || 1; Object.entries(mealMix(m)).forEach(([k, v]) => { if (k in c) c[k] += v * q; }); });
   return c;
 }
-// What today's plate is missing: 'sayur', 'protein' or ''. Mixed dishes (nasi lemak, mee goreng…) are
-// logged as 'lain', so a day with one isn't nagged about protein — we can't tell what's inside it.
+// What today's plate is missing: 'sayur', 'protein' or ''. A dish we can't break down (own food or AI menu
+// saved as 'lain') skips the protein nudge — we can't tell what's inside it.
 function plateGap(d, pc = plateCounts(d)) {
   const mains = pc.karbo + pc.protein;
   if (mains >= 2 && pc.serat < 1) return 'sayur';
-  const hasDish = d.meals.some(m => (m.plate || 'lain') === 'lain' && m.kcal >= 200);
+  const hasDish = d.meals.some(m => { const x = mealMix(m); return Object.keys(x).length === 1 && x.lain && m.kcal >= 200; });
   if (pc.karbo >= 2 && pc.protein < 1 && !hasDish) return 'protein';
   return '';
 }
@@ -350,7 +356,7 @@ function viewHome() {
   const pc = plateCounts(d);
   const pct = Math.min(100, (k / p.kcalMax) * 100), minPct = (p.kcalMin / p.kcalMax) * 100;
   const barColor = k > p.kcalMax ? '#d97706' : '#1e6b4a';
-  const legend = (key, label) => `<span class="flex items-center gap-1.5 ${pc[key] ? '' : 'text-mute'}"><span class="w-2.5 h-2.5 rounded-full" style="background:${PLATE[key].color};${pc[key] ? '' : 'opacity:.3'}"></span>${label} ${pc[key]}</span>`;
+  const legend = (key, label) => `<span class="flex items-center gap-1.5 ${pc[key] ? '' : 'text-mute'}"><span class="w-2.5 h-2.5 rounded-full" style="background:${PLATE[key].color};${pc[key] ? '' : 'opacity:.3'}"></span>${label} ${Math.round(pc[key] * 10) / 10}</span>`;
   return `
   <section class="home-hero relative overflow-hidden bg-brand-700 text-white -mx-4 px-5 pb-20 rounded-b-[2rem]">
     <svg class="absolute inset-0 w-full h-full opacity-10" aria-hidden="true"><defs><pattern id="songket" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M16 0 L32 16 L16 32 L0 16 Z" fill="none" stroke="#fff" stroke-width="1"/><circle r="3" cx="16" cy="16" fill="#fff"/></pattern></defs><rect fill="url(#songket)" width="100%" height="100%"/></svg>
@@ -1241,7 +1247,7 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
     meal, location: general ? null : UI.sug.loc, venue: !general && UI.sug.loc === 'luar' ? UI.sug.venue : null,
     remainingKcal: (p.kcalMax || 0) - kcalOf(d),
     nowMeal: guessMeal(), mealTargets: Object.fromEntries(MEALS.map(m => [m.id, mealTarget(m.id).ideal])), dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
-    eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal, plate: m.plate || 'lain', qty: m.qty || 1 })),
+    eatenToday: d.meals.map(m => ({ meal: m.meal, foodId: m.foodId || '', name: m.name, kcal: m.kcal, plate: m.plate || 'lain', qty: m.qty || 1 })),
     avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy,
     health: S.settings.ai?.health === false ? [] : (p.health || []),   // user can choose not to share health notes
     // The app presets (foods.js) already live on the server; only the user's own foods are sent.
@@ -1460,7 +1466,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.6';
+const APP_VERSION = '1.6.7';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },

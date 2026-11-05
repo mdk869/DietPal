@@ -1,5 +1,6 @@
 const test = require('node:test'), assert = require('node:assert');
 const { load } = require('./helpers');
+const { FOODS } = require('../foods.js');
 
 test('sanitizeState: strips markup, junk and unknown fields', () => {
   const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
@@ -83,7 +84,7 @@ test('CSP connect-src allows every host the service worker fetches (it runs unde
 });
 
 test('plateGap: flags missing veg / protein, but not on mixed-dish days', () => {
-  const { plateGap } = load(['plateCounts', 'plateGap']);
+  const { plateGap } = load(['mealMix', 'plateCounts', 'plateGap'], { FOODS });
   const day = (...ms) => ({ meals: ms.map(([plate, kcal = 150, qty = 1]) => ({ plate, kcal, qty })) });
   assert.equal(plateGap(day(['karbo'], ['protein'])), 'sayur');
   assert.equal(plateGap(day(['karbo'], ['protein'], ['serat'])), '');
@@ -91,4 +92,15 @@ test('plateGap: flags missing veg / protein, but not on mixed-dish days', () => 
   assert.equal(plateGap(day(['karbo'], ['karbo'], ['serat'], ['lain', 400])), '');   // nasi lemak: contents unknown
   assert.equal(plateGap(day(['karbo'], ['karbo'], ['serat'], ['lain', 5])), 'protein'); // kopi O doesn't count as a dish
   assert.equal(plateGap(day()), '');
+});
+
+test('mixed-dish presets count by their make-up', () => {
+  const { plateCounts, plateGap } = load(['mealMix', 'plateCounts', 'plateGap'], { FOODS });
+  const log = (...ids) => ({ meals: ids.map(([foodId, qty = 1]) => ({ foodId, plate: 'lain', kcal: 300 * qty, qty })) });
+  assert.deepEqual({ ...plateCounts(log(['nlemak', 2])) }, { serat: 0, protein: 1, karbo: 2, lain: 0 });
+  assert.equal(plateGap(log(['nlemak'], ['mgoreng'])), 'sayur');           // nasi lemak + mee goreng: no veg
+  assert.equal(plateGap(log(['rcanai', 2], ['ulam'])), 'protein');         // 2 roti canai: karbo only
+  assert.equal(plateGap(log(['ncampur'], ['ncampur'])), '');               // nasi campur already has lauk + sayur
+  assert.equal(plateCounts(log(['pisang'])).serat, 1);                     // fruit counts with sayur & buah
+  for (const f of FOODS) if (f.mix) assert(Object.keys(f.mix).every(k => ['serat', 'protein', 'karbo'].includes(k)), f.id);
 });

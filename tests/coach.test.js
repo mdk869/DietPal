@@ -71,6 +71,9 @@ test('presets live in the (cacheable) system message; phone sends only own foods
 test('Coach AI sees today\'s plate balance', () => {
   const msg = buildUserMessage({ question: 'x', context: { eatenToday: [
     { name: 'Nasi putih', kcal: 260, plate: 'karbo', qty: 2 }, { name: 'Ayam goreng', kcal: 290, plate: 'protein' }, { name: 'Teh tarik', kcal: 150, plate: '<b>' }] } });
-  assert.match(msg, /Imbangan pinggan hari ini: sayur & buah 0, protein 1, karbo 2, hidangan campur \/ minuman 1/);
+  assert.match(msg, /Imbangan pinggan hari ini: sayur & buah 0, protein 1, karbo 2, lain-lain \/ minuman 1/);
+  // App presets are broken down the same way as on the phone: nasi lemak = karbo 1 + protein ½
+  assert.match(buildUserMessage({ question: 'x', context: { eatenToday: [{ foodId: 'nlemak', name: 'Nasi lemak', kcal: 400, plate: 'lain', qty: 2 }] } }),
+    /sayur & buah 0, protein 1, karbo 2, lain-lain \/ minuman 0/);
   assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Imbangan pinggan/);
 });
