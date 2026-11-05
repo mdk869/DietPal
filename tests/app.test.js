@@ -124,3 +124,16 @@ test('coach: nudges about sugary drinks after plate gaps', () => {
     peekDay: () => ({ meals, water: 0 }), todayKey: () => 'x', kcalOf: d => d.meals.reduce((a, m) => a + m.kcal, 0), fmt: String, esc: x => x });
   assert.match(coach().msg, /dalam sasaran, pinggan pun seimbang\. Air manis hari ini ~190 kcal/);
 });
+
+test('recent AI menus: newest first, deduped, capped at 10, survive bad storage', () => {
+  const store = {};
+  const localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } };
+  const { rememberAIMenus, recentAIMenus } = load(['AI_RECENT_KEY', 'recentAIMenus', 'rememberAIMenus'], { localStorage, JSON, Array, Set, String });
+  rememberAIMenus([{ name: 'Mee hoon sup' }, { name: 'Nasi lemak separuh' }]);
+  rememberAIMenus([{ name: 'Capati + dal' }, { name: 'mee hoon sup' }]);
+  assert.deepEqual([...recentAIMenus()], ['Capati + dal', 'mee hoon sup', 'Nasi lemak separuh']);
+  rememberAIMenus(Array.from({ length: 15 }, (_, i) => ({ name: 'M' + i })));
+  assert.equal(recentAIMenus().length, 10);
+  store['dietpal.aiRecent'] = '{bad json';
+  assert.deepEqual([...recentAIMenus()], []);
+});

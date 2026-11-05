@@ -44,12 +44,14 @@ UTAMAKAN SOALAN PENGGUNA
 - Jangan sebut "di luar" atau "di rumah" melainkan soalan atau tetapan app menyatakannya. Tetapan "di rumah" → cadang masakan rumah, bukan kedai.
 - Soalan tentang data hari ini (cth: "berapa kalori saya makan hari ini?") → guna angka dari konteks app sahaja, jangan kira semula.
 - Jika ada minuman manis hari ini dan ia berkaitan dengan soalan (kalori, berat, cadangan minuman), cadang versi kurang manis atau kosong — sekali sahaja, tanpa menghukum.
-- Kalori bukan satu-satunya ukuran. Jika imbangan pinggan hari ini kurang sayur atau protein, sebut ringkas dalam "reply" (satu ayat) walaupun kalori dalam sasaran, dan utamakan menu yang menampung kekurangan itu. Hidangan campur app (nasi lemak, mee goreng…) sudah dipecah anggaran ke kumpulan pinggan; "lain-lain" = isi tidak diketahui atau minuman — jangan tegur jika kebanyakan makanan dalam "lain-lain".
+- Kalori bukan satu-satunya ukuran. Jika imbangan pinggan hari ini kurang sayur atau protein, sebut ringkas dalam "reply" (satu ayat) walaupun kalori dalam sasaran, dan utamakan menu yang menampung kekurangan itu. Hidangan campur app sudah dipecah anggaran ke kumpulan pinggan; "lain-lain" = isi tidak diketahui atau minuman — jangan tegur jika kebanyakan makanan dalam "lain-lain".
 
 CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
-- Beri 2–3 hidangan SEBENAR yang memang biasa dipesan atau dimasak di tempat itu di Malaysia (cth di mamak: "Nasi kandar ikan bakar", "Roti telur + dal", "Mee hoon sup"). Nama menu = nama hidangan yang orang kenal.
+- Beri 2–3 hidangan SEBENAR yang memang biasa dipesan atau dimasak di tempat itu di Malaysia. Nama menu = nama hidangan yang orang kenal.
+- VARIASI: setiap menu mesti berbeza jenis karbo (nasi / mee, bihun atau kuey teow / roti, capati atau tosai / ubi, oat atau jagung) dan cara masak (bakar, kukus, rebus, sup, masak berkuah, tumis). Pelbagaikan masakan Melayu, Cina, India dan lain yang biasa di Malaysia. Jangan sentiasa pilih hidangan yang paling biasa.
+- JANGAN ULANG: elak hidangan yang sudah dimakan hari ini dan yang ada dalam "Cadangan AI terkini" — kecuali pengguna sendiri sebut hidangan itu dalam soalan.
 - Untuk sarapan, tengah hari dan malam, setiap menu ialah HIDANGAN LENGKAP yang mengenyangkan: ada protein, karbohidrat (nasi, mee, roti, ubi, oat) dan sayur. Jangan jadikan sayur sahaja atau sup sahaja sebagai satu menu.
-- "items" ialah komponen hidangan itu dengan sukatan rumah (senduk, ketul, keping, mangkuk, cawan) dan anggaran kcal yang munasabah. Jangan cantum makanan yang tak masuk akal dalam satu menu. Jika satu item sudah mewakili hidangan penuh (cth "Mee hoon sup 1 mangkuk"), jangan tambah item lain yang sudah ada di dalamnya.
+- "items" ialah komponen hidangan itu dengan sukatan rumah (senduk, ketul, keping, mangkuk, cawan) dan anggaran kcal yang munasabah. Jangan cantum makanan yang tak masuk akal dalam satu menu. Jika satu item sudah mewakili hidangan penuh (satu mangkuk atau satu pinggan lengkap), jangan tambah item lain yang sudah ada di dalamnya.
 - Ikut Pinggan Sihat Malaysia (KKM): ½ sayur & buah, ¼ protein, ¼ karbohidrat. Utamakan bakar, kukus, rebus atau sup. Minuman: air kosong, teh O / kopi O kosong, atau kurang manis.
 - Sasarkan jumlah kcal setiap menu dalam julat waktu makan yang diberi.
 - Jika pengguna sebut bahan yang ada (cth: "telur, kobis & ayam"), gunakan bahan-bahan itu.
@@ -249,6 +251,8 @@ function buildUserMessage(body) {
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
   if (health.length) lines.push(`Nota kesihatan: ${health.join(', ')}.`);
+  const recent = (Array.isArray(c.recentMenus) ? c.recentMenus.slice(0, 10) : []).map(x => str(x, 60)).filter(Boolean);
+  if (recent.length) lines.push(`Cadangan AI terkini (elak ulang): ${recent.join('; ')}.`);
   const catalog = cleanCatalog(c.catalog);
   if (catalog.length) lines.push(`Makanan sendiri pengguna (rujukan kcal; tidak wajib): ${catalog.map(f => `${f.name} ${f.unit} ${f.kcal}`).join('; ')}.`);
   lines.push('', `SOALAN PENGGUNA: ${str(body.question, MAX_QUESTION) || 'Apa yang sesuai saya makan sekarang?'}`);
