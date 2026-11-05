@@ -1,8 +1,11 @@
 // DietPal – service worker
-const CACHE = 'dietpal-v15';
+const CACHE = 'dietpal-v16';
 const SHELL = [
   './',
   './index.html',
+  './app.css',
+  './foods.js',
+  './app.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -28,28 +31,31 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.hostname.endsWith('.supabase.co')) return;   // reminders API: never cache
 
+  // Only keep good responses (opaque = cross-origin CDN without CORS, can't be checked)
+  const keep = (res) => res && (res.ok || res.type === 'opaque');
+  const put = (key, res) => { if (keep(res)) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(key, copy)); } return res; };
+
   // Page navigations: network first, fall back to cached app shell (offline)
   if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req)
-        .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); return res; })
-        .catch(() => caches.match('./index.html'))
-    );
+    e.respondWith(fetch(req).then((res) => put('./index.html', res)).catch(() => caches.match('./index.html')));
     return;
   }
 
-  // Same-origin assets: cache first
   if (url.origin === self.location.origin) {
-    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return res;
-    })));
+    // App code & styles: network first, so a new deploy is used straight away (cache = offline copy)
+    if (/\.(js|css)$/.test(url.pathname)) {
+      e.respondWith(fetch(req).then((res) => put(req, res)).catch(() => caches.match(req)));
+      return;
+    }
+    // Icons, manifest: cache first
+    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => put(req, res))));
     return;
   }
 
-  // CDN (Tailwind, Google Fonts): stale-while-revalidate so the app works offline after first load
+  // CDN (Google Fonts): stale-while-revalidate so the app works offline after first load
   e.respondWith(
     caches.open(CACHE).then((c) => c.match(req).then((hit) => {
-      const net = fetch(req).then((res) => { c.put(req, res.clone()); return res; }).catch(() => hit);
+      const net = fetch(req).then((res) => { if (keep(res)) c.put(req, res.clone()); return res; }).catch(() => hit);
       return hit || net;
     }))
   );

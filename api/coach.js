@@ -4,6 +4,7 @@
 // The key never reaches the browser or the repo.
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const { FOODS } = require('../foods.js');   // same presets the app uses
 const MAX_QUESTION = 300;
 const RATE_LIMIT = Number(process.env.COACH_RATE_LIMIT || 12);   // requests per IP per window
 const RATE_WINDOW_MS = 10 * 60 * 1000;                             // 10 minutes
@@ -61,6 +62,14 @@ KESELAMATAN (WAJIB)
 - Soalan bukan tentang makanan atau pemakanan → jawab dengan sopan bahawa anda hanya bantu tentang makanan; "menus" kosong.
 
 Bahasa: Bahasa Melayu Malaysia yang mudah dan santai (bukan Bahasa Indonesia). Istilah Inggeris biasa boleh. Nama hidangan dalam huruf biasa (cth: "Ikan bakar", bukan "Ikan Bakar").`;
+
+// App presets as kcal reference. Kept in the system message, which is identical for every request,
+// so OpenAI's automatic prompt caching can reuse it (cached input tokens cost much less).
+const PRESETS = FOODS.map(f => ({ name: f.name, unit: f.unit, kcal: f.kcal }));
+const SYSTEM_MESSAGE = `${SYSTEM_PROMPT}
+
+RUJUKAN KCAL APP (anggaran untuk sukatan biasa; guna jika sama, tidak wajib, dan BUKAN senarai cadangan — tetap patuhi pantang & alahan):
+${PRESETS.map(f => `${f.name} ${f.unit} ${f.kcal}`).join('; ')}.`;
 
 const SCHEMA = {
   type: 'object',
@@ -161,13 +170,18 @@ function quotaState(rows, now = Date.now(), pending = 0) {
   return { blocked, left: Math.round(left * 100) / 100, reset_in: resetIn };
 }
 
+// Browsers always send Origin on a POST, so a request without one is not from the app.
+// Note: this only stops other websites; scripts can fake headers — the token quota is the real limit.
+// Allowed: the site itself (production or a preview of this project), plus ALLOWED_ORIGINS (comma-separated).
+const PREVIEW = /^dietpal-[a-z0-9-]+-techbite-resources-projects\.vercel\.app$/;
 function originAllowed(req) {
   const origin = req.headers.origin;
-  if (!origin) return true;   // same-origin fetches from some browsers omit Origin
-  let host;
-  try { host = new URL(origin).host; } catch { return false; }
+  if (!origin) return false;
+  let u;
+  try { u = new URL(origin); } catch { return false; }
   const extra = String(process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-  return host === req.headers.host || (host.endsWith('.vercel.app') && host.includes('dietpal')) || extra.includes(origin);
+  if (extra.includes(origin)) return true;
+  return u.protocol === 'https:' && (u.host === req.headers.host || u.host === 'dietpal-blond.vercel.app' || PREVIEW.test(u.host));
 }
 function targetRange(target, meal) {
   const tol = meal === 'snek' ? 0.4 : 0.2;
@@ -217,13 +231,13 @@ function buildUserMessage(body) {
   const health = pick(c.health, HEALTH);
   if (health.length) lines.push(`Nota kesihatan: ${health.join(', ')}.`);
   const catalog = cleanCatalog(c.catalog);
-  if (catalog.length) lines.push(`Rujukan kcal app (guna jika sama; tidak wajib): ${catalog.map(f => `${f.name} ${f.unit} ${f.kcal}`).join('; ')}.`);
+  if (catalog.length) lines.push(`Makanan sendiri pengguna (rujukan kcal; tidak wajib): ${catalog.map(f => `${f.name} ${f.unit} ${f.kcal}`).join('; ')}.`);
   lines.push('', `SOALAN PENGGUNA: ${str(body.question, MAX_QUESTION) || 'Apa yang sesuai saya makan sekarang?'}`);
   return lines.join('\n');
 }
 
 function cleanCatalog(list) {
-  return Array.isArray(list) ? list.slice(0, 120).map(f => ({ name: str(f?.name, 50), unit: str(f?.unit, 30), kcal: num(f?.kcal, 0, 1500) }))
+  return Array.isArray(list) ? list.slice(0, 60).map(f => ({ name: str(f?.name, 50), unit: str(f?.unit, 30), kcal: num(f?.kcal, 0, 1500) }))
     .filter(f => f.name && f.unit && f.kcal !== null) : [];
 }
 // "Sayur Campur Goreng" → "Sayur campur goreng"
@@ -379,9 +393,9 @@ module.exports = async function handler(req, res) {
   };
 
   const c = body.context || {};
-  const catalog = cleanCatalog(c.catalog), targets = mealTargets(c);
+  const catalog = [...cleanCatalog(c.catalog), ...PRESETS], targets = mealTargets(c);   // user's own foods win on name match
   try {
-    const ai = await callOpenAI([{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(body) }]);
+    const ai = await callOpenAI([{ role: 'system', content: SYSTEM_MESSAGE }, { role: 'user', content: buildUserMessage(body) }]);
     console.log('Coach tokens', ai.tokens);
     const quota = await charge(ai.tokens);
     if (ai.refusal) return res.status(200).json({ reply: 'Maaf, Coach tak dapat jawab soalan itu. Cuba tanya tentang makanan.', safety_note: '', meal: null, menus: [], quota });

@@ -19,7 +19,8 @@ const cors = (req: Request) => {
   let ok = false;
   try {
     const h = new URL(o).hostname;
-    ok = h === "localhost" || h === "127.0.0.1" || (h.endsWith(".vercel.app") && h.includes("diet")) ||
+    // Production + previews of this Vercel project, plus ALLOWED_ORIGINS (comma-separated, e.g. http://localhost:8000 for testing).
+    ok = (o.startsWith("https://") && (h === "dietpal-blond.vercel.app" || /^dietpal-[a-z0-9-]+-techbite-resources-projects\.vercel\.app$/.test(h))) ||
       (Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map((s) => s.trim()).includes(o);
   } catch { /* no origin */ }
   return {
@@ -38,18 +39,19 @@ const json = (body: unknown, status: number, headers: Record<string, string>) =>
 
 // ---------- config: VAPID keys generated once, kept server-side ----------
 let cfg: Record<string, string> | null = null;
-async function config() {
+async function config(): Promise<Record<string, string>> {
   if (cfg) return cfg;
   const { data } = await db.from("push_config").select("key,value");
-  cfg = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-  if (!cfg.vapid_public || !cfg.vapid_private) {
+  let c: Record<string, string> = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
+  if (!c.vapid_public || !c.vapid_private) {
     const k = webpush.generateVAPIDKeys();
     await db.from("push_config").upsert([{ key: "vapid_public", value: k.publicKey }, { key: "vapid_private", value: k.privateKey }]);
     const { data: again } = await db.from("push_config").select("key,value");   // keep whichever won a race
-    cfg = Object.fromEntries((again || []).map((r) => [r.key, r.value]));
+    c = Object.fromEntries((again || []).map((r) => [r.key, r.value]));
   }
-  webpush.setVapidDetails("mailto:dietpal@users.noreply.github.com", cfg.vapid_public, cfg.vapid_private);
-  return cfg;
+  webpush.setVapidDetails("mailto:dietpal@users.noreply.github.com", c.vapid_public, c.vapid_private);
+  cfg = c;
+  return c;
 }
 
 // ---------- input cleaning ----------
@@ -151,19 +153,47 @@ async function send(row: any, msg: { title: string; body: string; url: string; k
   }
 }
 
+// Walks every subscription in pages (keyset on endpoint, so deletions don't shift pages),
+// sends due reminders CONCURRENCY at a time, and stops starting new sends after BUDGET_MS
+// (anything left is picked up by the next run 15 minutes later).
+const PAGE = 1000, CONCURRENCY = 20, BUDGET_MS = 110_000;
+async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
+}
 async function run() {
-  const { data, error } = await db.from("push_subs").select("*").limit(5000);
-  if (error) throw error;
-  let sentCount = 0;
-  for (const row of data || []) {
-    const msg = due(row);
-    if (!msg) continue;
-    const today = localNow(row.tz).date;
-    const keys = row.sent?.date === today ? [...(row.sent.keys || []), msg.key] : [msg.key];
-    await db.from("push_subs").update({ sent: { date: today, keys, last: Date.now() } }).eq("endpoint", row.endpoint);   // mark first: never double-send
-    if (await send(row, msg) === "ok") sentCount++;
+  const started = Date.now();
+  let checked = 0, sentCount = 0, last = "", stopped = false;
+  while (!stopped) {
+    let q = db.from("push_subs").select("endpoint,p256dh,auth,tz,prefs,status,sent").order("endpoint").limit(PAGE);
+    if (last) q = q.gt("endpoint", last);
+    const { data, error } = await q;
+    if (error) throw error;
+    const rows = data || [];
+    checked += rows.length;
+    const todo = rows.map((row) => ({ row, msg: due(row) })).filter((x) => x.msg);
+    await pool(todo, CONCURRENCY, async ({ row, msg }) => {
+      if (Date.now() - started > BUDGET_MS) { stopped = true; return; }
+      const today = localNow(row.tz).date;
+      const keys = row.sent?.date === today ? [...(row.sent.keys || []), msg!.key] : [msg!.key];
+      await db.from("push_subs").update({ sent: { date: today, keys, last: Date.now() } }).eq("endpoint", row.endpoint);   // mark first: never double-send
+      if (await send(row, msg!) === "ok") sentCount++;
+    });
+    if (rows.length < PAGE) break;
+    last = rows[rows.length - 1].endpoint;
   }
-  return { checked: data?.length || 0, sent: sentCount };
+  const out = { checked, sent: sentCount, stopped, ms: Date.now() - started };
+  console.log("push run", JSON.stringify(out));
+  return out;
+}
+
+// New subscriptions per IP (hashed) per day — stops someone filling the table with fake rows.
+const SUBS_PER_IP_DAY = 20;
+async function ipHash(req: Request) {
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+  const salt = (await config()).cron_secret || "";
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + "|" + ip));
+  return Array.from(new Uint8Array(buf).slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 Deno.serve(async (req) => {
@@ -179,14 +209,26 @@ Deno.serve(async (req) => {
     if (body.action === "run") {   // pg_cron only
       const secret = (await config()).cron_secret;
       if (!secret || req.headers.get("x-cron-secret") !== secret) return json({ error: "forbidden" }, 403, c.headers);
-      return json(await run(), 200, c.headers);
+      // Answer the scheduler at once (pg_net waits 30 s at most) and keep sending in the background.
+      const job = run().catch((e) => console.error("push run failed", (e as Error)?.message));
+      // deno-lint-ignore no-explicit-any
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) { rt.waitUntil(job); return json({ started: true }, 202, c.headers); }
+      return json(await job, 200, c.headers);
     }
     if (!c.ok) return json({ error: "origin" }, 403, c.headers);
 
     const endpoint = String(body.sub?.endpoint || body.endpoint || "");
     if (body.action === "subscribe") {
       if (!validSub(body.sub)) return json({ error: "bad_subscription" }, 400, c.headers);
-      const { error } = await db.from("push_subs").upsert({
+      const ip = await ipHash(req);
+      const { data: known } = await db.from("push_subs").select("endpoint").eq("endpoint", endpoint).maybeSingle();
+      if (!known) {   // re-subscribing the same phone is always allowed
+        const since = new Date(Date.now() - 864e5).toISOString();
+        const { count } = await db.from("push_subs").select("endpoint", { count: "exact", head: true }).eq("ip_hash", ip).gte("created_at", since);
+        if ((count || 0) >= SUBS_PER_IP_DAY) return json({ error: "too_many" }, 429, c.headers);
+      }
+      const { error } = await db.from("push_subs").upsert({ ip_hash: ip,
         endpoint, p256dh: body.sub.keys.p256dh, auth: body.sub.keys.auth, tz: cleanTz(body.tz),
         prefs: cleanPrefs(body.prefs), status: cleanStatus(body.status), updated_at: new Date().toISOString(),
       });
@@ -211,6 +253,8 @@ Deno.serve(async (req) => {
     if (body.action === "test") {
       const { data } = await db.from("push_subs").select("*").eq("endpoint", endpoint).maybeSingle();
       if (!data) return json({ error: "unknown" }, 404, c.headers);
+      if (data.sent?.test && Date.now() - data.sent.test < 60_000) return json({ error: "too_soon" }, 429, c.headers);   // 1 test a minute
+      await db.from("push_subs").update({ sent: { ...(data.sent || {}), test: Date.now() } }).eq("endpoint", endpoint);
       return json({ result: await send(data, { title: "Ujian DietPal", body: "Notifikasi berfungsi.", url: "./" }) }, 200, c.headers);
     }
     return json({ error: "bad_request" }, 400, c.headers);

@@ -93,3 +93,9 @@ grant execute on function public.coach_usage_add(text, text[], integer, integer)
 -- Daily 03:00 MYT: drop rows not used for 2 days.
 select cron.schedule('dietpal-coach-cleanup', '0 19 * * *',
   $$ delete from public.coach_usage where updated_at < now() - interval '2 days' $$);
+
+-- ============================================================
+-- Per-IP limit on new push subscriptions (migration "push_ip_limit", see supabase/migrations/20261105_push_ip_limit.sql).
+-- ============================================================
+alter table public.push_subs add column if not exists ip_hash text;   -- sha256(cron_secret | ip), first 16 bytes
+create index if not exists push_subs_ip_created_idx on public.push_subs (ip_hash, created_at);
