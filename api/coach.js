@@ -1,6 +1,6 @@
 // DietPal — Coach AI (Vercel serverless function)
 // Reads OPENAI_API_KEY (required) and OPENAI_MODEL (optional) from Vercel environment variables.
-// Token quota: SUPABASE_URL, SUPABASE_ANON_KEY, COACH_QUOTA_SECRET (+ optional COACH_* limits, see README).
+// Token quota: SUPABASE_URL, SUPABASE_SECRET_KEY (or legacy SUPABASE_ANON_KEY), COACH_QUOTA_SECRET (+ optional COACH_* limits, see README).
 // The key never reaches the browser or the repo.
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
@@ -14,7 +14,8 @@ const hits = new Map();   // best-effort, per server instance — used only when
 // Counted per device id AND per IP (hashed); the IP budget is larger because many phones can share one IP.
 const QUOTA = {
   url: String(process.env.SUPABASE_URL || '').replace(/\/+$/, ''),
-  key: process.env.SUPABASE_ANON_KEY || '',
+  // Server-only secret key (sb_secret_…) is preferred: then coach_usage_add needs no public (anon) access at all.
+  key: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || '',
   secret: process.env.COACH_QUOTA_SECRET || '',
   windowSec: Math.round(Number(process.env.COACH_WINDOW_MIN || 15) * 60),
   perWindow: Number(process.env.COACH_TOKENS_WINDOW || 8000),
@@ -140,7 +141,7 @@ async function quotaAdd(keys, tokens) {
   const timer = setTimeout(() => ctrl.abort(), 4000);
   try {
     const headers = { 'Content-Type': 'application/json', apikey: QUOTA.key };
-    if (!QUOTA.key.startsWith('sb_')) headers.Authorization = `Bearer ${QUOTA.key}`;   // legacy anon JWT
+    if (!QUOTA.key.startsWith('sb_')) headers.Authorization = `Bearer ${QUOTA.key}`;   // legacy JWT keys (anon / service_role)
     const r = await fetch(`${QUOTA.url}/rest/v1/rpc/coach_usage_add`, {
       method: 'POST', signal: ctrl.signal, headers,
       body: JSON.stringify({ p_secret: QUOTA.secret, p_keys: keys, p_add: Math.round(tokens) || 0, p_window: QUOTA.windowSec })

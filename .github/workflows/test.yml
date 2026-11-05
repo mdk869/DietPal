@@ -1,0 +1,31 @@
+name: Ujian
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: Semak sintaks JS
+        run: for f in app.js foods.js sw.js api/coach.js; do node --check "$f"; done
+
+      - name: Ujian unit (app & Coach AI)
+        run: node --test tests/*.test.js
+
+      - name: app.css sepadan dengan kelas dalam kod
+        run: |
+          npx -y tailwindcss@3.4.19 -i src/app.input.css -o /tmp/app.css --minify
+          if ! cmp -s app.css /tmp/app.css; then
+            echo "::error::app.css lapuk. Jalankan: npx tailwindcss@3 -i src/app.input.css -o app.css --minify"
+            exit 1
+          fi
+
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.x }
+      - name: Semak jenis fungsi Supabase push
+        run: deno check supabase/functions/push/index.ts

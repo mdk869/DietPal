@@ -23,6 +23,7 @@ const DEFAULTS = {
   },
   push: { on: false, asked: false, cardDone: false, endpoint: '' },
   dismissed: { date: '', ids: [] },
+  backup: { lastAt: 0, snoozeAt: 0 },   // last backup download; backup reminder snoozed until
   days: {},          // { 'YYYY-MM-DD': { meals: [...], water: ml } }
   weights: [],       // [{ date, kg }]
   customFoods: []
@@ -135,8 +136,10 @@ function sanitizeState(d) {
     const water = n(f.water, 0, 5000); if (water) out.water = Math.round(water);
     return out;
   }).filter(Boolean);
+  const bk = obj(src.backup);
+  const backup = { lastAt: n(bk.lastAt, 0, 9e15, 0), snoozeAt: n(bk.snoozeAt, 0, 9e15, 0) };
   const dm = obj(src.dismissed);
-  const out = { profile, settings, push, days, weights, customFoods,
+  const out = { profile, settings, push, days, weights, customFoods, backup,
     dismissed: { date: DATE.test(dm.date) ? dm.date : '', ids: arr(dm.ids, 50).filter(x => typeof x === 'string' && ID.test(x)) } };
   const sp = obj(src.sugPrefs);
   if (src.sugPrefs) out.sugPrefs = { loc: oneOf(sp.loc, ['rumah', 'luar'], 'rumah'),
@@ -1274,16 +1277,32 @@ function quotaNote(q) {
 }
 UI.ai = { q: '', loading: false, result: null, error: '', logged: {} };
 // Safety net: flag AI items whose names hint at something the user avoids
+// Whole words / phrases only ("tuna" won't match inside another word). Dishes that usually hide an
+// ingredient are listed too (nasi lemak → ikan bilis, sate → kuah kacang, teh tarik → susu pekat).
 const TAG_WORDS = {
-  ayam: ['ayam', 'chicken'], daging: ['daging', 'lembu', 'kambing', 'rendang', 'beef', 'burger daging'],
-  ikan: ['ikan', 'tuna', 'sardin', 'bilis', 'salmon', 'yong tau'], laut: ['udang', 'sotong', 'ketam', 'kerang', 'belacan', 'seafood', 'cencaru'],
-  kacang: ['kacang', 'badam', 'peanut', 'satay sauce'], telur: ['telur', 'egg'], susu: ['susu', 'yogurt', 'keju', 'cheese', 'mentega', 'butter'],
-  pedas: ['pedas', 'sambal', 'cili', 'chili', 'masak merah', 'kari']
+  ayam: ['ayam', 'chicken'],
+  daging: ['daging', 'lembu', 'kambing', 'beef', 'mutton', 'rendang', 'kurma daging', 'burger daging', 'bebola daging'],
+  ikan: ['ikan', 'tuna', 'sardin', 'bilis', 'salmon', 'keli', 'tilapia', 'kembung', 'yong tau', 'nasi lemak', 'laksa', 'asam pedas'],
+  laut: ['udang', 'sotong', 'ketam', 'kerang', 'belacan', 'cencaru', 'seafood', 'sambal belacan', 'cincalok', 'budu', 'mee udang'],
+  kacang: ['kacang', 'badam', 'peanut', 'gajus', 'sate', 'satay', 'kuah kacang', 'gado-gado', 'rojak', 'pecal'],
+  telur: ['telur', 'egg', 'mayonis', 'mayo', 'roti telur', 'kuey teow goreng'],
+  susu: ['susu', 'yogurt', 'keju', 'cheese', 'mentega', 'butter', 'teh tarik', 'milo', 'latte', 'cappuccino', 'aiskrim', 'kopi susu', 'teh susu'],
+  pedas: ['pedas', 'sambal', 'cili', 'chili', 'masak merah', 'kari', 'asam pedas', 'tomyam', 'tom yam']
 };
-function aiConflicts(name) {
-  const n = String(name).toLowerCase(), a = avoidSet();
-  return Object.keys(TAG_WORDS).filter(t => a.has(t) && TAG_WORDS[t].some(w => n.includes(w)));
+// A word only counts when the dish isn't clearly something else: "rendang ayam" is chicken, not beef.
+const TAG_UNLESS = { daging: /\b(ayam|ikan|udang|sotong|tauhu|tempe|sayur|telur)\b/ };
+const TAG_RE = Object.fromEntries(Object.entries(TAG_WORDS).map(([t, ws]) =>
+  [t, new RegExp(`(^|[^a-z])(${ws.map(w => w.replace(/[-]/g, '\\$&')).join('|')})(?=$|[^a-z])`, 'i')]));
+function nameTags(name) {
+  const n = String(name).toLowerCase();
+  return Object.keys(TAG_RE).filter(t => {
+    if (!TAG_RE[t].test(n)) return false;
+    // daging matched only through "rendang"/"kurma": skip when another protein is named
+    if (TAG_UNLESS[t] && !/\b(daging|lembu|kambing|beef|mutton)\b/.test(n) && TAG_UNLESS[t].test(n)) return false;
+    return true;
+  });
 }
+function aiConflicts(name) { const a = avoidSet(); return nameTags(name).filter(t => a.has(t)); }
 
 function sheetAI(meal = UI.sug.meal) {
   UI.ai = { q: '', meal, loading: false, result: null, error: '', logged: {}, pickFor: null };
@@ -1427,7 +1446,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.3';
+const APP_VERSION = '1.6.4';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1527,7 +1546,16 @@ function reminders() {
     const expected = Math.max(0, Math.min(1, (h - 7) / 14)) * S.profile.waterGoal;
     if (d.water < expected - 500) out.push({ id: 'water-' + Math.floor(h / 2), icon: 'droplet', text: `Air baru ${fmt(d.water)} ml. Minum segelas sekarang.`, btn: '+250 ml', act: 'data-act="water" data-ml="250"' });
   }
+  if (backupDue()) out.push({ id: 'backup', icon: 'download', text: 'Data hanya ada dalam telefon ini. Simpan backup supaya tak hilang bila tukar atau reset telefon.', btn: 'Backup', act: 'data-act="export"' });
   return out.filter(x => !dis.includes(x.id));
+}
+// Backup nudge: after a week of use, then every 30 days since the last backup (snoozed 7 days when closed).
+function backupDue(now = Date.now()) {
+  const b = S.backup || {}, day = 864e5;
+  const since = S.profile.setupAt || 0;
+  if (!since || now - since < 7 * day) return false;
+  if (b.snoozeAt && now - b.snoozeAt < 7 * day) return false;
+  return !b.lastAt || now - b.lastAt > 30 * day;
 }
 function remindersBlock() {
   const list = reminders(); if (!list.length) return '';
@@ -1800,7 +1828,7 @@ function viewSettings() {
       <button data-act="exportCsv" class="tap col-span-2 btn btn-secondary py-2.5 text-[14px]">${icon('download', 'w-4 h-4')}Export CSV (makanan, air, berat)</button>
     </div>
     <button data-act="reset" class="tap mt-2 w-full btn btn-danger py-2.5 text-[14px]">Padam semua data</button>
-    <p class="text-[12px] text-slate-500 mt-1">Semua data disimpan dalam telefon ini sahaja. Buat backup sekali-sekala.</p>`)}
+    <p class="text-[12px] text-slate-500 mt-1">Semua data disimpan dalam telefon ini sahaja. ${S.backup?.lastAt ? `Backup terakhir: ${niceDate(todayKey(new Date(S.backup.lastAt)))}.` : '<b>Belum pernah backup.</b>'}</p>`)}
 
   ${card(`<div class="font-bold text-[16px] mb-1">Tentang DietPal</div>
     <div class="text-[13px] text-slate-600">Versi ${APP_VERSION}</div>
@@ -1882,7 +1910,10 @@ function handleProfileAction(a, el) {
     case 'setTheme': st.theme = el.dataset.v; save(); applyTheme(); render(); return true;
     case 'setText': st.textSize = el.dataset.v; save(); applyTheme(); render(); return true;
     case 'remToggle': st.reminders[el.dataset.k] = !st.reminders[el.dataset.k]; save(); render(); return true;
-    case 'dismissRem': dismissedToday().push(el.dataset.id); save(); render(); return true;
+    case 'dismissRem':
+      if (el.dataset.id === 'backup') S.backup = { ...S.backup, snoozeAt: Date.now() };   // ask again in a week
+      else dismissedToday().push(el.dataset.id);
+      save(); render(); return true;
     case 'exportCsv': exportCsv(); return true;
   }
   return false;
@@ -1952,6 +1983,7 @@ document.addEventListener('click', (e) => {
     case 'saveWeight': {
       const kg = parseFloat(document.getElementById('wKg').value), date = document.getElementById('wDate').value || todayKey();
       if (!(kg > 30 && kg < 300)) { toast('Masukkan berat yang betul'); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > todayKey() || date < '2000-01-01') { toast('Tarikh tak boleh selepas hari ini'); return; }
       const before = currentWeight();
       S.weights = S.weights.filter(w => w.date !== date); S.weights.push({ date, kg: Math.round(kg * 10) / 10 }); recalcTargets(); save();
       const hit = S.profile.milestones.find(m => before > m.kg && currentWeight() <= m.kg);
@@ -1965,9 +1997,10 @@ document.addEventListener('click', (e) => {
     case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
     case 'closeSheet': closeSheet(); render(); break;
     case 'export': {
+      S.backup = { ...S.backup, lastAt: Date.now() }; save();
       const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob); const link = document.createElement('a');
-      link.href = url; link.download = `dietpal-backup-${todayKey()}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); break;
+      link.href = url; link.download = `dietpal-backup-${todayKey()}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); render(); break;
     }
     case 'reset': if (confirm('Padam SEMUA data? Tindakan ini tak boleh diundur.')) {
       // Stop server reminders first, otherwise the old subscription keeps sending them after the reset
