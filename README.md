@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.6.4
+**Versi semasa:** 1.6.5
 
 ## Ciri utama
 
@@ -52,7 +52,7 @@ tailwind.config.js, src/app.input.css   Sumber untuk jana app.css
 tests/          Ujian unit (node --test): data backup, pengesanan pantang, kuota & origin Coach AI
 .github/workflows/test.yml   CI: sintaks, ujian, app.css terkini, deno check fungsi push
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v17, terima & buka notifikasi)
+sw.js           Service worker (cache dietpal-v18, terima & buka notifikasi)
 vercel.json     Fungsi Vercel (maxDuration 60 s) + header keselamatan (CSP dll.)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
