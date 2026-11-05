@@ -67,3 +67,10 @@ test('presets live in the (cacheable) system message; phone sends only own foods
   assert.doesNotMatch(user.content, /Nasi putih 1 senduk/);
   assert.match(buildUserMessage({ question: 'x', context: { catalog: [{ name: 'Kuih', unit: '1 biji', kcal: 100 }] } }), /Makanan sendiri pengguna.*Kuih 1 biji 100/);
 });
+
+test('Coach AI sees today\'s plate balance', () => {
+  const msg = buildUserMessage({ question: 'x', context: { eatenToday: [
+    { name: 'Nasi putih', kcal: 260, plate: 'karbo', qty: 2 }, { name: 'Ayam goreng', kcal: 290, plate: 'protein' }, { name: 'Teh tarik', kcal: 150, plate: '<b>' }] } });
+  assert.match(msg, /Imbangan pinggan hari ini: sayur & buah 0, protein 1, karbo 2, hidangan campur \/ minuman 1/);
+  assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Imbangan pinggan/);
+});

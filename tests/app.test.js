@@ -81,3 +81,14 @@ test('CSP connect-src allows every host the service worker fetches (it runs unde
   const hosts = [...html.matchAll(/https:\/\/(fonts\.[a-z.]+)/g)].map(m => m[1]);
   for (const h of new Set([...hosts, 'fonts.gstatic.com'])) assert(connect.includes('https://' + h), `connect-src missing ${h}`);
 });
+
+test('plateGap: flags missing veg / protein, but not on mixed-dish days', () => {
+  const { plateGap } = load(['plateCounts', 'plateGap']);
+  const day = (...ms) => ({ meals: ms.map(([plate, kcal = 150, qty = 1]) => ({ plate, kcal, qty })) });
+  assert.equal(plateGap(day(['karbo'], ['protein'])), 'sayur');
+  assert.equal(plateGap(day(['karbo'], ['protein'], ['serat'])), '');
+  assert.equal(plateGap(day(['karbo'], ['karbo'], ['serat'])), 'protein');
+  assert.equal(plateGap(day(['karbo'], ['karbo'], ['serat'], ['lain', 400])), '');   // nasi lemak: contents unknown
+  assert.equal(plateGap(day(['karbo'], ['karbo'], ['serat'], ['lain', 5])), 'protein'); // kopi O doesn't count as a dish
+  assert.equal(plateGap(day()), '');
+});

@@ -249,6 +249,15 @@ function plateCounts(d) {
   d.meals.forEach(m => { c[m.plate || 'lain'] += (m.qty || 1); });
   return c;
 }
+// What today's plate is missing: 'sayur', 'protein' or ''. Mixed dishes (nasi lemak, mee goreng…) are
+// logged as 'lain', so a day with one isn't nagged about protein — we can't tell what's inside it.
+function plateGap(d, pc = plateCounts(d)) {
+  const mains = pc.karbo + pc.protein;
+  if (mains >= 2 && pc.serat < 1) return 'sayur';
+  const hasDish = d.meals.some(m => (m.plate || 'lain') === 'lain' && m.kcal >= 200);
+  if (pc.karbo >= 2 && pc.protein < 1 && !hasDish) return 'protein';
+  return '';
+}
 
 /* ============================================================
    AI COACH (rule-based)
@@ -259,15 +268,20 @@ function coach() {
   const greet = h < 12 ? 'Selamat pagi' : h < 15 ? 'Selamat tengah hari' : h < 19 ? 'Selamat petang' : 'Selamat malam';
   const name = p.name ? ', ' + esc(p.name) : '';
   const expectedWater = Math.max(0, Math.min(1, (h - 7) / 14)) * p.waterGoal;
-  const pc = plateCounts(d);
+  const pc = plateCounts(d), gap = plateGap(d, pc);
   let msg, mood = '';
 
   if (k > p.kcalMax) { msg = `Hari ini lebih ${fmt(k - p.kcalMax)} kcal dari sasaran. Tak apa — ini bahagian "20" dalam 80/20. Esok sambung macam biasa, tak perlu ganti dengan makan terlalu sikit.`; }
   else if (h >= 19 && k > 0 && k < 1200) { msg = `Kalori hari ini baru ${fmt(k)} kcal — terlalu rendah boleh buat pening. Makan malam yang cukup ya: nasi 1 senduk + lauk + sayur.`; }
   else if (!d.meals.length && h < 11) { msg = 'Mulakan hari dengan sarapan berprotein — contoh 2 biji telur rebus + 2 keping roti gandum. Jangan skip sarapan, nanti lapar teruk waktu tengah hari.'; }
   else if (!S.settings.reminders.water && d.water < expectedWater - 500) { msg = `Air baru ${fmt(d.water)} ml. Minum segelas sekarang — kurang air antara punca pening dan rasa lapar palsu.`; }
-  else if (k >= p.kcalMin && k <= p.kcalMax) { msg = `Mantap! ${fmt(k)} kcal — tepat dalam sasaran. Konsisten macam ni yang bawa hasil.`; }
-  else if (pc.karbo + pc.protein >= 2 && pc.serat < 1) { msg = 'Hari ini belum ada sayur lagi. Separuh pinggan sayur — ulam pun dikira!'; }
+  else if (k >= p.kcalMin && k <= p.kcalMax) {
+    msg = gap === 'sayur' ? `${fmt(k)} kcal — dalam sasaran. Tapi hari ini belum ada sayur lagi. ${h < 19 ? 'Tambah sayur atau ulam waktu makan seterusnya — kalorinya rendah.' : 'Esok cuba isi separuh pinggan dengan sayur, ulam pun dikira!'}`
+      : gap === 'protein' ? `${fmt(k)} kcal — dalam sasaran. Tapi protein hari ini masih kurang. Esok pilih lauk protein — telur, ikan, ayam atau tauhu — supaya lebih kenyang.`
+      : `Mantap! ${fmt(k)} kcal — tepat dalam sasaran, pinggan pun seimbang. Konsisten macam ni yang bawa hasil.`;
+  }
+  else if (gap === 'sayur') { msg = 'Hari ini belum ada sayur lagi. Separuh pinggan sayur — ulam pun dikira!'; }
+  else if (gap === 'protein') { msg = 'Protein hari ini masih kurang. Waktu makan seterusnya, tambah telur, ikan, ayam atau tauhu — lebih kenyang dan jaga otot.'; }
   else { msg = `Baki ${fmt(Math.max(0, p.kcalMax - k))} kcal untuk hari ini. Makan perlahan, dahulukan sayur dan protein.`; }
   return { greet: greet + name, msg, mood };
 }
@@ -1227,7 +1241,7 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
     meal, location: general ? null : UI.sug.loc, venue: !general && UI.sug.loc === 'luar' ? UI.sug.venue : null,
     remainingKcal: (p.kcalMax || 0) - kcalOf(d),
     nowMeal: guessMeal(), mealTargets: Object.fromEntries(MEALS.map(m => [m.id, mealTarget(m.id).ideal])), dailyRange: [p.kcalMin, p.kcalMax], minDailyKcal: kcalFloor(p),
-    eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal })),
+    eatenToday: d.meals.map(m => ({ meal: m.meal, name: m.name, kcal: m.kcal, plate: m.plate || 'lain', qty: m.qty || 1 })),
     avoid: p.avoid || [], allergies: p.allergies || [], noSpicy: !!p.noSpicy,
     health: S.settings.ai?.health === false ? [] : (p.health || []),   // user can choose not to share health notes
     // The app presets (foods.js) already live on the server; only the user's own foods are sent.
@@ -1446,7 +1460,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.6.5';
+const APP_VERSION = '1.6.6';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },

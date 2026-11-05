@@ -43,6 +43,7 @@ UTAMAKAN SOALAN PENGGUNA
 - Jangan ulang nota kesihatan atau pantang pengguna dalam setiap jawapan — patuhi secara senyap. Sebut hanya jika ia memang berkait dengan soalan.
 - Jangan sebut "di luar" atau "di rumah" melainkan soalan atau tetapan app menyatakannya. Tetapan "di rumah" → cadang masakan rumah, bukan kedai.
 - Soalan tentang data hari ini (cth: "berapa kalori saya makan hari ini?") → guna angka dari konteks app sahaja, jangan kira semula.
+- Kalori bukan satu-satunya ukuran. Jika imbangan pinggan hari ini kurang sayur atau protein, sebut ringkas dalam "reply" (satu ayat) walaupun kalori dalam sasaran, dan utamakan menu yang menampung kekurangan itu. Jangan tegur jika kebanyakan makanan ialah hidangan campur — isinya tidak diketahui.
 
 CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
 - Beri 2–3 hidangan SEBENAR yang memang biasa dipesan atau dimasak di tempat itu di Malaysia (cth di mamak: "Nasi kandar ikan bakar", "Roti telur + dal", "Mee hoon sup"). Nama menu = nama hidangan yang orang kenal.
@@ -206,6 +207,14 @@ const EMERGENCY = {
   meal: 'tiada', menus: []
 };
 
+// Servings per plate group from the phone's log; "lain" = mixed dishes and drinks (contents unknown).
+const PLATE_LABEL = { serat: 'sayur & buah', protein: 'protein', karbo: 'karbo', lain: 'hidangan campur / minuman' };
+function plateSummary(list) {
+  const c = { serat: 0, protein: 0, karbo: 0, lain: 0 };
+  list.forEach(x => { const k = PLATE_LABEL[x?.plate] ? x.plate : 'lain'; const q = Number(x?.qty); c[k] += Number.isFinite(q) ? Math.min(10, Math.max(0.25, q)) : 1; });
+  return Object.entries(c).map(([k, v]) => `${PLATE_LABEL[k]} ${Math.round(v * 10) / 10}`).join(', ') + ' (bilangan hidangan)';
+}
+
 // Only whitelisted, size-limited fields reach the model.
 function buildUserMessage(body) {
   const c = body.context || {};
@@ -227,6 +236,7 @@ function buildUserMessage(body) {
   const range = Array.isArray(c.dailyRange) ? c.dailyRange.map(v => num(v, 800, 5000)) : [];
   if (range[0] && range[1]) lines.push(`Sasaran kalori harian: ${range[0]}–${range[1]} kcal.`);
   lines.push(`Sudah dimakan hari ini: ${eaten.length ? `${eaten.join(', ')}. JUMLAH: ${total} kcal` : 'belum ada'}.`);
+  if (list.length) lines.push(`Imbangan pinggan hari ini: ${plateSummary(list)}.`);
   const avoid = [...pick(c.avoid, AVOID), ...pick(c.allergies, ALLERGY), ...(c.noSpicy ? ['makanan pedas'] : [])];
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
@@ -425,4 +435,4 @@ module.exports = async function handler(req, res) {
 };
 
 // exported for local tests
-module.exports._test = { quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
+module.exports._test = { plateSummary, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
