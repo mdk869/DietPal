@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.6.3
+**Versi semasa:** 1.6.4
 
 ## Ciri utama
 
@@ -31,6 +31,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 
 **Tetapan**
 - Tema cerah / gelap / ikut telefon, saiz teks, waktu makan biasa, jenis peringatan (log makan, air, timbang, ringkasan malam), status notifikasi dan butang *Hantar notifikasi ujian*.
+- Peringatan backup dalam app: selepas seminggu guna, kemudian setiap 30 hari sejak backup terakhir (tutup = tanya semula seminggu lagi). Kad Data papar tarikh backup terakhir.
 - Backup / restore (JSON), export CSV (makanan, air, berat), padam semua data. Data yang dipulihkan disemak medan demi medan (jenis, julat, panjang) dan medan asing dibuang; alamat notifikasi telefon lama tidak dibawa. *Padam semua data* turut mematikan notifikasi di server.
 
 ## Teknologi
@@ -48,13 +49,21 @@ app.js          Logik app: data menu, enjin cadangan, profil & tetapan, ikon, Co
 foods.js        69 preset makanan Malaysia — dikongsi app & api/coach.js
 app.css         CSS Tailwind yang dijana (jangan edit terus)
 tailwind.config.js, src/app.input.css   Sumber untuk jana app.css
+tests/          Ujian unit (node --test): data backup, pengesanan pantang, kuota & origin Coach AI
+.github/workflows/test.yml   CI: sintaks, ujian, app.css terkini, deno check fungsi push
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v16, terima & buka notifikasi)
+sw.js           Service worker (cache dietpal-v17, terima & buka notifikasi)
 vercel.json     Fungsi Vercel (maxDuration 60 s) + header keselamatan (CSP dll.)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
 icons/          Ikon 192, 512, maskable, apple-touch-icon
 ```
+
+## Ujian
+```bash
+node --test tests/*.test.js
+```
+CI (GitHub Actions) menjalankan ujian ini, semak sintaks, pastikan `app.css` sepadan dengan kelas dalam kod, dan `deno check` fungsi push pada setiap PR.
 
 ## Jalankan secara lokal
 ```bash
@@ -99,7 +108,8 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
 | `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`). |
 | `SUPABASE_URL` | Ya | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
-| `SUPABASE_ANON_KEY` | Ya | Publishable key projek Supabase **dietpal** (bukan rahsia). |
+| `SUPABASE_SECRET_KEY` | Disyorkan | *Secret key* projek Supabase **dietpal** (`sb_secret_…`, Project Settings → API Keys). Bila diset, fungsi kuota tak perlu akses awam — lepas itu pasang migration `supabase/migrations/20261105_coach_usage_private.sql`. |
+| `SUPABASE_ANON_KEY` | Jika tiada secret key | Publishable key (cara lama). Diabaikan bila `SUPABASE_SECRET_KEY` diset. |
 | `COACH_QUOTA_SECRET` | Ya | Rahsia `coach_secret` dalam jadual `push_config` (lihat di bawah). |
 | `COACH_TOKENS_WINDOW` | Tidak | Bajet token setiap telefon dalam satu tempoh (lalai: 8000). |
 | `COACH_WINDOW_MIN` | Tidak | Panjang tempoh dalam minit (lalai: 15). |
