@@ -18,7 +18,7 @@ const DEFAULTS = {
   settings: {
     theme: 'light', textSize: 'normal',
     mealTimes: { sarapan: '07:30', tengahari: '13:00', malam: '20:00' },
-    reminders: { water: true, meals: true, weigh: true, summary: true, weighDay: 1 },
+    reminders: { water: true, meals: true, weigh: true, summary: true, tips: true, weighDay: 1 },
     ai: { consent: false, consentAt: 0, health: true, scanConsent: false }   // Coach AI / Scan makanan: each asked once before first use
   },
   push: { on: false, asked: false, cardDone: false, endpoint: '' },
@@ -105,7 +105,7 @@ function sanitizeState(d) {
     theme: oneOf(st.theme, ['light', 'dark', 'auto'], bs.theme), textSize: oneOf(st.textSize, ['normal', 'big'], bs.textSize),
     mealTimes: Object.fromEntries(Object.entries(bs.mealTimes).map(([k, v]) => [k, HHMM.test(mt[k]) ? mt[k] : v])),
     reminders: { water: rm.water !== false, meals: rm.meals !== false, weigh: rm.weigh !== false, summary: rm.summary !== false,
-      weighDay: Math.round(n(rm.weighDay, 0, 6, bs.reminders.weighDay)) },
+      tips: rm.tips !== false, weighDay: Math.round(n(rm.weighDay, 0, 6, bs.reminders.weighDay)) },
     ai: { consent: obj(st.ai).consent === true, consentAt: n(obj(st.ai).consentAt, 0, 9e15, 0), health: obj(st.ai).health !== false,
       scanConsent: obj(st.ai).scanConsent === true }
   };
@@ -142,6 +142,15 @@ function sanitizeState(d) {
   const dm = obj(src.dismissed);
   const out = { profile, settings, push, days, weights, customFoods, backup,
     dismissed: { date: DATE.test(dm.date) ? dm.date : '', ids: arr(dm.ids, 50).filter(x => typeof x === 'string' && ID.test(x)) } };
+  if (src.tips) {   // Tips hari ini (v1.8): today's & tomorrow's pick, history, saved, votes, unsent votes
+    const tp = obj(src.tips), WHY = /^[a-zA-Z]{0,12}$/;
+    const pick = v => { v = obj(v); return DATE.test(v.date) && ID.test(v.id) ? { date: v.date, id: v.id, why: WHY.test(v.why) ? v.why || '' : '' } : null; };
+    const map = (v, max, ok) => Object.fromEntries(Object.entries(obj(v)).filter(([k, x]) => ID.test(k) && ok(x)).slice(-max));
+    out.tips = { day: pick(tp.day), next: pick(tp.next), hidden: DATE.test(tp.hidden) ? tp.hidden : '',
+      seen: map(tp.seen, 300, x => DATE.test(x)), votes: map(tp.votes, 300, x => x === 1 || x === -1),
+      saved: [...new Set(arr(tp.saved, 200).filter(x => typeof x === 'string' && ID.test(x)))],
+      fbq: arr(tp.fbq, 50).map(obj).filter(x => ID.test(x.id) && [1, 0, -1].includes(x.v)).map(x => ({ id: x.id, v: x.v, why: WHY.test(x.why) ? x.why || '' : '' })) };
+  }
   const sp = obj(src.sugPrefs);
   if (src.sugPrefs) out.sugPrefs = { loc: oneOf(sp.loc, ['rumah', 'luar'], 'rumah'),
     venue: oneOf(sp.venue, ['gerai', 'mamak', 'campur', 'kopitiam', 'segera', 'kenduri', 'kedai'], 'mamak') };
@@ -189,6 +198,10 @@ const IC = {
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  thumbUp: '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>',
+  thumbDown: '<path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   // symptoms
   dizzy: '<path d="M21 12a9 9 0 1 1-6.2-8.6"/><path d="M16.5 12a4.5 4.5 0 1 1-3.2-4.3"/><circle cx="12" cy="12" r="1"/>',
   pulse: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
@@ -208,6 +221,7 @@ const IC = {
 function icon(name, cls = 'w-5 h-5', sw = 2) {
   return `<svg class="${cls} shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[name] || ''}</svg>`;
 }
+const iconFill = (name, cls) => icon(name, cls).replace('fill="none"', 'fill="currentColor"');
 const MEAL_ICON = { sarapan: 'sunrise', tengahari: 'sun', malam: 'moon', snek: 'apple' };
 
 /* ============================================================
@@ -405,6 +419,8 @@ function viewHome() {
 
   ${remindersBlock()}
 
+  ${tipCard()}
+
   ${homeSuggest(c)}
 
   ${waterCard()}
@@ -555,6 +571,154 @@ function weightCard() {
     </div>
     ${spark}
   </section>`;
+}
+
+/* ---------- TIPS HARI INI (v1.8) ---------- */
+// One tip a day, picked on this phone (tips.js) from signals in the log — no AI, no cost. Tomorrow's pick is made in
+// advance and sent with the reminder status, so the lunchtime notification and tomorrow's Home card are the same tip.
+function tipState() { if (!S.tips) S.tips = { day: null, next: null, hidden: '', seen: {}, votes: {}, saved: [], fbq: [] }; return S.tips; }
+function addDays(k, n) { const d = parseKey(k); d.setDate(d.getDate() + n); return todayKey(d); }
+// What the log says about the 3 days before `dk` (plus weights & season-independent signals). See TIP_WHY in tips.js.
+function tipSignals(dk = todayKey()) {
+  const p = S.profile, sig = new Set();
+  const prev = [1, 2, 3].map(i => peekDay(addDays(dk, -i)));
+  const logged = prev.filter(d => d.meals.length >= 2);   // a day with 0–1 items logged says nothing about the diet
+  const most = f => logged.length >= 2 && logged.filter(f).length >= 2;
+  if (most(d => kcalOf(d) < p.kcalMin)) sig.add('under');
+  if (most(d => kcalOf(d) > p.kcalMax)) sig.add('over');
+  // 'lain' = own food / AI menu we can't break down: don't call protein or veg low on those days
+  if (most(d => { const c = plateCounts(d); return c.protein < 1.5 && c.lain < 1; })) sig.add('lowProtein');
+  if (most(d => { const c = plateCounts(d); return c.serat < 1 && c.lain < 1; })) sig.add('lowVeg');
+  if (logged.filter(d => d.meals.filter(isSweetMeal).reduce((a, m) => a + m.kcal, 0) >= 100).length >= 2) sig.add('sweet');
+  if (most(d => (d.water || 0) < p.waterGoal * 0.6)) sig.add('lowWater');
+  if (!prev[0].meals.length && !prev[1].meals.length && Array.from({ length: 12 }, (_, i) => peekDay(addDays(dk, -3 - i))).some(d => d.meals.length)) sig.add('lapse');
+  const wd = parseKey(dk).getDay();
+  if (wd === 5 || wd === 6) {   // Friday / Saturday: was last weekend over target?
+    const sat = addDays(dk, -(wd + 1));
+    if ([sat, addDays(sat, 1)].some(k => { const d = peekDay(k); return d.meals.length >= 2 && kcalOf(d) > p.kcalMax; })) sig.add('weekend');
+  }
+  const ws = sortedWeights().filter(w => w.date <= dk), last = ws[ws.length - 1];
+  if (last && tipDayDiff(last.date, dk) <= 3) {
+    const before = ws.filter(w => { const g = tipDayDiff(w.date, last.date); return g >= 5 && g <= 14; });
+    if (before.length && last.kg - before[0].kg >= 1) sig.add('gain');
+  }
+  const recent = ws.filter(w => tipDayDiff(w.date, dk) <= 21);
+  if (recent.length >= 3 && tipDayDiff(recent[0].date, dk) >= 14) {
+    const kg = recent.map(w => w.kg);
+    if (Math.max(...kg) - Math.min(...kg) <= 0.5 && (!p.targetWeight || last.kg > p.targetWeight + 0.5)) sig.add('plateau');
+  }
+  if (p.setupAt && dk <= todayKey(new Date(p.setupAt + 6 * 864e5))) sig.add('newbie');
+  return sig;
+}
+function tipFor(dk, exclude, lastWhy) {
+  const t = tipState();
+  return pickTip({ date: dk, signals: tipSignals(dk), seen: t.seen, votes: t.votes, avoid: avoidSet(), exclude, lastWhy });
+}
+// Today's tip: fixed for the whole day (picked on first look, or yesterday's advance pick).
+function todayTip() {
+  if (!S.profile.setupDone) return null;
+  const t = tipState(), dk = todayKey();
+  if (t.day?.date !== dk || !tipById(t.day.id)) {
+    const prev = t.day?.date === addDays(dk, -1) ? t.day : null;
+    const pre = t.next?.date === dk && tipById(t.next.id) && t.votes[t.next.id] !== -1 ? t.next : null;
+    const p = pre || tipFor(dk, prev?.id, prev?.why || '');
+    t.day = p ? { date: dk, id: p.id, why: p.why } : null;
+    if (t.day) t.seen[t.day.id] = dk;
+    t.next = null;
+    save();
+  }
+  return t.day;
+}
+function nextTip() {
+  const day = todayTip(); if (!day) return null;
+  const dk = addDays(day.date, 1), p = tipFor(dk, day.id, day.why);
+  return (tipState().next = p ? { date: dk, id: p.id, why: p.why } : null);
+}
+// Sent with the reminder status: today's & tomorrow's tip (title + short text only — no reason, no log data).
+function pushTips() {
+  if (!S.profile.setupDone || S.settings.reminders.tips === false) return [];
+  const day = todayTip(), before = JSON.stringify(S.tips.next || null), next = nextTip();
+  if (JSON.stringify(next) !== before) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* full */ } }
+  return [day, next].map(p => p && tipById(p.id)).filter(Boolean).map((x, i) => ({ d: i ? next.date : day.date, id: x.id, t: x.t, s: x.s }));
+}
+
+function tipCard() {
+  const day = todayTip(), x = day && tipById(day.id);
+  if (!x || tipState().hidden === day.date) return '';
+  return `
+  <section class="rounded-3xl bg-brand-50 border border-brand-200 p-4 shadow-card">
+    <div class="flex items-center justify-between gap-2">
+      <span class="flex items-center gap-1.5 text-[13px] font-bold text-brand-800">${icon('lightbulb', 'w-4 h-4')}Tips hari ini</span>
+      <button data-act="tipHide" class="tap -mr-2 -my-2 w-10 h-10 grid place-items-center text-brand-800" aria-label="Sorok tip hari ini">${icon('x', 'w-4 h-4')}</button>
+    </div>
+    <button data-act="tipOpen" data-id="${x.id}" class="tap block w-full text-left mt-1">
+      <span class="block font-heading text-[17px] font-bold leading-snug">${esc(x.t)}</span>
+      <span class="block text-[14px] text-slate-600 mt-1 leading-snug">${esc(x.s)}</span>
+      <span class="inline-flex items-center gap-1 mt-2 text-[14px] font-bold text-brand-700">Baca lagi ${ph('caret-right-bold', 14)}</span>
+    </button>
+  </section>`;
+}
+function openTip(id) { if (!tipById(id)) return; UI.tipId = id; openSheet(tipBody); }
+function tipBody() {
+  const x = tipById(UI.tipId); if (!x) return '';
+  const t = tipState(), day = t.day?.id === x.id && t.day.date === todayKey() ? t.day : null;
+  const why = day ? tipWhyText(day.why, day.date) : '', v = t.votes[x.id] || 0, saved = t.saved.includes(x.id);
+  const notes = Object.entries(x.note || {}).filter(([k]) => hasHealth(k)).map(([, n]) => n);
+  const vote = (val, ic, label, on) => `<button data-act="tipVote" data-id="${x.id}" data-v="${val}" class="tap w-11 h-11 rounded-full grid place-items-center border ${on} " aria-label="${label}" aria-pressed="${v === val}">${v === val ? iconFill(ic) : icon(ic)}</button>`;
+  return `<div class="p-5">
+    <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+    <div class="flex items-center justify-between gap-2">
+      <span class="rounded-full bg-brand-100 text-brand-800 px-2.5 py-1 text-[12px] font-bold">${TIP_CATS[x.cat]}</span>
+      <button data-act="tipSave" data-id="${x.id}" class="tap w-11 h-11 -mr-2 grid place-items-center ${saved ? 'text-brand-700' : 'text-slate-500'}" aria-label="${saved ? 'Buang dari simpanan' : 'Simpan tip'}" aria-pressed="${saved}">${saved ? iconFill('bookmark') : icon('bookmark')}</button>
+    </div>
+    <h2 class="font-heading text-[21px] font-bold leading-snug mt-2">${esc(x.t)}</h2>
+    <p class="text-[15px] text-slate-600 leading-relaxed mt-2">${esc(x.b)}</p>
+    ${notes.map(n => `<p class="mt-3 text-[13px] bg-amber-50 text-amber-800 rounded-xl p-3">${esc(n)}</p>`).join('')}
+    ${why ? `<p class="mt-3 flex items-start gap-2 text-[13px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">${icon('info', 'w-4 h-4 mt-0.5')}<span>${esc(why)}</span></p>` : ''}
+    <div class="mt-4 flex items-center justify-between gap-3">
+      <span class="text-[14px] font-semibold text-slate-600">Tip ni membantu?</span>
+      <div class="flex gap-2">
+        ${vote(1, 'thumbUp', 'Membantu', v === 1 ? 'bg-brand-700 border-brand-700 text-white' : 'border-slate-200 text-slate-500')}
+        ${vote(-1, 'thumbDown', 'Tak membantu', v === -1 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'border-slate-200 text-slate-500')}
+      </div>
+    </div>
+    <button data-act="tipAsk" data-id="${x.id}" class="tap mt-4 w-full btn btn-secondary h-12 text-[15px]">${icon('message', 'w-5 h-5')}Tanya Coach</button>
+    <button data-act="closeSheet" class="tap mt-1 w-full btn btn-text h-11 text-[14px]">Tutup</button>
+  </div>`;
+}
+// Panduan → Koleksi tips: browse by category, plus the ones saved with the bookmark.
+function tipsCollection() {
+  const t = tipState(), cat = UI.tipCat || 'semua', avoid = avoidSet();
+  const visible = TIPS.filter(x => !(x.tags || []).some(g => avoid.has(g)));
+  const list = cat === 'simpan' ? TIPS.filter(x => t.saved.includes(x.id)) : visible.filter(x => cat === 'semua' || x.cat === cat);
+  const shown = cat === 'semua' && !UI.tipAll ? list.slice(0, 6) : list;
+  const chips = [['semua', 'Semua'], ['simpan', 'Disimpan' + (t.saved.length ? ' · ' + t.saved.length : '')], ...Object.entries(TIP_CATS)];
+  return card(`
+    <div class="flex items-baseline justify-between"><div class="font-bold text-[16px]">Koleksi tips</div><span class="text-[12px] text-slate-500">${visible.length} tips</span></div>
+    <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 mt-2 pb-1">
+      ${chips.map(([k, l]) => `<button data-act="tipCat" data-v="${k}" class="tap chip ${cat === k ? 'chip-on' : ''}">${l}</button>`).join('')}
+    </div>
+    ${list.length ? `<div class="divide-y divide-slate-100">${shown.map(x => `
+      <button data-act="tipOpen" data-id="${x.id}" class="tap w-full flex items-center gap-3 py-3 text-left">
+        <span class="flex-1 min-w-0"><span class="block text-[14px] font-semibold leading-snug">${esc(x.t)}</span><span class="block text-[12px] text-slate-500 mt-0.5">${TIP_CATS[x.cat]}</span></span>
+        ${t.saved.includes(x.id) ? `<span class="text-brand-700">${iconFill('bookmark', 'w-4 h-4')}</span>` : ''}
+        <span class="text-slate-400">${icon('chevR', 'w-4 h-4')}</span>
+      </button>`).join('')}</div>`
+    : `<p class="text-[13px] text-slate-500 mt-3">${cat === 'simpan' ? 'Tekan ikon simpan pada mana-mana tip untuk letak di sini.' : 'Tiada tip dalam kategori ini.'}</p>`}
+    ${shown.length < list.length ? `<button data-act="tipAll" class="tap w-full btn btn-text h-10 text-[14px]">Lihat semua ${list.length} tips</button>` : ''}`);
+}
+// 👍/👎 go to Supabase (anonymous: tip id, vote, why it was shown, hashed phone ID). Queued on the phone until sent.
+let tipFbBusy = false;
+async function sendTipFeedback() {
+  const t = tipState(); if (tipFbBusy || !t.fbq.length || !navigator.onLine || !S.profile.setupDone) return;
+  tipFbBusy = true;
+  const batch = t.fbq.slice(0, 20), key = x => x.id + ':' + x.v;
+  try {
+    await pushPost({ action: 'tipfb', device: deviceId(), votes: batch });
+    const sent = new Set(batch.map(key)); t.fbq = t.fbq.filter(x => !sent.has(key(x))); save();
+  } catch (e) {
+    if (e.message === 'bad_request') { const sent = new Set(batch.map(key)); t.fbq = t.fbq.filter(x => !sent.has(key(x))); save(); }   // never retry a rejected batch
+  } finally { tipFbBusy = false; }
 }
 
 /* ---------- PLATE ---------- */
@@ -861,6 +1025,8 @@ function viewGuide() {
     </ul>`)}
 
   ${eatOutCard()}
+
+  ${tipsCollection()}
 
   ${sourcesCard()}
 
@@ -1367,6 +1533,7 @@ function privacyBody() {
     ${sec('Notifikasi (Supabase, Singapura)', '<p>Untuk hantar peringatan pada masa yang betul: alamat notifikasi telefon, zon waktu, waktu makan & pilihan peringatan, dan status hari ini (waktu makan yang dah dilog — ya/tidak, jumlah air, jumlah kalori, tarikh timbang terakhir).</p><p>Nama, berat dan senarai makanan <b>tidak</b> dihantar. Data ini dipadam bila notifikasi dimatikan atau data dipadam.</p>')}
     ${sec('Coach AI (OpenAI, Amerika Syarikat)', `<p>Hanya bila anda bertanya: soalan, makanan yang dilog hari ini, sasaran kalori, pantang & alahan, makanan sendiri${(S.profile.health || []).length ? ', dan nota kesihatan jika dibenarkan' : ''}. Nama dan berat tidak dihantar.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>`)}
     ${sec('Scan makanan (OpenAI, Amerika Syarikat)', '<p>Hanya bila anda scan: gambar makanan (dikecilkan dalam telefon dulu) dihantar ke OpenAI untuk anggaran kalori. DietPal <b>tidak</b> menyimpan gambar itu — ia tidak disimpan di server kami dan tidak dimasukkan ke backup.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>')}
+    ${sec('Tips hari ini', '<p>Tip dipilih dalam telefon ini berdasarkan log anda — log tidak dihantar ke mana-mana. Jika peringatan tips hidup, tajuk tip hari ini & esok dihantar bersama status notifikasi.</p><p>Bila anda tekan <b>membantu / tak membantu</b>, server simpan tip yang dinilai, undian anda dan ID rawak telefon dalam bentuk hash — tanpa nama atau data diet — supaya kami tahu tip mana yang berguna.</p>')}
     ${sec('Had penggunaan Coach AI', '<p>Untuk had soalan dan had scan, server simpan ID rawak telefon (bukan nama atau nombor telefon) dan alamat IP dalam bentuk hash, bersama kiraan token. Rekod dipadam selepas 2 hari tidak digunakan.</p>')}
     ${sec('Hosting (Vercel)', '<p>Seperti laman web biasa, pelayan mencatat log akses teknikal (cth alamat IP) untuk keselamatan.</p>')}
     ${sec('Pilihan anda', `<p>Tukar atau tarik balik persetujuan Coach AI, scan makanan dan perkongsian nota kesihatan di Tetapan → Privasi. Matikan jenis peringatan di Tetapan → Peringatan.</p>`)}
@@ -1645,7 +1812,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2006,6 +2173,7 @@ function viewSettings() {
       ${toggleRow('remToggle', 'meals', r.meals, 'Log makan', 'Lepas waktu makan biasa, jika belum log')}
       ${toggleRow('remToggle', 'weigh', r.weigh, 'Timbang berat mingguan', 'Sekali seminggu pada hari pilihan')}
       ${toggleRow('remToggle', 'summary', r.summary !== false, 'Ringkasan malam', 'Jumlah kalori hari ini, sekitar 9.30 malam')}
+      ${toggleRow('remToggle', 'tips', r.tips !== false, 'Tips hari ini', 'Sekali sehari, sebelum waktu makan tengah hari')}
     </div>
     ${r.weigh ? `<div class="mt-2">${selectField('weighDay', 'Hari timbang', String(r.weighDay), Object.fromEntries(HARI_PENUH.map((h, i) => [String(i), h])))}</div>` : ''}
     ${pushSettingsBlock()}`)}
@@ -2231,6 +2399,18 @@ document.addEventListener('click', (e) => {
       render(); break;
     }
     case 'askAI': sheetAI(); break;
+    case 'tipOpen': openTip(el.dataset.id); break;
+    case 'tipHide': tipState().hidden = todayKey(); save(); render(); toast('Tip disorok hingga esok. Semua tips ada di Panduan'); break;
+    case 'tipCat': UI.tipCat = el.dataset.v; UI.tipAll = false; render(); break;
+    case 'tipAll': UI.tipAll = true; render(); break;
+    case 'tipSave': { const t = tipState(), id = el.dataset.id, on = t.saved.includes(id);
+      t.saved = on ? t.saved.filter(x => x !== id) : [...t.saved, id]; save(); refreshSheet(); render(); toast(on ? 'Dibuang dari simpanan' : 'Tip disimpan di Panduan'); break; }
+    case 'tipVote': { const t = tipState(), id = el.dataset.id, v = Number(el.dataset.v), nv = t.votes[id] === v ? 0 : v;
+      if (nv) t.votes[id] = nv; else delete t.votes[id];
+      t.fbq = [...t.fbq.filter(x => x.id !== id), { id, v: nv, why: t.day?.id === id ? t.day.why : '' }].slice(-50);
+      save(); refreshSheet(); sendTipFeedback();
+      if (nv) toast(nv === 1 ? 'Terima kasih atas maklum balas' : 'Faham — tip ni tak akan dipilih lagi untuk anda'); break; }
+    case 'tipAsk': { const x = tipById(el.dataset.id); if (!x) break; sheetAI('umum'); UI.ai.q = x.ask; refreshSheet(); break; }
     case 'aiAsk': aiAsk(); break;
     case 'aiChip': UI.ai.q = (UI.ai.meal === 'umum' ? AI_CHIPS_GENERAL : AI_CHIPS)[Number(el.dataset.i)]; refreshSheet(); break;
     case 'aiMeal': {   // switching meal changes the target, so earlier answers no longer apply
@@ -2288,7 +2468,7 @@ document.addEventListener('change', (e) => {
   }
 });
 // Re-render when returning to the app (e.g. new day)
-document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!sheetFn) render(); if (typeof pushCheck === 'function') pushCheck(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!sheetFn) render(); if (typeof pushCheck === 'function') pushCheck(); if (typeof sendTipFeedback === 'function') sendTipFeedback(); });
 
 /* ============================================================
    ICONS
@@ -2367,11 +2547,12 @@ const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in win
 const pushDenied = () => pushSupported() && Notification.permission === 'denied';
 const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kuala_Lumpur'; } catch { return 'Asia/Kuala_Lumpur'; } };
 function b64ToBytes(s) { const b = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); }
-function pushPrefs() { const r = S.settings.reminders; return { mealTimes: S.settings.mealTimes, meals: r.meals, water: r.water, weigh: r.weigh, summary: r.summary !== false, weighDay: Number(r.weighDay) }; }
+function pushPrefs() { const r = S.settings.reminders; return { mealTimes: S.settings.mealTimes, meals: r.meals, water: r.water, weigh: r.weigh, summary: r.summary !== false, tips: r.tips !== false, weighDay: Number(r.weighDay) }; }
 function pushStatus() {
   const d = peekDay(todayKey()), p = S.profile;
   return { date: todayKey(), logged: [...new Set(d.meals.map(m => m.meal))], water: d.water || 0, waterGoal: p.waterGoal,
-    kcal: kcalOf(d), kcalMin: p.kcalMin, kcalMax: p.kcalMax, weighedOn: S.weights.map(w => w.date).sort().pop() || '' };
+    kcal: kcalOf(d), kcalMin: p.kcalMin, kcalMax: p.kcalMax, weighedOn: S.weights.map(w => w.date).sort().pop() || '',
+    tips: pushTips() };
 }
 async function pushPost(body, keepalive = false) {
   const r = await fetch(PUSH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive });
@@ -2480,7 +2661,7 @@ function pushSettingsBlock() {
   return `<div class="mt-3 rounded-xl bg-green-50 px-3 py-3">
       <div class="text-[13px] text-green-800 flex items-center gap-1.5">${icon('check', 'w-4 h-4', 2.5)}Notifikasi hidup di telefon ini.</div>
       <button data-act="pushTest" class="tap mt-2 w-full btn btn-secondary py-2 text-[13px]">Hantar notifikasi ujian</button></div>
-    <p class="text-[12px] text-slate-500 mt-2">Untuk hantar peringatan yang tepat, status ringkas hari ini (dah log atau belum, air, jumlah kalori) dihantar ke server. Nama, berat dan senarai makanan tidak dihantar.</p>`;
+    <p class="text-[12px] text-slate-500 mt-2">Untuk hantar peringatan yang tepat, status ringkas hari ini (dah log atau belum, air, jumlah kalori) dan tajuk tips hari ini dihantar ke server. Nama, berat dan senarai makanan tidak dihantar.</p>`;
 }
 
 // Notification taps open the app at the right place (./?meal=… | ?tab=weight | ?water=1)
@@ -2488,6 +2669,8 @@ function openFromLink(search = location.search) {
   const q = new URLSearchParams(search); let used = false;
   if (S.profile.setupDone && q.get('tab') === 'weight') { UI.tab = 'weight'; used = true; }
   if (S.profile.setupDone && q.has('water')) { UI.tab = 'home'; used = true; }
+  const tip = q.get('tip');
+  if (S.profile.setupDone && tip && tipById(tip)) { UI.tab = 'home'; used = true; setTimeout(() => openTip(tip), 50); }
   const meal = q.get('meal');
   if (S.profile.setupDone && MEALS.some(m => m.id === meal)) { UI.tab = 'food'; used = true; setTimeout(() => openAdd(meal), 50); }
   if (used || q.has('dev')) history.replaceState(null, '', location.pathname);
@@ -2520,3 +2703,4 @@ openFromLink();
 render();
 pushCheck();
 setTimeout(checkReminders, 1500);
+setTimeout(sendTipFeedback, 4000);

@@ -1,5 +1,5 @@
 // DietPal — push reminders (Supabase Edge Function)
-// Actions (POST JSON): subscribe · status · unsubscribe · test · run (cron only). GET → { publicKey }.
+// Actions (POST JSON): subscribe · status · unsubscribe · test · tipfb (👍/👎 on tips) · run (cron only). GET → { publicKey }.
 // Stores only the push address, time zone, reminder settings and a small daily status
 // (meals logged yes/no, water, kcal total). No name, weight or food list.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -65,7 +65,7 @@ function cleanPrefs(p: any = {}) {
   const t = p.mealTimes || {};
   return {
     mealTimes: { sarapan: hhmm(t.sarapan, "07:30"), tengahari: hhmm(t.tengahari, "13:00"), malam: hhmm(t.malam, "20:00") },
-    meals: p.meals !== false, water: p.water !== false, weigh: p.weigh !== false, summary: p.summary !== false,
+    meals: p.meals !== false, water: p.water !== false, weigh: p.weigh !== false, summary: p.summary !== false, tips: p.tips !== false,
     weighDay: int(p.weighDay, 0, 6, 1),
   };
 }
@@ -76,7 +76,16 @@ function cleanStatus(s: any = {}) {
     water: int(s.water, 0, 20000), waterGoal: int(s.waterGoal, 500, 10000, 2500),
     kcal: int(s.kcal, 0, 20000), kcalMin: int(s.kcalMin, 800, 6000, 1500), kcalMax: int(s.kcalMax, 800, 6000, 1800),
     weighedOn: day(s.weighedOn),
+    tips: cleanTips(s.tips),
   };
+}
+// "Tips hari ini": the app picks the tip and sends today's & tomorrow's title + short text (v1.8+).
+const TIP_ID = /^[a-z0-9-]{1,40}$/;
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, max) : "");
+function cleanTips(v: unknown) {
+  return (Array.isArray(v) ? v : []).slice(0, 2)
+    .map((x: any) => ({ d: day(x?.d), id: TIP_ID.test(x?.id) ? x.id : "", t: text(x?.t, 60), s: text(x?.s, 140) }))
+    .filter((x) => x.d && x.id && x.t);
 }
 function cleanTz(tz: unknown) {
   try { if (typeof tz === "string" && tz.length < 64) { new Intl.DateTimeFormat("en", { timeZone: tz }); return tz; } } catch { /* bad tz */ }
@@ -128,7 +137,13 @@ function due(row: any) {
       : `Hari ini ${fmt(s.kcal)} kcal — lebih sikit dari sasaran ${fmt(s.kcalMax)}. Esok cuba lagi.`;
     return { key: "summary", title: "Ringkasan hari ini", body, url: "./" };
   }
-  // 4. water every 2 hours (9am–7pm) when behind
+  // 4. today's tip, 15–60 min before the usual lunch time (the tip list survives midnight: it holds tomorrow's too)
+  const lunch = mins(p.mealTimes.tengahari);
+  if (p.tips && now.min >= lunch - 60 && now.min < lunch - 15 && fresh("tip")) {
+    const tip = cleanTips(row.status?.tips).find((x) => x.d === now.date);
+    if (tip) return { key: "tip", title: tip.t, body: tip.s, url: `./?tip=${tip.id}` };
+  }
+  // 5. water every 2 hours (9am–7pm) when behind
   const h = Math.floor(now.min / 60);
   if (p.water && h >= 9 && h <= 19 && h % 2 === 1 && fresh("water-" + h)) {
     const expected = Math.min(1, (h - 7) / 14) * s.waterGoal;
@@ -189,11 +204,33 @@ async function run() {
 
 // New subscriptions per IP (hashed) per day — stops someone filling the table with fake rows.
 const SUBS_PER_IP_DAY = 20;
-async function ipHash(req: Request) {
-  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+async function hash16(v: string) {
   const salt = (await config()).cron_secret || "";
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + "|" + ip));
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + "|" + v));
   return Array.from(new Uint8Array(buf).slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+const ipHash = (req: Request) => hash16((req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown");
+
+// 👍/👎 on tips: anonymous (phone ID and IP stored only as salted hashes). One row per phone per tip; vote 0 removes it.
+const TIPFB_PER_IP_DAY = 300, WHY = /^[a-zA-Z]{0,12}$/;
+async function tipFeedback(req: Request, body: any) {
+  const device = String(body.device || "");
+  const votes = Array.isArray(body.votes) ? body.votes.slice(0, 20) : [];
+  if (!/^[0-9a-f-]{36}$/i.test(device) || !votes.length) return { status: 400, out: { error: "bad_request" } };
+  const clean = votes.map((v: any) => ({ id: String(v?.id || ""), v: Number(v?.v), why: typeof v?.why === "string" && WHY.test(v.why) ? v.why : "" }))
+    .filter((v: any) => TIP_ID.test(v.id) && [1, 0, -1].includes(v.v))
+    .filter((v: any, i: number, all: any[]) => all.findLastIndex((x: any) => x.id === v.id) === i);   // last vote per tip wins
+  if (!clean.length) return { status: 400, out: { error: "bad_request" } };
+  const [dev, ip] = await Promise.all([hash16("tip|" + device), ipHash(req)]);
+  const since = new Date(Date.now() - 864e5).toISOString();
+  const { count } = await db.from("tip_feedback").select("tip_id", { count: "exact", head: true }).eq("ip_hash", ip).gte("updated_at", since);
+  if ((count || 0) >= TIPFB_PER_IP_DAY) return { status: 429, out: { error: "too_many" } };
+  const now = new Date().toISOString();
+  const up = clean.filter((v: any) => v.v !== 0).map((v: any) => ({ device_hash: dev, tip_id: v.id, vote: v.v, why: v.why || null, ip_hash: ip, updated_at: now }));
+  const del = clean.filter((v: any) => v.v === 0).map((v: any) => v.id);
+  if (up.length) { const { error } = await db.from("tip_feedback").upsert(up, { onConflict: "device_hash,tip_id" }); if (error) throw error; }
+  if (del.length) { const { error } = await db.from("tip_feedback").delete().eq("device_hash", dev).in("tip_id", del); if (error) throw error; }
+  return { status: 200, out: { ok: true } };
 }
 
 Deno.serve(async (req) => {
@@ -245,6 +282,10 @@ Deno.serve(async (req) => {
       const { data, error } = await db.from("push_subs").update(patch).eq("endpoint", endpoint).select("endpoint");
       if (error) throw error;
       return json({ ok: true, known: !!data?.length }, 200, c.headers);
+    }
+    if (body.action === "tipfb") {
+      const r = await tipFeedback(req, body);
+      return json(r.out, r.status, c.headers);
     }
     if (body.action === "unsubscribe") {
       await db.from("push_subs").delete().eq("endpoint", endpoint);
