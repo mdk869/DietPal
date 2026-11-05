@@ -48,7 +48,7 @@ test('clean: presets win, totals recomputed, junk dropped', () => {
     { preset: 'tiada-id', name: '', unit: '', kcal: 'x', qty: 1, plate: 'x', confidence: 'rendah' },
     { preset: '', name: 'Kuih', unit: '1 biji', kcal: 99999, qty: 50, plate: 'nope', confidence: 'rendah' }
   ] });
-  assert.deepEqual(out.items[0], { foodId: 'nasi1', name: 'Nasi putih', unit: '1 senduk', kcal: 130, plate: 'karbo', qty: 2, confidence: 'tinggi' });
+  assert.deepEqual(out.items[0], { foodId: 'nasi1', name: 'Nasi putih', unit: '1 senduk', kcal: 130, plate: 'karbo', qty: 2, confidence: 'tinggi', source: 'gambar' });
   assert.equal(out.items[1].name, 'Ayam masak merah');
   assert.equal(out.items[1].confidence, 'sederhana');
   assert.equal(out.items.length, 3);
@@ -56,6 +56,17 @@ test('clean: presets win, totals recomputed, junk dropped', () => {
   assert.equal(out.kcal, 130 * 2 + 280 + 2000 * 5);
   assert.deepEqual(clean({ is_food: false, items: GOOD.items, note: 'Bukan makanan.' }), { is_food: false, items: [], note: 'Bukan makanan.', kcal: 0 });
   assert.equal(clean(null).items.length, 0);
+});
+
+test('clean: label values kept as read, never swapped for a preset', () => {
+  const out = clean({ is_food: true, note: '', items: [
+    { source: 'label', preset: 'rotig', name: 'Roti Gardenia Original', unit: '1 hidangan (2 keping, 60 g)', kcal: 156, qty: 1, plate: 'karbo', confidence: 'tinggi' },
+    { source: 'weird', preset: 'rotig', name: 'x', unit: 'x', kcal: 1, qty: 1, plate: 'karbo', confidence: 'tinggi' }
+  ] });
+  assert.equal(out.items[0].foodId, ''); assert.equal(out.items[0].kcal, 156); assert.equal(out.items[0].source, 'label');
+  assert.equal(out.items[0].unit, '1 hidangan (2 keping, 60 g)');
+  assert.equal(out.items[0].name, 'Roti Gardenia Original');
+  assert.equal(out.items[1].foodId, 'rotig'); assert.equal(out.items[1].source, 'gambar');
 });
 
 test('scan works, sends image to OpenAI with strict schema, never logged in the response', async () => {
@@ -68,6 +79,8 @@ test('scan works, sends image to OpenAI with strict schema, never logged in the 
   assert.equal(user[1].image_url.url, JPEG);
   assert.equal(lastOpenAI.response_format.json_schema.strict, true);
   assert.match(lastOpenAI.messages[0].content, /nlemak: Nasi lemak/);
+  assert.match(lastOpenAI.messages[0].content, /Maklumat Pemakanan/);
+  assert.equal(user[1].image_url.detail, 'high');
   assert(!JSON.stringify(r.j).includes('base64'));
 });
 
