@@ -134,7 +134,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 - Preset makanan (`foods.js`) disimpan di server dalam mesej sistem yang sama setiap kali, jadi *prompt caching* OpenAI boleh guna semula (input cached lebih murah). Telefon hanya hantar makanan *sendiri* pengguna. kcal item diselaraskan dengan preset bila nama & sukatan sepadan.
 
 **Perlindungan**
-- Julat kcal setiap menu (±20%, snek ±40%): jika menu jelas terkeluar, server melaraskan sukatan (tambah nasi jika tiada karbo, protein → karbo maks 40% → buah → sayur; kurangkan karbo jika lebih). Menu yang masih terkeluar ditanda "bawah/atas sasaran".
+- Julat kcal setiap menu (±20%, snek ±40%): jika menu **di rumah** jelas terkeluar, server melaraskan sukatan (tambah nasi hanya jika tiada karbo langsung — burger, roti, mee, nasi dsb. dikira sudah ada karbo; protein → karbo maks 40% → buah → sayur; kurangkan karbo jika lebih). Hidangan penuh (burger, mee goreng…) tidak dibesarkan jadi "1.5 biji". **Makan di luar** tidak dilaraskan sebab hidangan datang seperti yang kedai hidang — menu terkeluar hanya ditanda "bawah/atas sasaran".
 - Had kalori minimum harian, tiada skip makan atau potong nasi/garam terus, patuhi pantang & alahan, tiada diagnosis/ubat/dos.
 - Simptom serius (sakit dada, sesak nafas, pengsan, dll.) dikesan di server dan terus dijawab dengan amaran 999 tanpa memanggil AI.
 - Input disaring di server (hanya medan tertentu, panjang terhad); output disemak dan jumlah kcal dikira semula.
