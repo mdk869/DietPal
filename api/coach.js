@@ -61,6 +61,8 @@ CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
 - Sasarkan jumlah kcal setiap menu dalam julat waktu makan yang diberi.
 - Jika pengguna sebut bahan yang ada (cth: "telur, kobis & ayam"), gunakan bahan-bahan itu.
 - Untuk soalan fakta (kalori, waktu makan, boleh/tidak, cara), jawab terus dalam "reply" dan biarkan "menus" KOSONG — jangan tambah menu kecuali pengguna minta cadangan makan.
+- Setiap makanan yang disebut dalam nama menu mesti ada sebagai item (cth "Burger ayam grill dengan salad" → item burger DAN item salad).
+- Dalam "reply", jangan sebut jumlah kcal untuk menu yang dicadangkan — kad menu sudah tunjuk kalori.
 - "tip": satu ayat praktikal untuk hidangan itu.
 
 KESELAMATAN (WAJIB)
@@ -316,17 +318,22 @@ function clean(out, catalog = []) {
 
 // Light-touch portion fit: only when a menu is clearly outside the range, nudge portions
 // (protein → carbs while ≤ 40% of the menu → fruit → veg / one-dish meals; too high → carbs first).
+// Dishes that already carry their own carb (bun, bread, noodles, rice…), whatever plate tag the AI gave them.
+const CARB_DISH = /burger|sandwic|sandwich|roti|\bbun\b|pau|mee|\bmi\b|bihun|kuey ?teow|laksa|pasta|spag|piza|pizza|wrap|tortilla|capati|chapati|tosai|thosai|nasi|bubur|lontong|ketupat|kentang|ubi|oat|jagung|bijirin|lasagna|kebab|murtabak|apam|lempeng|bijan/i;
+const hasCarb = items => items.some(i => i.plate === 'karbo' || CARB_DISH.test(i.name));
+
 function fitPortions(menu, lo, hi, catalog, meal) {
   const items = menu.items.map(i => ({ ...i }));
   const rice = catalog.find(f => /^nasi putih$/i.test(f.name) && /senduk/.test(f.unit));
-  if (meal !== 'snek' && rice && !items.some(i => i.plate === 'karbo') && menuTotal(items) + rice.kcal <= hi + 40)
+  if (meal !== 'snek' && rice && !hasCarb(items) && menuTotal(items) + rice.kcal <= hi + 40)
     items.push({ name: rice.name, unit: rice.unit, qty: 1, kcal: rice.kcal, plate: 'karbo' });
   const fruit = catalog.find(f => /^buah/i.test(f.name));
   let total = menuTotal(items), adjusted = items.length !== menu.items.length;
   for (let step = 0; step < 8 && (total < lo || total > hi); step++) {
     let changed = false;
     if (total < lo) {
-      const fits = i => i && total + i.kcal * 0.5 <= hi + 40;
+      // A whole dish with its own carb (burger, mee goreng…) isn't enlarged — "1.5 burger" makes no sense.
+      const fits = i => i && !(CARB_DISH.test(i.name) && i.plate !== 'karbo') && total + i.kcal * 0.5 <= hi + 40;
       const carbKcal = items.filter(i => i.plate === 'karbo').reduce((a, i) => a + i.kcal * i.qty, 0);
       const carb = items.find(i => i.plate === 'karbo' && i.qty < 2);
       const carbOk = carb && (carbKcal + carb.kcal * 0.5) <= 0.4 * hi;
@@ -450,7 +457,9 @@ module.exports = async function handler(req, res) {
     if (meal && targets[meal] && out.menus.length) {
       const [lo, hi] = targetRange(targets[meal], meal);
       out.menus = out.menus.map(m => {
-        const f = (m.kcal < lo * 0.95 || m.kcal > hi * 1.05) ? fitPortions(m, lo, hi, catalog, meal) : m;
+        // Eating out: the dish comes as the shop serves it, so portions are not resized (only flagged low/high).
+        const resize = c.location !== 'luar' && (m.kcal < lo * 0.95 || m.kcal > hi * 1.05);
+        const f = resize ? fitPortions(m, lo, hi, catalog, meal) : m;
         return { ...f, offTarget: f.kcal < lo ? 'low' : f.kcal > hi ? 'high' : '' };
       });
       out.range = [lo, hi];
@@ -467,4 +476,4 @@ module.exports = async function handler(req, res) {
 };
 
 // exported for local tests
-module.exports._test = { plateSummary, quotaTokens, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, presetKcal, parseUnit, SCHEMA };
+module.exports._test = { plateSummary, quotaTokens, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, hasCarb, presetKcal, parseUnit, SCHEMA };
