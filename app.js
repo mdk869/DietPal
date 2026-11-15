@@ -663,11 +663,11 @@ function tipCard() {
     </button>
   </section>`;
 }
-function openTip(id) { if (!tipById(id)) return; UI.tipId = id; openSheet(tipBody); }
+function openTip(id, why = '') { if (!tipById(id)) return; UI.tipId = id; UI.tipWhy = TIP_WHY[why] ? why : ''; openSheet(tipBody); }
 function tipBody() {
   const x = tipById(UI.tipId); if (!x) return '';
   const t = tipState(), day = t.day?.id === x.id && t.day.date === todayKey() ? t.day : null;
-  const why = day ? tipWhyText(day.why, day.date) : '', v = t.votes[x.id] || 0, saved = t.saved.includes(x.id);
+  const why = day ? tipWhyText(day.why, day.date) : UI.tipWhy ? tipWhyText(UI.tipWhy, todayKey()) : '', v = t.votes[x.id] || 0, saved = t.saved.includes(x.id);
   const notes = Object.entries(x.note || {}).filter(([k]) => hasHealth(k)).map(([, n]) => n);
   const vote = (val, ic, label, on) => `<button data-act="tipVote" data-id="${x.id}" data-v="${val}" class="tap w-11 h-11 rounded-full grid place-items-center border ${on} " aria-label="${label}" aria-pressed="${v === val}">${v === val ? iconFill(ic) : icon(ic)}</button>`;
   return `<div class="p-5">
@@ -929,6 +929,8 @@ function viewWeight() {
     <div class="flex justify-between items-center mb-2"><div class="font-bold text-[16px]">Trend berat</div><div class="text-[12px] text-slate-500">${ws.length} catatan</div></div>
     ${weightChart(ws)}`)}
 
+  ${weightTipsCard()}
+
   ${card(`
     <div class="font-bold text-[16px] mb-3">Milestone</div>
     <div class="space-y-4">${p.milestones.map((m, i) => milestoneRow(m, i)).join('')}</div>`)}
@@ -944,6 +946,24 @@ function viewWeight() {
     </div>`) : ''}`;
 }
 
+// Berat page: tips picked from the weight signals (gain / plateau …), or a general weight tip. Tap → same sheet as Tips hari ini.
+function weightTipsCard() {
+  if (!S.profile.setupDone || typeof pickWeightTips !== 'function') return '';
+  const list = pickWeightTips({ date: todayKey(), signals: tipSignals(), votes: tipState().votes, avoid: avoidSet() })
+    .map(p => ({ ...p, x: tipById(p.id) })).filter(p => p.x);
+  if (!list.length) return '';
+  const why = k => { const w = TIP_WHY[k] || ''; return w.charAt(0).toUpperCase() + w.slice(1); };
+  return card(`
+    <div class="font-bold text-[16px] flex items-center gap-1.5">${icon('lightbulb', 'w-4 h-4')}Tips untuk berat anda</div>
+    <div class="divide-y divide-slate-100">${list.map(({ x, why: k }) => `
+      <button data-act="tipOpen" data-id="${x.id}" data-why="${k}" class="tap block w-full text-left py-3">
+        ${k ? `<span class="block text-[12px] font-semibold text-brand-700">${esc(why(k))}</span>` : ''}
+        <span class="block font-semibold text-[15px] leading-snug">${esc(x.t)}</span>
+        <span class="block text-[13px] text-slate-600 mt-0.5 leading-snug">${esc(x.s)}</span>
+        <span class="inline-flex items-center gap-1 mt-1.5 text-[13px] font-bold text-brand-700">Baca lagi ${ph('caret-right-bold', 13)}</span>
+      </button>`).join('')}
+    </div>`);
+}
 function bmiLabel(b) { return b < 18.5 ? 'kurang' : b < 23 ? 'normal' : b < 27.5 ? 'berlebihan' : 'obes'; } // Asian cut-offs (KKM)
 // Change vs the weigh-in closest to 7 days before the latest one (5–10 days back). If none, the newest weigh-in
 // 11–35 days back, so the label can say "since <date>" instead of pretending it is 7 days. null = nothing to compare.
@@ -986,7 +1006,11 @@ function weightChart(ws) {
   const x = t => pl + ((t - t0) / Math.max(1, t1 - t0)) * (W - pl - pr);
   const y = kg => pt + (1 - (kg - lo) / (hi - lo)) * (H - pt - pb);
   const coords = pts.map(p => [x(parseKey(p.date).getTime()), y(p.kg)]);
-  const line = coords.map((c, i) => (i ? 'L' : 'M') + c[0].toFixed(1) + ' ' + c[1].toFixed(1)).join(' ');
+  const path = cs => cs.map((c, i) => (i ? 'L' : 'M') + c[0].toFixed(1) + ' ' + c[1].toFixed(1)).join(' ');
+  const line = path(coords);
+  // 7-day average: only drawn when the user weighs more often than weekly (otherwise it equals the dots)
+  const ma = weightAverage(pts), showMa = ma.filter((v, i) => Math.abs(v - pts[i].kg) >= 0.05).length >= 2;
+  const maLine = showMa ? path(pts.map((p, i) => [coords[i][0], y(ma[i])])) : '';
   const area = line + ` L${coords[coords.length - 1][0]} ${H - pb} L${coords[0][0]} ${H - pb} Z`;
   const ticks = [lo, Math.round((lo + hi) / 2), hi];
   const last = coords[coords.length - 1];
@@ -996,12 +1020,21 @@ function weightChart(ws) {
     ${ticks.map(t => `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#eef2f1"/><text x="${pl - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="#94a3b8">${t}</text>`).join('')}
     ${next && next.kg >= lo ? `<line x1="${pl}" x2="${W - pr}" y1="${y(next.kg)}" y2="${y(next.kg)}" stroke="#6ba539" stroke-dasharray="4 4"/><text x="${W - pr}" y="${y(next.kg) - 4}" text-anchor="end" font-size="10" font-weight="700" fill="#16a34a">${esc(next.name)} ${next.kg} kg</text>` : ''}
     <path d="${area}" fill="url(#g)"/>
-    <path d="${line}" fill="none" stroke="#1e6b4a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    ${coords.map(c => `<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="#fff" stroke="#1e6b4a" stroke-width="2"/>`).join('')}
+    <path d="${line}" fill="none" stroke="#1e6b4a" stroke-width="${showMa ? 1.5 : 2.5}" stroke-opacity="${showMa ? 0.35 : 1}" stroke-linejoin="round" stroke-linecap="round"/>
+    ${showMa ? `<path d="${maLine}" fill="none" stroke="#1e6b4a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+    ${coords.map(c => `<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="#fff" stroke="#1e6b4a" stroke-width="2" ${showMa ? 'stroke-opacity=".5"' : ''}/>`).join('')}
     <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="#1e6b4a"/>
     <text x="${pl}" y="${H - 6}" font-size="10" fill="#94a3b8">${niceDate(pts[0].date)}</text>
     <text x="${W - pr}" y="${H - 6}" text-anchor="end" font-size="10" fill="#94a3b8">${niceDate(pts[pts.length - 1].date)}</text>
-  </svg>`;
+  </svg>
+  ${showMa ? `<p class="mt-1 flex items-center gap-3 text-[12px] text-slate-500"><span class="inline-flex items-center gap-1.5"><span class="w-4 h-[3px] rounded-full bg-brand-700"></span>Purata 7 hari</span><span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full border-2 border-brand-700 opacity-50"></span>Timbangan</span></p>` : ''}`;
+}
+// For each weigh-in: average of the weigh-ins in the 7 days up to and including it (smooths out water & salt swings).
+function weightAverage(ws) {
+  return ws.map((w, i) => {
+    const t = parseKey(w.date).getTime(), win = ws.slice(0, i + 1).filter(v => t - parseKey(v.date).getTime() < 7 * 864e5);
+    return win.reduce((a, v) => a + v.kg, 0) / win.length;
+  });
 }
 
 /* ---------- GUIDE ---------- */
@@ -1820,7 +1853,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.8.4';
+const APP_VERSION = '1.8.5';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2409,7 +2442,7 @@ document.addEventListener('click', (e) => {
       render(); break;
     }
     case 'askAI': sheetAI(); break;
-    case 'tipOpen': openTip(el.dataset.id); break;
+    case 'tipOpen': openTip(el.dataset.id, el.dataset.why); break;
     case 'tipHide': tipState().hidden = todayKey(); save(); render(); toast('Tip disorok hingga esok. Semua tips ada di Panduan'); break;
     case 'tipCat': UI.tipCat = el.dataset.v; UI.tipAll = false; render(); break;
     case 'tipAll': UI.tipAll = true; render(); break;

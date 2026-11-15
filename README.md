@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.8.4
+**Versi semasa:** 1.8.5
 
 ## Ciri utama
 
@@ -26,7 +26,8 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Notifikasi peringatan** – sampai walaupun app ditutup: log makan (lepas waktu makan biasa, jika belum log), minum air (setiap 2 jam, 9 pagi–7 malam, jika kurang), timbang berat mingguan, dan ringkasan kalori malam (~9.30 malam). Waktu senyap 10 malam–7 pagi, jarak minimum 45 minit. **Wajib:** setup tidak selesai dan app tidak boleh digunakan selagi notifikasi tidak dibenarkan. Jika pengguna tekan *Block / Don't Allow*, app papar langkah untuk hidupkan semula di tetapan telefon (iPhone, Android, komputer) dan butang *Saya dah hidupkan — teruskan*. Jika kebenaran ditarik balik kemudian, app disekat semula sehingga dibenarkan. Peranti yang tidak menyokong notifikasi (cth. iOS bawah 16.4) diminta kemas kini. Peringatan dalam app masih dipaparkan bila app dibuka.
 
 **Kemajuan & panduan**
-- **Berat & milestone** – graf trend, BMI (had Asia), perubahan 7 hari, milestone yang boleh diedit.
+- **Berat & milestone** – graf trend (dengan garis purata 7 hari bila timbang lebih kerap dari seminggu sekali), BMI (had Asia), perubahan 7 hari, milestone yang boleh diedit.
+- **Tips untuk berat anda (v1.8.5)** – kad dalam tab Berat: tip ikut isyarat berat (naik / plateau), atau satu tip berat umum yang bertukar setiap hari. Tekan untuk sheet tip yang sama seperti *Tips hari ini*.
 - **Panduan pinggan Suku-Suku Separuh** – ½ sayur, ¼ protein, ¼ karbo kompleks; prinsip 80/20; elak diet ekstrem.
 - **Makan di luar dengan bijak** – 3 cara mudah memesan dan tukaran kecil dengan anggaran kalori dijimat.
 - **Sumber rujukan** – senarai rujukan yang digunakan dalam app (lihat di bawah).

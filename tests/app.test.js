@@ -182,3 +182,9 @@ test('deleting a weight recalculates targets', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
   assert.match(src, /case 'delWeight':[^\n]*recalcTargets\(\)/);
 });
+
+test('weightAverage: 7-day trailing average of weigh-ins', () => {
+  const { weightAverage } = load(['parseKey', 'weightAverage']);
+  const avg = weightAverage([{ date: '2026-11-01', kg: 90 }, { date: '2026-11-03', kg: 89 }, { date: '2026-11-07', kg: 88 }, { date: '2026-11-08', kg: 91 }]);
+  assert.deepEqual(avg.map(v => Math.round(v * 100) / 100), [90, 89.5, 89, 89.33]);   // 1 Nov drops out of the window on 8 Nov
+});
