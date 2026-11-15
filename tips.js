@@ -4,7 +4,7 @@
 //   tip disorok jika bercanggah dengan pantang/alahan) · season (hanya dalam musim itu) · note (nota ikut nota kesihatan).
 // Loaded by the app (<script src="tips.js">) and by the unit tests (require).
 const TIP_CATS = {
-  protein: 'Protein', sayur: 'Sayur', karbo: 'Karbo', gula: 'Gula & minuman', luar: 'Makan luar',
+  protein: 'Protein', sayur: 'Sayur', buah: 'Buah', karbo: 'Karbo', masak: 'Cara masak', gula: 'Gula & minuman', luar: 'Makan luar',
   air: 'Air', berat: 'Berat badan', senam: 'Senaman', tabiat: 'Tabiat', perayaan: 'Musim perayaan'
 };
 
@@ -19,6 +19,9 @@ const TIP_WHY = {
   slowMove: 'berat anda turun lebih perlahan dari kadar pilihan anda sejak 3 minggu',
   lowProtein: 'protein dalam log anda rendah dalam 3 hari lepas',
   lowVeg: 'sayur dalam log anda kurang dalam 3 hari lepas',
+  lowFruit: 'buah dalam log anda kurang dalam 3 hari lepas',
+  noFish: 'tiada ikan dalam log anda 3 hari lepas',
+  fried: 'banyak makanan goreng atau bersantan dalam log anda 3 hari lepas',
   sweet: 'ada air manis dalam log anda dalam 3 hari lepas',
   over: 'kalori anda lebih dari sasaran dalam 3 hari lepas',
   weekend: 'hujung minggu lepas kalori anda lebih dari sasaran',
@@ -26,7 +29,7 @@ const TIP_WHY = {
   newbie: 'ini minggu pertama anda guna DietPal'
 };
 // Checked in this order. A season tip comes after the safety/progress signals but before everyday nudges.
-const TIP_ORDER = ['under', 'fast', 'lapse', 'gain', 'plateau', 'slowEat', 'slowMove', 'season', 'lowProtein', 'lowVeg', 'sweet', 'over', 'weekend', 'lowWater', 'newbie'];
+const TIP_ORDER = ['under', 'fast', 'lapse', 'gain', 'plateau', 'slowEat', 'slowMove', 'season', 'lowProtein', 'lowVeg', 'lowFruit', 'noFish', 'fried', 'sweet', 'over', 'weekend', 'lowWater', 'newbie'];
 
 // Festive seasons — dates are worked out on the phone every year, so this never needs a yearly update.
 //   Tahun Baru Cina → Chinese calendar (1/1) · Ramadan, Aidilfitri, Aidiladha → Hijri calendar (Umm al-Qura: 1 Ramadan,
@@ -133,6 +136,48 @@ const TIPS = [
     b: 'Bila sayur dah ambil separuh pinggan, ruang untuk nasi dan lauk goreng jadi kecil dengan sendirinya. Pilih sayur tumis atau rebus berbanding sayur masak lemak.',
     ask: 'Apa pilihan terbaik di gerai nasi campur?' },
 
+  // ---------- Buah (Piramid Makanan: 2 sajian sehari) ----------
+  { id: 'buah-dua', cat: 'buah', on: ['lowFruit'],
+    t: 'Buah 2 sajian sehari',
+    s: 'Piramid Makanan sarankan 2 sajian buah sehari — sebiji pisang atau sehiris betik dah kira satu.',
+    b: 'Buah beri serat, vitamin dan rasa manis semula jadi. 1 sajian = 1 biji pisang, epal atau oren, atau 1 hiris betik, tembikai atau nanas. Cuba satu waktu pagi dan satu lagi waktu petang.',
+    ask: 'Buah apa yang sesuai untuk diet dan senang dapat?',
+    note: { diabetes: 'Ada kencing manis? Buah masih digalakkan — ambil 1 sajian setiap kali, bukan sekali gus, dan pilih buah segar berbanding jus.' } },
+  { id: 'buah-snek', cat: 'buah', on: ['lowFruit', 'sweet'],
+    t: 'Buah untuk snek petang',
+    s: 'Ganti kuih atau biskut petang dengan buah — manis semula jadi, seratnya buat kenyang.',
+    b: 'Snek petang selalunya kuih goreng atau biskut manis. Buah seperti pisang, jambu batu atau betik kurang kalori, dan seratnya buat kenyang lebih lama. Potong siap dalam bekas supaya senang ambil.',
+    ask: 'Bagi idea snek buah bawah 100 kcal' },
+  { id: 'buah-bawa', cat: 'buah', on: ['lowFruit'],
+    t: 'Bawa buah ke tempat kerja',
+    s: 'Letak pisang atau epal dalam beg — senang capai bila lapar, tak perlu singgah kedai.',
+    b: 'Buah yang tak perlu dikupas dengan pisau (pisang, epal, oren, limau) mudah dibawa ke mana-mana. Bila lapar antara waktu makan, ia pilihan yang lebih baik dari kedai serbaneka.',
+    ask: 'Snek sihat apa yang senang dibawa ke tempat kerja?' },
+
+  // ---------- Ikan (Piramid Makanan: 1 sajian sehari) ----------
+  { id: 'ikan-sehari', cat: 'protein', on: ['noFish'], tags: ['ikan'],
+    t: 'Ikan satu sajian sehari',
+    s: 'Piramid Makanan sarankan ikan setiap hari — seekor ikan kembung atau setengah tin tuna pun cukup.',
+    b: 'Ikan seperti kembung, selar dan sardin murah dan kaya omega-3 yang baik untuk jantung. 1 sajian = 1 ekor ikan kembung sederhana. Masak bakar, kukus atau asam pedas — kurang minyak dari goreng.',
+    ask: 'Bagi idea lauk ikan yang murah dan rendah minyak' },
+  { id: 'ikan-tin', cat: 'protein', on: ['noFish'], tags: ['ikan'],
+    t: 'Ikan dalam tin pun boleh',
+    s: 'Sardin atau tuna dalam tin — cepat, murah dan tetap dikira sebagai ikan.',
+    b: 'Tak sempat beli ikan segar? Tuna dalam air atau sardin dalam tin sesuai untuk roti, nasi atau salad. Pilih tuna dalam air berbanding dalam minyak, dan buang sebahagian kuah sardin yang masin.',
+    ask: 'Bagi resepi ringkas guna tuna atau sardin dalam tin' },
+
+  // ---------- Cara masak ----------
+  { id: 'masak-goreng', cat: 'masak', on: ['fried'],
+    t: 'Kurangkan goreng, cuba bakar',
+    s: 'Banyak goreng minggu ni? Cuba ayam atau ikan bakar, kukus atau air fryer — rasa tetap sedap.',
+    b: 'Makanan goreng menyerap minyak, jadi kalorinya naik banyak tanpa buat lebih kenyang. Tak perlu elak terus — cuba gantikan satu lauk goreng sehari dengan bakar, kukus, rebus atau sup.',
+    ask: 'Bagi idea lauk bakar atau kukus yang senang dimasak' },
+  { id: 'masak-santan', cat: 'masak', on: ['fried'],
+    t: 'Santan secukup rasa',
+    s: 'Masak lemak dan kari sedap, tapi santan tinggi lemak — ambil isi lebih dari kuah.',
+    b: 'Santan memberi rasa lemak tetapi juga banyak kalori. Bila makan kari atau masak lemak, ambil isi (ayam, ikan, sayur) dan kurangkan kuah. Di rumah, cuba campur santan dengan sedikit susu rendah lemak.',
+    ask: 'Macam mana nak kurangkan santan dalam masakan tanpa hilang rasa?' },
+
   // ---------- Karbo ----------
   { id: 'karbo-senduk', cat: 'karbo', on: ['over'],
     t: 'Nasi 1 senduk dah cukup',
@@ -183,7 +228,7 @@ const TIPS = [
     s: 'Tosai atau roti canai kosong dengan dal, dan teh O kurang manis.',
     b: 'Di mamak, pilih tosai, capati atau roti canai kosong berbanding roti telur, murtabak atau roti bom. Minta kuah dal berbanding kari, dan pilih minuman kurang manis.',
     ask: 'Apa pilihan terbaik di kedai mamak?' },
-  { id: 'luar-bakar', cat: 'luar', on: ['over'],
+  { id: 'luar-bakar', cat: 'luar', on: ['over', 'fried'],
     t: 'Pilih bakar, kukus atau sup',
     s: 'Lauk bakar, kukus atau sup berbanding goreng — rasa tetap sedap, minyak kurang.',
     b: 'Cara masak beri beza besar pada kalori. Ayam bakar, ikan kukus atau sup biasanya jauh lebih rendah kalori dari versi goreng tepung. Minta sos atau kuah diasingkan.',

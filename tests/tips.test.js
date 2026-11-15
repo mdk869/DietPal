@@ -100,7 +100,7 @@ test('pickTip: always returns something, even when everything was seen recently'
 
 function signals(days, extra = {}) {
   const S = { profile: { kcalMin: 1400, kcalMax: 1700, waterGoal: 2500, targetWeight: 60, setupAt: Date.parse('2026-01-01'), ...extra.profile }, days, weights: extra.weights || [] };
-  const ctx = load(['todayKey', 'parseKey', 'peekDay', 'kcalOf', 'mainMeals', 'mealMix', 'plateCounts', 'sortedWeights', 'currentWeight', 'addDays', 'weightTrend', 'effPace', 'canAuto', 'tipSignals'],
+  const ctx = load(['PYRAMID', 'PY_KEYS', 'pyOf', 'cookOf', 'pyAdd', 'pyZero', 'pyCounts', 'heavyCount', 'todayKey', 'parseKey', 'peekDay', 'kcalOf', 'mainMeals', 'mealMix', 'plateCounts', 'sortedWeights', 'currentWeight', 'addDays', 'weightTrend', 'effPace', 'canAuto', 'tipSignals'],
     { S, FOODS, isSweetMeal, tipDayDiff: T.tipDayDiff });
   return [...ctx.tipSignals(extra.date || '2026-11-20')].sort();
 }
@@ -111,11 +111,11 @@ const spread = (...items) => items.map((x, i) => ({ ...x, meal: MAINS[i % 3] }))
 
 test('tipSignals: reads the 3 days before, ignores days with too little logged', () => {
   const carbsOnly = { meals: spread(meal('nasip', 900), meal('nasip', 900)), water: 2600 };          // over target, no protein/veg
-  assert.deepEqual(signals({ '2026-11-19': carbsOnly, '2026-11-18': carbsOnly }), ['lowProtein', 'lowVeg', 'over']);
+  assert.deepEqual(signals({ '2026-11-19': carbsOnly, '2026-11-18': carbsOnly }), ['lowFruit', 'lowProtein', 'lowVeg', 'noFish', 'over']);
   assert.deepEqual(signals({ '2026-11-19': carbsOnly }), []);                                  // one day is not a pattern
   assert.deepEqual(signals({ '2026-11-20': carbsOnly, '2026-11-19': { meals: [meal('nasip', 900)], water: 0 } }), []);   // today & thin days don't count
   const sweet = { meals: spread(meal('tehtarik', 120), meal('agrill', 300), meal('sayurr', 80), meal('nasip', 130), meal('telurr', 75), meal('agrill', 300), meal('nasip', 130), meal('sayurr', 80), meal('tehtarik', 120), meal('nasip', 130)), water: 500 };
-  assert.deepEqual(signals({ '2026-11-19': sweet, '2026-11-17': sweet }), ['lowWater', 'sweet']);
+  assert.deepEqual(signals({ '2026-11-19': sweet, '2026-11-17': sweet }), ['lowFruit', 'lowWater', 'noFish', 'sweet']);
 });
 
 test('tipSignals: a day counts only with 2+ main meals; "too little" needs all 3 (v1.10)', () => {
@@ -202,4 +202,19 @@ test('pickWeightTips: activity tips for slowMove, food tip for slowEat, safety t
 test('pickWeightTips: a single signal gets two different tips', () => {
   const out = T.pickWeightTips({ date: '2026-11-15', signals: new Set(['slowMove']) });
   assert.equal(out.length, 2); assert.notEqual(out[0].id, out[1].id); out.forEach(p => assert.equal(p.why, 'slowMove'));
+});
+
+test('tipSignals v1.12.1: fruit, fish (not for people who avoid fish) and fried / santan from the food pyramid', () => {
+  const good = { meals: spread(meal('nasi1', 130), meal('ikanb', 170), meal('pisang', 100), meal('epal', 80), meal('sayurr', 50)), water: 2600 };
+  const fried = { meals: spread(meal('agoreng', 290), meal('nlemak', 400), meal('ikang', 230)), water: 2600 };
+  assert(!signals({ '2026-11-19': good, '2026-11-18': good }).some(k => ['lowFruit', 'noFish', 'fried'].includes(k)));
+  const f = signals({ '2026-11-19': fried, '2026-11-18': fried });
+  assert(f.includes('fried') && f.includes('lowFruit') && !f.includes('noFish'));                   // ikan goreng counts as fish
+  const noFish = { meals: spread(meal('agrill', 220), meal('nasi1', 130)), water: 2600 };
+  assert(signals({ '2026-11-19': noFish, '2026-11-18': noFish }).includes('noFish'));
+  assert(!signals({ '2026-11-19': noFish, '2026-11-18': noFish }, { profile: { avoid: ['ikan'] } }).includes('noFish'));
+  assert(!signals({ '2026-11-19': noFish }).includes('noFish'));                                    // one day is not a pattern
+  const T2 = require('../tips.js');
+  ['lowFruit', 'noFish', 'fried'].forEach(k => assert.equal(T2.pickTip({ date: '2026-11-20', signals: new Set([k]) }).why, k));
+  assert.notEqual(T2.pickTip({ date: '2026-11-20', signals: new Set(['noFish']), avoid: new Set(['ikan']) })?.why, 'noFish');   // fish tips hidden
 });

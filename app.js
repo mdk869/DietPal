@@ -654,6 +654,10 @@ function tipSignals(dk = todayKey()) {
   // 'lain' = own food / AI menu we can't break down: don't call protein or veg low on those days
   if (most(d => { const c = plateCounts(d); return c.protein < 1.5 && c.lain < 1; })) sig.add('lowProtein');
   if (most(d => { const c = plateCounts(d); return c.serat < 1 && c.lain < 1; })) sig.add('lowVeg');
+  // Piramid Makanan: fruit (2 a day), fish (1 a day — not for people who don't eat fish), fried / santan dishes
+  if (most(d => pyCounts(d).buah < 1)) sig.add('lowFruit');
+  if (logged.length >= 2 && logged.every(d => pyCounts(d).ikan === 0) && !(p.avoid || []).includes('ikan')) sig.add('noFish');
+  if (most(d => heavyCount(d) >= 2)) sig.add('fried');
   if (logged.filter(d => d.meals.filter(isSweetMeal).reduce((a, m) => a + m.kcal, 0) >= 100).length >= 2) sig.add('sweet');
   if (most(d => (d.water || 0) < p.waterGoal * 0.6)) sig.add('lowWater');
   if (!prev[0].meals.length && !prev[1].meals.length && Array.from({ length: 12 }, (_, i) => peekDay(addDays(dk, -3 - i))).some(d => d.meals.length)) sig.add('lapse');
@@ -2189,7 +2193,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.12.1';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
