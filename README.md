@@ -2,14 +2,14 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.8.5
+**Versi semasa:** 1.9.0
 
 ## Ciri utama
 
 **Setup & profil**
 - **Pasang dulu** – jika dibuka dalam browser, app hanya papar skrin pasang dengan arahan ikut peranti: butang *Pasang DietPal* (Android / Chrome / Edge), langkah *Share → Add to Home Screen* (iPhone), atau minta buka dalam Chrome/Safari (browser dalam WhatsApp, Instagram, Facebook dll.). Jika ada data lama dalam browser, butang *Simpan data saya* muncul — di iPhone, app yang dipasang bermula kosong, jadi pulihkan backup semasa setup.
 - **Setup kali pertama** – 7 langkah ringkas: nama (atau *Pulihkan data* dari backup), jantina/umur/tinggi, berat semasa & sasaran, kadar turun, tahap aktiviti, pilihan makanan & kesihatan, sasaran, dan **Hidupkan peringatan**.
-- **Sasaran automatik** – kalori dikira dengan formula Mifflin-St Jeor (BMR → TDEE → defisit ikut kadar 0.25/0.5/0.75 kg seminggu), air ~30 ml setiap kg, milestone setiap 10 kg hingga berat sasaran. Mod manual tersedia.
+- **Sasaran automatik** – kalori dikira dengan formula Mifflin-St Jeor (BMR → TDEE → defisit ikut kadar 0.25/0.5/0.75/1 kg seminggu — 1 kg ialah had selamat), air ~30 ml setiap kg, milestone setiap 10 kg hingga berat sasaran. Mod manual tersedia.
 - **Had keselamatan** – minimum 1,500 kcal (lelaki) / 1,200 kcal (perempuan) dalam semua mod; berat sasaran tidak bawah BMI 18.5; umur 18–90 tahun.
 - **Pilihan makanan & alahan** – tak makan daging lembu/kambing, ayam, ikan, makanan laut & belacan; alahan kacang, telur, susu; tak gemar pedas. Menu yang bercanggah tidak dicadangkan.
 - **Nota kesihatan (pilihan)** – kencing manis, darah tinggi, gastrik; menyesuaikan panduan "Rasa tak selesa" dan cadangan menu.
@@ -28,6 +28,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 **Kemajuan & panduan**
 - **Berat & milestone** – graf trend (dengan garis purata 7 hari bila timbang lebih kerap dari seminggu sekali), BMI (had Asia), perubahan 7 hari, milestone yang boleh diedit.
 - **Tips untuk berat anda (v1.8.5)** – kad dalam tab Berat: tip ikut isyarat berat (naik / plateau), atau satu tip berat umum yang bertukar setiap hari. Tekan untuk sheet tip yang sama seperti *Tips hari ini*.
+- **Kadar sebenar vs kadar pilihan (v1.9)** – trend 3–4 minggu (regresi linear atas timbangan) dibanding dengan kadar pilihan (dihadkan oleh had kalori minimum). Turun > 1.2 kg seminggu → tip *makan cukup*. Turun kurang dari separuh kadar → jika log makan selalu lebih sasaran, tip saiz hidangan dulu; jika tidak, tip **senaman** (150 minit seminggu, kekuatan 2 kali seminggu, mesra lutut, kurang duduk lama, bila perlu berhenti). Kategori tips baru: *Senaman*.
 - **Panduan pinggan Suku-Suku Separuh** – ½ sayur, ¼ protein, ¼ karbo kompleks; prinsip 80/20; elak diet ekstrem.
 - **Makan di luar dengan bijak** – 3 cara mudah memesan dan tukaran kecil dengan anggaran kalori dijimat.
 - **Sumber rujukan** – senarai rujukan yang digunakan dalam app (lihat di bawah).
@@ -91,6 +92,8 @@ Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v14` →
 | Digunakan untuk | Sumber |
 | --- | --- |
 | Pinggan Suku-Suku Separuh | Pinggan Sihat Malaysia, Kementerian Kesihatan Malaysia ([Album Makanan Malaysia Edisi Kedua, 2024](https://iku.moh.gov.my/images/teknikal-report/album-makanan-malaysia-edisi-kedua-2024-1.pdf)) |
+| Kadar turun berat selamat 0.5–1 kg seminggu; aktiviti 150–300 minit seminggu | [CPG Management of Obesity, Edisi Ke-2 (2023)](https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf) |
+| Senaman kekuatan 2 hari seminggu | [WHO Guidelines on Physical Activity and Sedentary Behaviour (2020)](https://www.ncbi.nlm.nih.gov/books/NBK566048/) |
 | Kategori BMI (18.5 / 23 / 27.5) | [CPG Management of Obesity, Edisi Ke-2 (2023)](https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf) — KKM, MEMS, MDA & lain-lain |
 | Sasaran kalori automatik (BMR → TDEE) | [Mifflin MD, St Jeor ST et al., Am J Clin Nutr 1990;51:241–247](https://agris.fao.org/search/ar/records/65de26fe7c7033e84be9ee76) |
 | Ambang gula rendah (< 4.0 mmol/L) | Garis panduan hipoglisemia antarabangsa, ambang 3.9–4.0 mmol/L ([kajian sistematik, BMC Endocrine Disorders 2026](https://ruor.uottawa.ca/bitstreams/25132578-f3be-4701-96d9-702abc7eb43b/download)) |
@@ -143,7 +146,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 - Jawapan dihadkan kepada 1,200 token output.
 - Semakan origin (wajib ada header Origin, senarai tepat), had saiz permintaan, tamat masa 30 saat. Origin hanya menyekat laman web lain — had token ialah perlindungan sebenar.
 - App menanda item AI yang bercanggah dengan pantang/alahan pengguna.
-- Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, makanan sendiri, nota kesihatan (jika pengguna benarkan). **Nama dan berat tidak dihantar.**
+- Data dihantar: soalan, ringkasan makanan hari ini, sasaran kalori, pantang/alahan, makanan sendiri, trend berat mingguan sahaja (cth turun 0.3 kg seminggu, status perlahan/laju — v1.9), nota kesihatan (jika pengguna benarkan). **Nama dan berat tidak dihantar.** Coach juga boleh jawab soalan berat badan & aktiviti fizikal harian.
 - **Persetujuan:** sebelum soalan pertama, app terangkan data yang dihantar ke OpenAI dan minta *Setuju & teruskan*. Pengguna boleh matikan *Kongsi nota kesihatan* atau tarik balik persetujuan di Tetapan → Privasi. Notis privasi penuh ada di Tetapan dan Panduan.
 - Tanpa internet atau jika AI gagal, app terus guna cadangan menu Enjin A.
 
@@ -177,8 +180,8 @@ Butang **Scan makanan dengan kamera** dalam sheet *Tambah*. Gambar dikecilkan da
 Tips ditulis siap dalam [`tips.js`](tips.js) — tiada AI, tiada kos. Setiap tip ada kategori, tajuk, teks ringkas (kad & notifikasi), teks penuh, soalan untuk Coach AI, dan pilihan `on` (isyarat), `tags` (makanan yang disebut) dan `season`.
 
 **Cara pilih (sekali sehari, tetap sepanjang hari):**
-1. Isyarat dari 3 hari lepas (hanya hari dengan ≥ 2 item dilog): kalori bawah minimum, terlebih, protein/sayur rendah, air manis, air kurang; tiada log 2 hari; hujung minggu lepas terlebih (Jumaat/Sabtu); berat naik ≥ 1 kg atau tak berubah 2 minggu; minggu pertama.
-2. Ikut keutamaan: keselamatan & berat dulu (`under`, `lapse`, `gain`, `plateau`), kemudian musim perayaan, kemudian tabiat harian. Sebab yang sama tidak diulang dua hari berturut jika ada isyarat lain.
+1. Isyarat dari 3 hari lepas (hanya hari dengan ≥ 2 item dilog): kalori bawah minimum, terlebih, protein/sayur rendah, air manis, air kurang; tiada log 2 hari; hujung minggu lepas terlebih (Jumaat/Sabtu); berat naik ≥ 1 kg atau tak berubah 2 minggu; trend 3–4 minggu terlalu laju (`fast`) atau lebih perlahan dari separuh kadar pilihan (`slowEat` / `slowMove`); minggu pertama.
+2. Ikut keutamaan: keselamatan & berat dulu (`under`, `fast`, `lapse`, `gain`, `plateau`, `slowEat`, `slowMove`), kemudian musim perayaan, kemudian tabiat harian. Sebab yang sama tidak diulang dua hari berturut jika ada isyarat lain.
 3. Tip tidak berulang dalam 30 hari; tip yang ditanda *tak membantu* tidak dipilih lagi; tip yang menyebut makanan dalam pantang/alahan disorok.
 4. Tiada isyarat → giliran umum (tip yang belum pernah dilihat dulu).
 
