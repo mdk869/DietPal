@@ -166,7 +166,7 @@ test('weeklyChange: compares with ~7 days back, says "since" for older, ignores 
 });
 
 test('milestoneRow: weeks follow the chosen pace, no NaN when start is missing or equal', () => {
-  const mk = profile => load(['esc', 'icon', 'parseKey', 'sortedWeights', 'currentWeight', 'milestoneRow'], {
+  const mk = profile => load(['esc', 'icon', 'parseKey', 'sortedWeights', 'currentWeight', 'effPace', 'canAuto', 'milestoneRow'], {
     S: { profile, weights: [{ date: '2026-11-15', kg: 90 }] } });
   let html = mk({ startWeight: 100, pace: '0.25', milestones: [{ name: 'Fasa 1', kg: 85 }] }).milestoneRow({ name: 'Fasa 1', kg: 85 }, 0);
   assert.match(html, /5\.0 kg lagi · anggaran 20 minggu/);
@@ -187,4 +187,19 @@ test('weightAverage: 7-day trailing average of weigh-ins', () => {
   const { weightAverage } = load(['parseKey', 'weightAverage']);
   const avg = weightAverage([{ date: '2026-11-01', kg: 90 }, { date: '2026-11-03', kg: 89 }, { date: '2026-11-07', kg: 88 }, { date: '2026-11-08', kg: 91 }]);
   assert.deepEqual(avg.map(v => Math.round(v * 100) / 100), [90, 89.5, 89, 89.33]);   // 1 Nov drops out of the window on 8 Nov
+});
+
+test('pace 1 kg/week survives backup restore; effPace is limited by the calorie floor', () => {
+  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  assert.equal(sanitizeState({ profile: { pace: '1.0' } }).profile.pace, '1.0');
+  assert.equal(sanitizeState({ profile: { pace: '2' } }).profile.pace, '0.5');
+  const mk = profile => load(['ACTIVITY', 'parseKey', 'sortedWeights', 'currentWeight', 'kcalFloor', 'canAuto', 'autoWater', 'calcTargets', 'effPace'],
+    { S: { profile, weights: [] } });
+  // small woman, low activity: TDEE ~1,540 → floor 1,200 leaves room for ~0.3 kg/week only
+  let p = { sex: 'P', age: 40, height: 152, startWeight: 62, activity: 'rendah', pace: '1.0', kcalMin: 1200, kcalMax: 1400 };
+  const e = mk(p).effPace(p); assert(e < 0.5 && e > 0.1, String(e));
+  // big man: 1 kg/week is reachable
+  p = { sex: 'L', age: 35, height: 175, startWeight: 120, activity: 'sederhana', pace: '1.0', kcalMin: 1700, kcalMax: 1900 };
+  assert.equal(mk(p).effPace(p), 1);
+  assert.equal(mk({ pace: '0.75' }).effPace({ pace: '0.75' }), 0.75);   // no profile data: chosen pace
 });

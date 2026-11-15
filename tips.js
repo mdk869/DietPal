@@ -5,7 +5,7 @@
 // Loaded by the app (<script src="tips.js">) and by the unit tests (require).
 const TIP_CATS = {
   protein: 'Protein', sayur: 'Sayur', karbo: 'Karbo', gula: 'Gula & minuman', luar: 'Makan luar',
-  air: 'Air', berat: 'Berat badan', tabiat: 'Tabiat', perayaan: 'Musim perayaan'
+  air: 'Air', berat: 'Berat badan', senam: 'Senaman', tabiat: 'Tabiat', perayaan: 'Musim perayaan'
 };
 
 // Why a tip was picked today — shown in the sheet ("Anda nampak tip ni sebab …").
@@ -14,6 +14,9 @@ const TIP_WHY = {
   lapse: 'tiada log makan 2 hari lepas',
   gain: 'berat anda naik minggu ini',
   plateau: 'berat anda hampir sama sejak 2 minggu',
+  fast: 'berat anda turun lebih 1 kg seminggu sejak 3 minggu',
+  slowEat: 'berat anda turun lebih perlahan dari kadar pilihan, dan kalori yang dilog selalu lebih dari sasaran',
+  slowMove: 'berat anda turun lebih perlahan dari kadar pilihan anda sejak 3 minggu',
   lowProtein: 'protein dalam log anda rendah dalam 3 hari lepas',
   lowVeg: 'sayur dalam log anda kurang dalam 3 hari lepas',
   sweet: 'ada air manis dalam log anda dalam 3 hari lepas',
@@ -23,7 +26,7 @@ const TIP_WHY = {
   newbie: 'ini minggu pertama anda guna DietPal'
 };
 // Checked in this order. A season tip comes after the safety/progress signals but before everyday nudges.
-const TIP_ORDER = ['under', 'lapse', 'gain', 'plateau', 'season', 'lowProtein', 'lowVeg', 'sweet', 'over', 'weekend', 'lowWater', 'newbie'];
+const TIP_ORDER = ['under', 'fast', 'lapse', 'gain', 'plateau', 'slowEat', 'slowMove', 'season', 'lowProtein', 'lowVeg', 'sweet', 'over', 'weekend', 'lowWater', 'newbie'];
 
 // Festive seasons — dates are worked out on the phone every year, so this never needs a yearly update.
 //   Tahun Baru Cina → Chinese calendar (1/1) · Ramadan, Aidilfitri, Aidiladha → Hijri calendar (Umm al-Qura: 1 Ramadan,
@@ -223,7 +226,64 @@ const TIPS = [
     b: 'Minum segelas air kira-kira 15–30 minit sebelum makan boleh bantu anda rasa kenyang lebih awal, jadi kurang tambah nasi.',
     ask: 'Bila waktu terbaik untuk minum air?' },
 
+  // ---------- Senaman ----------
+  // Activity: 150–300 min/week moderate + muscle strengthening 2 days/week (CPG Obesity KKM 2023; WHO 2020).
+  { id: 'senam-150', cat: 'senam', on: ['slowMove'],
+    t: 'Sasaran 150 minit seminggu',
+    s: '30 minit sehari, 5 hari seminggu. Boleh pecah jadi 3 × 10 minit — jalan laju pun dikira.',
+    b: 'KKM dan WHO menyarankan sekurang-kurangnya 150 minit aktiviti sederhana seminggu, dan naik perlahan-lahan ke 300 minit untuk bantu turun berat. Sederhana maksudnya nafas lebih laju: masih boleh bercakap, tapi tak boleh menyanyi. Jalan laju, berbasikal, berenang dan senamrobik semuanya dikira.',
+    note: { diabetes: 'Ada kencing manis dan guna insulin atau ubat yang turunkan gula? Bawa snek kecil semasa bersenam dan tanya doktor tentang tanda gula rendah.' },
+    ask: 'Bagi jadual senaman 150 minit seminggu untuk pemula' },
+  { id: 'senam-kekuatan', cat: 'senam', on: ['slowMove', 'plateau'],
+    t: 'Senaman kekuatan 2 kali seminggu',
+    s: 'Duduk-bangun dari kerusi, tolak dinding, angkat botol air — 15 minit di rumah, tak perlu gym.',
+    b: 'Senaman kekuatan bantu kekalkan otot semasa diet, jadi badan terus guna tenaga dan nampak lebih tegap. Cuba 2 kali seminggu: duduk-bangun dari kerusi, tolak dinding, dan angkat botol air 1.5 liter. Buat 2–3 set, 8–12 kali setiap satu. Bernafas seperti biasa, jangan tahan nafas.',
+    note: { bp: 'Ada darah tinggi? Guna beban ringan, jangan tahan nafas, dan tanya doktor dulu jika tekanan darah belum terkawal.' },
+    ask: 'Bagi rutin senaman kekuatan 15 minit di rumah tanpa alat' },
+  { id: 'senam-lutut', cat: 'senam', on: ['slowMove'],
+    t: 'Senaman mesra lutut',
+    s: 'Berat badan tinggi? Pilih jalan kaki, berenang, basikal statik atau senam duduk — kurang hentakan.',
+    b: 'Melompat dan berlari memberi hentakan besar pada lutut bila berat badan tinggi. Mula dengan aktiviti kurang hentakan: jalan kaki di permukaan rata, berenang atau berjalan dalam air, basikal statik, atau senaman sambil duduk. Pakai kasut yang selesa. Berlari boleh dicuba kemudian bila berat dah turun dan badan dah biasa.',
+    ask: 'Senaman apa yang tak sakitkan lutut untuk orang berat badan tinggi?' },
+  { id: 'senam-duduk', cat: 'senam', on: ['slowMove'],
+    t: 'Kurangkan duduk lama',
+    s: 'Bangun dan bergerak 2–3 minit setiap 30–60 minit. Naik tangga, parkir jauh sikit.',
+    b: 'Pergerakan kecil sepanjang hari — berdiri, berjalan ke pantri, naik tangga, kemas rumah — membakar tenaga yang banyak bila dijumlahkan. Set peringatan dalam telefon untuk bangun setiap jam, bercakap telefon sambil berjalan, dan parkir lebih jauh dari pintu.',
+    ask: 'Macam mana nak lebih aktif kalau kerja duduk sepanjang hari?' },
+  { id: 'senam-langkah', cat: 'senam',
+    t: 'Tambah langkah sikit-sikit',
+    s: 'Tengok kiraan langkah dalam telefon, kemudian tambah 1,000 langkah sehari setiap minggu.',
+    b: 'Kebanyakan telefon sudah kira langkah. Tengok purata anda minggu ini, kemudian tambah lebih kurang 1,000 langkah sehari (lebih kurang 10 minit berjalan) setiap minggu. Naik perlahan-lahan lebih mudah dikekalkan berbanding terus sasar 10,000 langkah.',
+    ask: 'Macam mana nak tambah langkah harian dengan mudah?' },
+  { id: 'senam-bukan-tiket', cat: 'senam', on: ['slowEat', 'slowMove'],
+    t: 'Senam bukan tiket makan lebih',
+    s: 'Kalori yang dibakar selalunya lebih kecil dari sangkaan. Jangan tambah makan sebab dah bersenam.',
+    b: 'Jalan laju 30 minit membakar lebih kurang 100–200 kcal — lebih kurang secawan teh tarik. Jam pintar dan mesin gym pula selalu terlebih anggar. Jadi kekalkan sasaran kalori yang sama pada hari bersenam, dan minum air kosong, bukan minuman isotonik yang manis.',
+    ask: 'Perlu ke saya makan lebih pada hari bersenam?' },
+  { id: 'senam-berhenti', cat: 'senam',
+    t: 'Bila perlu berhenti bersenam',
+    s: 'Sakit dada, sesak nafas luar biasa atau pening — berhenti segera. Mula perlahan, naik sikit-sikit.',
+    b: 'Senaman sepatutnya buat nafas laju, bukan sakit. Berhenti dan berehat jika rasa sakit atau ketat di dada, pening, jantung berdebar luar biasa, atau sakit sendi yang tajam. Sakit dada yang tak hilang bila berehat — hubungi 999. Jika ada sakit jantung, darah tinggi yang tak terkawal atau baru bersalin, tanya doktor sebelum mula.',
+    note: { diabetes: 'Ada kencing manis? Rasa menggeletar, berpeluh sejuk atau keliru semasa bersenam boleh jadi tanda gula rendah — berhenti dan ambil sesuatu yang manis.', bp: 'Ada darah tinggi? Elak senaman yang buat anda tahan nafas atau angkat beban berat.' },
+    ask: 'Apa tanda saya bersenam terlalu kuat?' },
+
   // ---------- Berat badan ----------
+  // Safe rate: 0.5–1 kg a week (CPG Management of Obesity, KKM 2023). Faster isn't better.
+  { id: 'berat-laju', cat: 'berat', on: ['fast'],
+    t: 'Turun laju? Pastikan makan cukup',
+    s: 'Turun lebih 1 kg seminggu berterusan bukan lebih baik. Makan ikut sasaran, ada protein setiap kali makan.',
+    b: 'Kadar yang selamat ialah 0.5–1 kg seminggu. Minggu pertama memang laju sebab air, tapi kalau berterusan, badan boleh hilang otot, rasa lemah atau pening, dan berat lebih mudah naik semula. Makan dalam sasaran kalori (jangan bawah had minimum), ada protein setiap kali makan dan minum air cukup. Jumpa doktor jika rasa lemah, pening atau rambut gugur.',
+    ask: 'Berat saya turun lebih 1 kg seminggu. Adakah ini selamat?' },
+  { id: 'berat-hidangan', cat: 'berat', on: ['slowEat'],
+    t: 'Semak saiz hidangan dulu',
+    s: 'Kalori log selalu lebih sasaran — itu punca utama. Cuba kurang ½ senduk nasi dan pilih air kurang manis.',
+    b: 'Dalam 2 minggu lepas, kalori yang dilog selalu lebih dari sasaran. Itu sebab utama berat turun perlahan, dan senaman sahaja susah nak tampung. Mula dengan satu perubahan kecil: kurang ½ senduk nasi, minuman kurang manis atau kosong, dan kuah atau sambal sikit. Log juga minyak dan minuman supaya kiraan lebih tepat.',
+    ask: 'Macam mana nak kurangkan kalori tanpa rasa lapar?' },
+  { id: 'berat-selamat', cat: 'berat', on: ['slowMove'],
+    t: 'Nak cepat tapi selamat?',
+    s: 'Paling laju yang selamat: 1 kg seminggu. Gabungkan makan ikut sasaran dan aktif 150 minit seminggu.',
+    b: 'Garis panduan obesiti KKM menyarankan turun 0.5–1 kg seminggu. Untuk sampai ke kadar itu: makan ikut sasaran kalori, aktif sekurang-kurangnya 150 minit seminggu, dan buat senaman kekuatan 2 kali seminggu. Jangan skip makan atau makan bawah had minimum — itu bukan cara selamat dan berat selalu naik semula. Kadar turun berat boleh ditukar di Profil.',
+    ask: 'Macam mana nak turun berat lebih cepat tapi masih selamat?' },
   { id: 'berat-plateau', cat: 'berat', on: ['plateau'],
     t: 'Berat tak turun 2 minggu? Normal',
     s: 'Plateau biasa berlaku. Semak saiz hidangan, tambah jalan kaki, dan teruskan — jangan potong makan.',
@@ -276,7 +336,7 @@ const TIPS = [
     s: 'Kurang tidur boleh buat lebih lapar dan teringin makanan manis esoknya. Cuba tidur 7–8 jam.',
     b: 'Tidur yang tak cukup mengganggu hormon yang kawal rasa lapar dan kenyang. Elak skrin sebelum tidur dan cuba tidur pada waktu yang sama setiap malam.',
     ask: 'Snek malam yang sesuai kalau lapar sebelum tidur?' },
-  { id: 'tabiat-jalan', cat: 'tabiat', on: ['plateau'],
+  { id: 'tabiat-jalan', cat: 'tabiat', on: ['plateau', 'slowMove'],
     t: 'Jalan kaki lepas makan',
     s: 'Jalan 10–15 minit lepas makan — senang, tak perlu ke gym.',
     b: 'Jalan kaki ringan lepas makan bantu tambah aktiviti harian tanpa rasa penat. Mula dengan 10 minit lepas makan malam, dan tambah bila dah biasa.',
@@ -390,7 +450,7 @@ function pickTip(o) {
 }
 // Tips for the Berat page: up to `max` tips for the weight signals found (one per signal, in this order),
 // else one general Berat badan tip that changes daily. Ignores the 30-day repeat window — these are reference, not "today's tip".
-const TIP_WEIGHT_KEYS = ['gain', 'plateau'];
+const TIP_WEIGHT_KEYS = ['fast', 'gain', 'plateau', 'slowEat', 'slowMove'];
 function pickWeightTips(o) {
   const votes = o.votes || {}, avoid = o.avoid || new Set(), signals = o.signals || new Set(), max = o.max || 2, out = [];
   const ok = x => votes[x.id] !== -1 && !x.season && !(x.tags || []).some(t => avoid.has(t)) && !out.some(p => p.id === x.id);
@@ -398,6 +458,10 @@ function pickWeightTips(o) {
   for (const k of TIP_WEIGHT_KEYS) {
     if (out.length >= max || !signals.has(k)) continue;
     const x = choose(TIPS.filter(x => ok(x) && (x.on || []).includes(k)), k); if (x) out.push({ id: x.id, why: k });
+  }
+  // Only one signal: a second tip for the same signal (e.g. food + activity for a slow week).
+  if (out.length === 1 && out[0].why && max > 1) {
+    const k = out[0].why, x = choose(TIPS.filter(x => ok(x) && (x.on || []).includes(k)), k + '|2'); if (x) out.push({ id: x.id, why: k });
   }
   // General: weight tips not written only for a signal (e.g. "Berat tak turun 2 minggu?" stays out when there is no plateau).
   const general = x => x.cat === 'berat' && !((x.on || []).length && x.on.every(k => TIP_WEIGHT_KEYS.includes(k)));

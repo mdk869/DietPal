@@ -94,7 +94,7 @@ function sanitizeState(d) {
   const profile = {
     setupDone: p.setupDone === true, setupAt: n(p.setupAt, 0, 9e15) ?? undefined, name: s(p.name, 40), sex: oneOf(p.sex, ['L', 'P'], ''),
     age: n(p.age, 18, 90), height: n(p.height, 100, 250), startWeight: n(p.startWeight, 30, 300), targetWeight: n(p.targetWeight, 30, 300),
-    activity: oneOf(p.activity, ['rendah', 'sederhana', 'aktif'], bp.activity), pace: oneOf(String(p.pace), ['0.25', '0.5', '0.75'], bp.pace),
+    activity: oneOf(p.activity, ['rendah', 'sederhana', 'aktif'], bp.activity), pace: oneOf(String(p.pace), ['0.25', '0.5', '0.75', '1.0'], bp.pace),
     kcalMode: oneOf(p.kcalMode, ['auto', 'manual'], bp.kcalMode), waterMode: oneOf(p.waterMode, ['auto', 'manual'], bp.waterMode),
     kcalMin: n(p.kcalMin, 800, 6000, bp.kcalMin), kcalMax: n(p.kcalMax, 800, 6000, bp.kcalMax),
     waterGoal: n(p.waterGoal, 500, 10000, bp.waterGoal), waterIdeal: n(p.waterIdeal, 500, 10000, bp.waterIdeal),
@@ -612,6 +612,15 @@ function tipSignals(dk = todayKey()) {
     const kg = recent.map(w => w.kg);
     if (Math.max(...kg) - Math.min(...kg) <= 0.5 && (!p.targetWeight || last.kg > p.targetWeight + 0.5)) sig.add('plateau');
   }
+  // Rate over 3–4 weeks vs the chosen pace. Too fast → safety tip. Too slow → food first if the log is over target, else activity.
+  const tr = weightTrend(dk);
+  if (tr && tr.span >= 20) {
+    if (tr.rate <= -1.2) sig.add('fast');
+    else if (!sig.has('plateau') && !sig.has('gain') && (!p.targetWeight || last.kg > p.targetWeight + 0.5) && tr.rate > -0.5 * effPace(p)) {
+      const d14 = Array.from({ length: 14 }, (_, i) => peekDay(addDays(dk, -1 - i))).filter(d => d.meals.length >= 2);
+      sig.add(d14.length >= 4 && d14.filter(d => kcalOf(d) > p.kcalMax).length * 2 >= d14.length ? 'slowEat' : 'slowMove');
+    }
+  }
   if (p.setupAt && dk <= todayKey(new Date(p.setupAt + 6 * 864e5))) sig.add('newbie');
   return sig;
 }
@@ -911,7 +920,7 @@ function viewWeight() {
       <div><div class="text-[12px] text-slate-500">Dah turun</div><div class="text-xl font-extrabold text-brand-700">${Math.max(0, start - cur).toFixed(1)}</div><div class="text-[12px] text-slate-500">dari ${fmtKg(start)} kg</div></div>
       <div><div class="text-[12px] text-slate-500">BMI</div><div class="text-xl font-extrabold">${b.toFixed(1)}</div><div class="text-[12px] text-slate-500">${bmiLabel(b)}</div></div>
     </div>
-    ${ch ? `<div class="mt-3 text-[13px] text-center rounded-xl py-2 ${wk <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}">${since}: ${wk <= 0 ? '↓' : '↑'} ${Math.abs(wk).toFixed(1)} kg ${wk > 0 ? '— biasa naik turun sebab air & garam, tengok trend minggu ke minggu' : rate < -1.2 ? `— laju! Pastikan makan cukup, jangan bawah ${fmt(kcalFloor())} kcal selalu` : '— kadar sihat'}</div>` : ''}`)}
+    ${ch ? `<div class="mt-3 text-[13px] text-center rounded-xl py-2 ${wk <= 0 && rate >= -1.2 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}">${since}: ${wk <= 0 ? '↓' : '↑'} ${Math.abs(wk).toFixed(1)} kg ${wk > 0 ? '— biasa naik turun sebab air & garam, tengok trend minggu ke minggu' : rate < -1.2 ? `— laju! Pastikan makan cukup, jangan bawah ${fmt(kcalFloor())} kcal selalu` : '— kadar sihat'}</div>` : ''}`)}
 
   ${card(`
     <div class="font-bold text-[16px] mb-3">Log berat</div>
@@ -955,9 +964,9 @@ function weightTipsCard() {
   const why = k => { const w = TIP_WHY[k] || ''; return w.charAt(0).toUpperCase() + w.slice(1); };
   return card(`
     <div class="font-bold text-[16px] flex items-center gap-1.5">${icon('lightbulb', 'w-4 h-4')}Tips untuk berat anda</div>
-    <div class="divide-y divide-slate-100">${list.map(({ x, why: k }) => `
+    <div class="divide-y divide-slate-100">${list.map(({ x, why: k }, i) => `
       <button data-act="tipOpen" data-id="${x.id}" data-why="${k}" class="tap block w-full text-left py-3">
-        ${k ? `<span class="block text-[12px] font-semibold text-brand-700">${esc(why(k))}</span>` : ''}
+        ${k && (i === 0 || list[i - 1].why !== k) ? `<span class="block text-[12px] font-semibold text-brand-700">${esc(why(k))}</span>` : ''}
         <span class="block font-semibold text-[15px] leading-snug">${esc(x.t)}</span>
         <span class="block text-[13px] text-slate-600 mt-0.5 leading-snug">${esc(x.s)}</span>
         <span class="inline-flex items-center gap-1 mt-1.5 text-[13px] font-bold text-brand-700">Baca lagi ${ph('caret-right-bold', 13)}</span>
@@ -980,7 +989,7 @@ function milestoneRow(m, i) {
   const from = i === 0 ? (p.startWeight || cur) : p.milestones[i - 1].kg;
   const done = cur <= m.kg;
   const span = from - m.kg, pct = span > 0 ? Math.max(0, Math.min(100, ((from - cur) / span) * 100)) : 0;
-  const left = cur - m.kg, pace = parseFloat(p.pace) || 0.5;
+  const left = cur - m.kg, pace = effPace(p);
   const active = !done && (i === 0 || cur <= p.milestones[i - 1].kg);
   return `
   <div class="${!done && !active ? 'opacity-60' : ''}">
@@ -1028,6 +1037,34 @@ function weightChart(ws) {
     <text x="${W - pr}" y="${H - 6}" text-anchor="end" font-size="10" fill="#94a3b8">${niceDate(pts[pts.length - 1].date)}</text>
   </svg>
   ${showMa ? `<p class="mt-1 flex items-center gap-3 text-[12px] text-slate-500"><span class="inline-flex items-center gap-1.5"><span class="w-4 h-[3px] rounded-full bg-brand-700"></span>Purata 7 hari</span><span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full border-2 border-brand-700 opacity-50"></span>Timbangan</span></p>` : ''}`;
+}
+// Trend over the last `days` days: least-squares slope of the weigh-ins → kg per week (negative = losing).
+// Needs ≥3 weigh-ins spanning ≥14 days, the latest within 7 days of `dk`. Smooths out day-to-day water swings.
+function weightTrend(dk = todayKey(), days = 28) {
+  const back = w => Math.round((parseKey(dk) - parseKey(w.date)) / 864e5);
+  const ws = sortedWeights().filter(w => w.date <= dk && back(w) <= days);
+  if (ws.length < 3 || back(ws[ws.length - 1]) > 7) return null;
+  const xs = ws.map(w => -back(w)), span = xs[xs.length - 1] - xs[0];
+  if (span < 14) return null;
+  const mx = xs.reduce((a, v) => a + v, 0) / xs.length, my = ws.reduce((a, w) => a + w.kg, 0) / ws.length;
+  const slope = xs.reduce((a, x, i) => a + (x - mx) * (ws[i].kg - my), 0) / xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+  return { rate: slope * 7, span, n: ws.length };
+}
+// The rate the user can actually reach: their chosen pace, unless the calorie target (e.g. raised to the safety
+// floor) only allows a smaller deficit. Used for "slow" and the milestone estimate.
+function effPace(p = S.profile) {
+  const pace = parseFloat(p.pace) || 0.5;
+  if (!canAuto(p) || !(p.kcalMax > 0) || !(p.height > 0)) return pace;
+  const t = calcTargets(p), ach = (t.tdee - (p.kcalMin + p.kcalMax) / 2) * 7 / 7700;
+  return Math.max(0.1, Math.min(pace, Math.round(ach * 20) / 20));
+}
+// What Coach AI gets about weight: the weekly trend only — never a weight, target or BMI.
+function weightTrendForAI() {
+  const tr = weightTrend(); if (!tr) return null;
+  const p = S.profile, r = Math.round(tr.rate * 10) / 10, cur = currentWeight();
+  const status = p.targetWeight && cur <= p.targetWeight + 0.5 ? 'capai' : tr.rate <= -1.2 ? 'laju' : tr.rate >= 0.3 ? 'naik'
+    : Math.abs(tr.rate) < 0.15 ? 'tetap' : tr.rate > -0.5 * effPace(p) ? 'perlahan' : 'ikut';
+  return { ratePerWeek: r, weeks: Math.max(2, Math.round(tr.span / 7)), pace: parseFloat(p.pace) || 0.5, status };
 }
 // For each weigh-in: average of the weigh-ins in the 7 days up to and including it (smooths out water & salt swings).
 function weightAverage(ws) {
@@ -1085,10 +1122,12 @@ const guideRow = (c, t, d) => `<div class="flex gap-3 items-start"><span class="
 const SOURCES = [
   { title: 'Pinggan Sihat Malaysia (KKM)', use: 'Suku-Suku Separuh',
     url: 'https://iku.moh.gov.my/images/teknikal-report/album-makanan-malaysia-edisi-kedua-2024-1.pdf' },
-  { title: 'CPG Pengurusan Obesiti 2023 (KKM)', use: 'kategori BMI',
+  { title: 'CPG Pengurusan Obesiti 2023 (KKM)', use: 'kategori BMI, kadar turun berat & aktiviti',
     url: 'https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf' },
   { title: 'Formula Mifflin-St Jeor (1990)', use: 'sasaran kalori',
     url: 'https://agris.fao.org/search/ar/records/65de26fe7c7033e84be9ee76' },
+  { title: 'Garis panduan aktiviti fizikal WHO (2020)', use: 'senaman kekuatan',
+    url: 'https://www.ncbi.nlm.nih.gov/books/NBK566048/' },
   { title: 'Panduan hipoglisemia antarabangsa', use: 'nota kencing manis',
     url: 'https://ruor.uottawa.ca/bitstreams/25132578-f3be-4701-96d9-702abc7eb43b/download' }
 ];
@@ -1454,7 +1493,7 @@ function suggestBlock(inSheet = false) {
   ${AI_ENDPOINT ? `<button data-act="askAI" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">${icon('lightbulb', 'w-4 h-4')}Tanya Coach AI — soalan bebas</button>` : ''}`;
 }
 
-// Context the AI coach (Enjin B) will receive later — no name, no weight history.
+// Context the AI coach (Enjin B) receives — no name, no weight or weight history (only the weekly trend, e.g. −0.3 kg/week).
 function buildAIContext(extra = {}, meal = UI.sug.meal) {
   const d = peekDay(todayKey()), p = S.profile, general = meal === 'umum';
   const t = mealTarget(general ? 'snek' : meal);
@@ -1467,7 +1506,7 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
     health: S.settings.ai?.health === false ? [] : (p.health || []),   // user can choose not to share health notes
     // The app presets (foods.js) already live on the server; only the user's own foods are sent.
     catalog: S.customFoods.filter(f => !foodConflicts(f).length).slice(0, 60).map(f => ({ name: f.name, unit: f.unit, kcal: f.kcal })),
-    recentMenus: recentAIMenus(), ...extra
+    recentMenus: recentAIMenus(), weightTrend: weightTrendForAI(), ...extra
   };
 }
 
@@ -1556,7 +1595,7 @@ function aiConsentHtml() {
       <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}Sasaran kalori, pantang & alahan, makanan sendiri</li>
       ${hasHealth ? `<li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}Nota kesihatan (jika dibenarkan di bawah)</li>` : ''}
     </ul>
-    <p class="text-[13px] text-slate-500 mt-2">Nama dan berat <b>tidak</b> dihantar. OpenAI tidak guna data ini untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan.</p>
+    <p class="text-[13px] text-slate-500 mt-2">Nama dan berat <b>tidak</b> dihantar — hanya trend mingguan (cth turun 0.3 kg seminggu). OpenAI tidak guna data ini untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan.</p>
     ${hasHealth ? `<div class="mt-3 rounded-xl bg-slate-50 px-3">${toggleRow('aiToggle', 'health', S.settings.ai?.health !== false, 'Kongsi nota kesihatan', 'Supaya cadangan elak gula, garam atau pedas ikut keadaan anda')}</div>` : ''}
     <button data-act="aiConsent" class="tap mt-4 w-full btn btn-primary py-3 text-[16px]">Setuju & teruskan</button>
     <button data-act="privacy" class="tap mt-2 w-full btn btn-text py-2 text-[14px]">Baca notis privasi</button>
@@ -1572,7 +1611,7 @@ function privacyBody() {
     <div class="px-5 pb-8">
     ${sec('Dalam telefon anda', '<p>Profil, makanan, air, berat dan tetapan disimpan dalam telefon ini sahaja. DietPal tiada akaun dan tiada salinan di server. Padam bila-bila masa: Tetapan → <b>Padam semua data</b>.</p>')}
     ${sec('Notifikasi (Supabase, Singapura)', '<p>Untuk hantar peringatan pada masa yang betul: alamat notifikasi telefon, zon waktu, waktu makan & pilihan peringatan, dan status hari ini (waktu makan yang dah dilog — ya/tidak, jumlah air, jumlah kalori, tarikh timbang terakhir).</p><p>Nama, berat dan senarai makanan <b>tidak</b> dihantar. Data ini dipadam bila notifikasi dimatikan atau data dipadam.</p>')}
-    ${sec('Coach AI (OpenAI, Amerika Syarikat)', `<p>Hanya bila anda bertanya: soalan, makanan yang dilog hari ini, sasaran kalori, pantang & alahan, makanan sendiri${(S.profile.health || []).length ? ', dan nota kesihatan jika dibenarkan' : ''}. Nama dan berat tidak dihantar.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>`)}
+    ${sec('Coach AI (OpenAI, Amerika Syarikat)', `<p>Hanya bila anda bertanya: soalan, makanan yang dilog hari ini, sasaran kalori, pantang & alahan, makanan sendiri, trend berat mingguan (cth turun 0.3 kg seminggu)${(S.profile.health || []).length ? ', dan nota kesihatan jika dibenarkan' : ''}. Nama dan berat tidak dihantar.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>`)}
     ${sec('Scan makanan (OpenAI, Amerika Syarikat)', '<p>Hanya bila anda scan: gambar makanan (dikecilkan dalam telefon dulu) dihantar ke OpenAI untuk anggaran kalori. DietPal <b>tidak</b> menyimpan gambar itu — ia tidak disimpan di server kami dan tidak dimasukkan ke backup.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>')}
     ${sec('Tips hari ini', '<p>Tip dipilih dalam telefon ini berdasarkan log anda — log tidak dihantar ke mana-mana. Jika peringatan tips hidup, tajuk tip hari ini & esok dihantar bersama status notifikasi.</p><p>Bila anda tekan <b>membantu / tak membantu</b>, server simpan tip yang dinilai, undian anda dan ID rawak telefon dalam bentuk hash — tanpa nama atau data diet — supaya kami tahu tip mana yang berguna.</p>')}
     ${sec('Had penggunaan Coach AI', '<p>Untuk had soalan dan had scan, server simpan ID rawak telefon (bukan nama atau nombor telefon) dan alamat IP dalam bentuk hash, bersama kiraan token. Rekod dipadam selepas 2 hari tidak digunakan.</p>')}
@@ -1605,7 +1644,7 @@ function aiBody() {
       ${(general ? AI_CHIPS_GENERAL : AI_CHIPS).map((c, i) => `<button data-act="aiChip" data-i="${i}" class="tap chip">${c}</button>`).join('')}
     </div>
     <button data-act="aiAsk" class="tap mt-3 w-full btn btn-primary py-3 text-[16px]" ${a.loading ? 'disabled' : ''}>${a.loading ? 'Coach sedang fikir…' : 'Tanya'}</button>
-    <p class="text-[12px] text-slate-500 mt-2">Soalan anda, ringkasan makanan hari ini, pilihan makanan${S.settings.ai?.health === false ? '' : ' & nota kesihatan'} dihantar ke OpenAI untuk jawapan. Nama dan berat tidak dihantar. <button data-act="privacy" class="font-semibold text-brand-700 underline underline-offset-2">Privasi</button></p>
+    <p class="text-[12px] text-slate-500 mt-2">Soalan anda, ringkasan makanan hari ini, trend berat mingguan, pilihan makanan${S.settings.ai?.health === false ? '' : ' & nota kesihatan'} dihantar ke OpenAI untuk jawapan. Nama dan berat tidak dihantar. <button data-act="privacy" class="font-semibold text-brand-700 underline underline-offset-2">Privasi</button></p>
 
     ${a.loading ? `<div class="mt-4 space-y-2">${[1, 2].map(() => '<div class="h-20 rounded-xl bg-slate-100 animate-pulse"></div>').join('')}</div>` : ''}
 
@@ -1853,7 +1892,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.8.5';
+const APP_VERSION = '1.9.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -1862,7 +1901,8 @@ const ACTIVITY = {
 const PACE = {
   '0.25': { label: 'Perlahan', d: '0.25 kg seminggu' },
   '0.5':  { label: 'Sederhana', d: '0.5 kg seminggu · disyorkan' },
-  '0.75': { label: 'Laju', d: '0.75 kg seminggu' }
+  '0.75': { label: 'Laju', d: '0.75 kg seminggu' },
+  '1.0':  { label: 'Paling laju', d: '1 kg seminggu · had selamat' }
 };
 const AVOID = { daging: 'Daging lembu / kambing', ayam: 'Ayam', ikan: 'Ikan', laut: 'Makanan laut & belacan' };
 const ALLERGY = { kacang: 'Kacang', telur: 'Telur', susu: 'Susu / laktosa' };
@@ -2051,7 +2091,8 @@ function viewOnboard() {
     <div class="bg-white rounded-2xl shadow-card p-3 mt-2">
       <div class="text-[12px] text-slate-500 mb-1">Milestone</div>
       ${ms.map((m, i) => `<div class="flex justify-between text-[14px] py-1"><span>${i + 1}. ${esc(m.name)}</span><b>${esc(m.kg)} kg</b></div>`).join('')}
-      <div class="text-[12px] text-slate-500 mt-1">Anggaran ${Math.ceil((d.weight - d.target) / parseFloat(d.pace))} minggu pada kadar ${PACE[d.pace].d.split(' ·')[0]}.</div>
+      ${(() => { const want = parseFloat(d.pace), eff = Math.max(0.1, Math.min(want, Math.round((t.tdee - (t.min + t.max) / 2) * 7 / 7700 * 20) / 20));
+        return `<div class="text-[12px] text-slate-500 mt-1">Anggaran ${Math.ceil((d.weight - d.target) / eff)} minggu pada kadar ${eff < want ? `~${eff} kg seminggu (had kalori minimum tak cukup untuk ${want} kg)` : PACE[d.pace].d.split(' ·')[0]}.</div>`; })()}
     </div>
     ${nav()}`;
   }

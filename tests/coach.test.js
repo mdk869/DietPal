@@ -92,3 +92,11 @@ test('variety: no example dish names in the prompt; recent AI menus are passed o
   assert.match(msg, /Cadangan AI terkini \(elak ulang\): Mee hoon sup; Nasi lemak separuh; <x>/);
   assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Cadangan AI terkini/);
 });
+
+test('Coach AI gets the weekly weight trend only — whitelisted, never a weight', () => {
+  const msg = buildUserMessage({ question: 'x', context: { weightTrend: { ratePerWeek: -0.24, weeks: 4, pace: 0.5, status: 'perlahan', kg: 92 } } });
+  assert.match(msg, /Trend berat 4 minggu lepas \(nombor berat tidak dikongsi\): turun 0\.2 kg seminggu — lebih perlahan dari kadar yang dipilih \(kadar dipilih 0\.5 kg seminggu\)\./);
+  assert.doesNotMatch(msg, /92/);
+  assert.doesNotMatch(buildUserMessage({ question: 'x', context: { weightTrend: { ratePerWeek: -1, status: '<b>hack' } } }), /Trend berat/);
+  assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Trend berat/);
+});

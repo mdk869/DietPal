@@ -100,7 +100,7 @@ test('pickTip: always returns something, even when everything was seen recently'
 
 function signals(days, extra = {}) {
   const S = { profile: { kcalMin: 1400, kcalMax: 1700, waterGoal: 2500, targetWeight: 60, setupAt: Date.parse('2026-01-01'), ...extra.profile }, days, weights: extra.weights || [] };
-  const ctx = load(['todayKey', 'parseKey', 'peekDay', 'kcalOf', 'mealMix', 'plateCounts', 'sortedWeights', 'addDays', 'tipSignals'],
+  const ctx = load(['todayKey', 'parseKey', 'peekDay', 'kcalOf', 'mealMix', 'plateCounts', 'sortedWeights', 'currentWeight', 'addDays', 'weightTrend', 'effPace', 'canAuto', 'tipSignals'],
     { S, FOODS, isSweetMeal, tipDayDiff: T.tipDayDiff });
   return [...ctx.tipSignals(extra.date || '2026-11-20')].sort();
 }
@@ -157,4 +157,37 @@ test('pickWeightTips: one tip per weight signal, general weight tip otherwise, s
   assert.deepEqual(pickWeightTips({ date, signals: new Set(['plateau']) }), pickWeightTips({ date, signals: new Set(['plateau']) }));   // stable within a day
   const first = pickWeightTips({ date, signals: new Set(['plateau']) })[0].id;
   assert.notEqual(pickWeightTips({ date, signals: new Set(['plateau']), votes: { [first]: -1 } })[0]?.id, first);
+});
+
+test('tipSignals: weight trend vs chosen pace → fast / slowEat / slowMove', () => {
+  const w = (date, kg) => ({ date, kg });
+  const slowW = [w('2026-10-23', 82), w('2026-10-30', 81.4), w('2026-11-06', 81.7), w('2026-11-13', 81), w('2026-11-19', 81.4)];   // ~−0.2 kg/week, noisy
+  const s1 = signals({}, { weights: slowW, profile: { pace: '0.5' } });
+  assert(s1.includes('slowMove') && !s1.includes('plateau') && !s1.includes('slowEat'), s1.join());
+  assert(!signals({}, { weights: slowW, profile: { pace: '0.25' } }).some(k => k.startsWith('slow')));   // 0.2 is fine for a 0.25 pace
+  const over = { meals: [meal('nasip', 1000), meal('agrill', 900)], water: 2500 };
+  const days = Object.fromEntries(['2026-11-08', '2026-11-10', '2026-11-12', '2026-11-14', '2026-11-16'].map(d => [d, over]));
+  assert(signals(days, { weights: slowW, profile: { pace: '0.5' } }).includes('slowEat'));                // over target → food tip first
+  const fastW = [w('2026-10-22', 90), w('2026-10-29', 88.6), w('2026-11-05', 87.2), w('2026-11-12', 85.8), w('2026-11-19', 84.4)];
+  assert(signals({}, { weights: fastW }).includes('fast'));
+  const okW = [w('2026-10-22', 90), w('2026-10-29', 89.5), w('2026-11-05', 89), w('2026-11-12', 88.4), w('2026-11-19', 88)];
+  assert(!signals({}, { weights: okW, profile: { pace: '0.5' } }).some(k => ['fast', 'slowEat', 'slowMove'].includes(k)));
+  assert(!signals({}, { weights: [w('2026-11-10', 82), w('2026-11-19', 82)] }).some(k => k.startsWith('slow')));   // too little data
+});
+
+test('pickWeightTips: activity tips for slowMove, food tip for slowEat, safety tip for fast', () => {
+  const { pickWeightTips, tipById } = T;
+  for (let i = 1; i <= 9; i++) {
+    const date = '2026-11-0' + i;
+    assert.equal(tipById(pickWeightTips({ date, signals: new Set(['slowEat']) })[0].id).on.includes('slowEat'), true);
+    assert.equal(pickWeightTips({ date, signals: new Set(['fast']) })[0].id, 'berat-laju');
+    const m = tipById(pickWeightTips({ date, signals: new Set(['slowMove']) })[0].id);
+    assert(m.on.includes('slowMove'));
+  }
+  assert(T.TIPS.filter(x => x.cat === 'senam').length >= 5);
+});
+
+test('pickWeightTips: a single signal gets two different tips', () => {
+  const out = T.pickWeightTips({ date: '2026-11-15', signals: new Set(['slowMove']) });
+  assert.equal(out.length, 2); assert.notEqual(out[0].id, out[1].id); out.forEach(p => assert.equal(p.why, 'slowMove'));
 });

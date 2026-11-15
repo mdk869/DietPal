@@ -65,13 +65,20 @@ CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
 - Dalam "reply", jangan sebut jumlah kcal untuk menu yang dicadangkan — kad menu sudah tunjuk kalori.
 - "tip": satu ayat praktikal untuk hidangan itu.
 
+BERAT BADAN & AKTIVITI FIZIKAL (bila soalan tentang berat, kadar turun berat atau senaman)
+- Jawab dalam "reply", "menus" kosong. Guna "Trend berat" dari konteks app jika ada; jangan teka nombor berat.
+- Kadar selamat 0.5–1 kg seminggu (CPG Obesiti KKM). Jangan galakkan lebih laju dari 1 kg seminggu. Jika trend lebih laju, ingatkan makan cukup dan protein.
+- Berat turun perlahan: semak makanan dulu (saiz hidangan, minuman manis, minyak) — kesan makanan lebih besar dari senaman. Senaman tidak menggantikan sasaran kalori; jangan suruh makan lebih pada hari bersenam.
+- Cadangan aktiviti untuk orang biasa: jalan laju, kurang duduk lama, sasaran 150 minit seminggu (naik perlahan ke 300), senaman kekuatan guna berat badan 2 kali seminggu. Berat badan tinggi → aktiviti kurang hentakan (jalan, berenang, basikal statik). Mula perlahan, naik sikit-sikit. Jangan cadang program ekstrem, puasa, pil kurus atau suplemen.
+
 KESELAMATAN (WAJIB)
 - Patuhi SEMUA pantang & alahan pengguna, termasuk dalam kuah, sambal dan minuman.
 - Jangan cadang skip makan, puasa untuk kurus, atau makan bawah had kalori minimum harian. Jangan suruh buang nasi atau garam sepenuhnya — kurangkan sikit-sikit.
 - Nota kesihatan: kencing manis → elak manis; darah tinggi → kurangkan garam & kicap; gastrik → elak pedas, kopi & perut kosong lama.
 - "safety_note" HANYA untuk risiko keselamatan sebenar (simptom, alahan dalam soalan, bahaya). Untuk soalan makanan biasa, biarkan kosong — jangan isi dengan peringatan umum.
 - Tiada diagnosis, ubat atau dos. Simptom serius → nasihat jumpa doktor / hubungi 999 dalam "safety_note", "menus" kosong.
-- Soalan bukan tentang makanan atau pemakanan → jawab dengan sopan bahawa anda hanya bantu tentang makanan; "menus" kosong.
+- Soalan bukan tentang makanan, pemakanan, berat badan atau aktiviti fizikal harian → jawab dengan sopan bahawa anda hanya bantu tentang makanan dan gaya hidup sihat; "menus" kosong.
+- Simptom semasa atau selepas bersenam (sakit dada, sesak nafas, pening, berdebar) → nasihat berhenti, dan jumpa doktor / 999 dalam "safety_note".
 
 Bahasa: Bahasa Melayu Malaysia yang mudah dan santai (bukan Bahasa Indonesia). Istilah Inggeris biasa boleh. Nama hidangan dalam huruf biasa (cth: "Ikan bakar", bukan "Ikan Bakar").`;
 
@@ -124,6 +131,7 @@ const SCHEMA = {
 // Strips control chars and scripts that never belong in BM/English answers (guards against stray tokens from small models).
 const ODD_SCRIPT = /[\u0400-\u04ff\u0590-\u05ff\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]+/g;
 const str = (v, max = 80) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').replace(ODD_SCRIPT, '').replace(/\s{2,}/g, ' ').trim().slice(0, max) : '');
+const dec = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n)) * 10) / 10 : null; };
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : null; };
 const pick = (arr, dict) => (Array.isArray(arr) ? arr.filter(k => dict[k]).map(k => dict[k]) : []);
 const norm = t => String(t).toLowerCase().replace(/\s+/g, ' ').trim();
@@ -260,12 +268,24 @@ function buildUserMessage(body) {
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
   if (health.length) lines.push(`Nota kesihatan: ${health.join(', ')}.`);
+  const trend = weightTrendLine(c.weightTrend);
+  if (trend) lines.push(trend);
   const recent = (Array.isArray(c.recentMenus) ? c.recentMenus.slice(0, 10) : []).map(x => str(x, 60)).filter(Boolean);
   if (recent.length) lines.push(`Cadangan AI terkini (elak ulang): ${recent.join('; ')}.`);
   const catalog = cleanCatalog(c.catalog);
   if (catalog.length) lines.push(`Makanan sendiri pengguna (rujukan kcal; tidak wajib): ${catalog.map(f => `${f.name} ${f.unit} ${f.kcal}`).join('; ')}.`);
   lines.push('', `SOALAN PENGGUNA: ${str(body.question, MAX_QUESTION) || 'Apa yang sesuai saya makan sekarang?'}`);
   return lines.join('\n');
+}
+
+// Weekly weight trend from the phone (never a weight). Whitelisted status → fixed wording.
+const TREND = { laju: 'lebih laju dari had selamat 1 kg seminggu', naik: 'berat naik', tetap: 'berat hampir tidak berubah',
+  perlahan: 'lebih perlahan dari kadar yang dipilih', ikut: 'ikut kadar yang dipilih', capai: 'sudah hampir atau capai berat sasaran' };
+function weightTrendLine(t) {
+  if (!t || typeof t !== 'object' || !TREND[t.status]) return '';
+  const r = dec(t.ratePerWeek, -3, 3), w = num(t.weeks, 2, 4), pace = dec(t.pace, 0.25, 1);
+  const move = r === null ? '' : r < 0 ? `turun ${-r} kg seminggu` : r > 0 ? `naik ${r} kg seminggu` : 'tiada perubahan';
+  return `Trend berat ${w ? `${w} minggu lepas` : 'terkini'} (nombor berat tidak dikongsi): ${move ? move + ' — ' : ''}${TREND[t.status]}${pace ? ` (kadar dipilih ${pace} kg seminggu)` : ''}.`;
 }
 
 function cleanCatalog(list) {
