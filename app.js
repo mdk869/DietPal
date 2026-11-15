@@ -2021,7 +2021,7 @@ function aiResultHtml(r) {
   return `
     <div class="mt-4">
       ${r.safety_note ? `<div class="mb-3 bg-red-50 border border-red-200 rounded-xl p-3 text-[14px] text-red-800 flex gap-2"><span class="text-red-600 mt-0.5">${icon('alert', 'w-5 h-5')}</span><span>${esc(r.safety_note)}</span></div>` : ''}
-      ${r.reply ? `<div class="flex gap-3"><img src="icons/icon-192.png" alt="" class="w-9 h-9 rounded-xl shrink-0"><p class="text-[14px] text-slate-700 leading-relaxed">${esc(r.reply)}</p></div>` : ''}
+      ${r.reply ? `<div class="flex gap-3"><img src="icons/icon-192.png" alt="" class="w-9 h-9 rounded-xl shrink-0"><p class="text-[14px] text-slate-700 leading-relaxed whitespace-pre-line">${esc(r.reply)}</p></div>` : ''}
       <div class="space-y-2.5 mt-3">
         ${(r.menus || []).map((m, i) => `
           <div class="rounded-xl border border-slate-200 p-3">
@@ -2336,7 +2336,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.13.1';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
