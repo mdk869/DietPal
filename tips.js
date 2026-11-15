@@ -388,9 +388,25 @@ function pickTip(o) {
   const y = choose(any, 'any');
   return y ? { id: y.id, why: '' } : null;
 }
+// Tips for the Berat page: up to `max` tips for the weight signals found (one per signal, in this order),
+// else one general Berat badan tip that changes daily. Ignores the 30-day repeat window — these are reference, not "today's tip".
+const TIP_WEIGHT_KEYS = ['gain', 'plateau'];
+function pickWeightTips(o) {
+  const votes = o.votes || {}, avoid = o.avoid || new Set(), signals = o.signals || new Set(), max = o.max || 2, out = [];
+  const ok = x => votes[x.id] !== -1 && !x.season && !(x.tags || []).some(t => avoid.has(t)) && !out.some(p => p.id === x.id);
+  const choose = (list, salt) => list.length ? list[tipHash(o.date + '|w|' + salt) % list.length] : null;
+  for (const k of TIP_WEIGHT_KEYS) {
+    if (out.length >= max || !signals.has(k)) continue;
+    const x = choose(TIPS.filter(x => ok(x) && (x.on || []).includes(k)), k); if (x) out.push({ id: x.id, why: k });
+  }
+  // General: weight tips not written only for a signal (e.g. "Berat tak turun 2 minggu?" stays out when there is no plateau).
+  const general = x => x.cat === 'berat' && !((x.on || []).length && x.on.every(k => TIP_WEIGHT_KEYS.includes(k)));
+  if (!out.length) { const x = choose(TIPS.filter(x => ok(x) && general(x)), 'umum'); if (x) out.push({ id: x.id, why: '' }); }
+  return out;
+}
 function tipWhyText(why, date) {
   if (why === 'season') { const s = tipSeason(date); return s ? 'Tip khas ' + s.label + '.' : ''; }
   return TIP_WHY[why] ? 'Anda nampak tip ni sebab ' + TIP_WHY[why] + '.' : '';
 }
 
-if (typeof module !== 'undefined') module.exports = { TIPS, TIP_CATS, TIP_WHY, TIP_ORDER, TIP_SEASONS, tipSeason, tipFestivals, tipDeepavali, tipById, pickTip, tipWhyText, tipDayDiff };
+if (typeof module !== 'undefined') module.exports = { TIPS, TIP_CATS, TIP_WHY, TIP_ORDER, TIP_SEASONS, tipSeason, tipFestivals, tipDeepavali, tipById, pickTip, pickWeightTips, TIP_WEIGHT_KEYS, tipWhyText, tipDayDiff };

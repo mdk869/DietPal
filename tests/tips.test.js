@@ -141,3 +141,20 @@ test('sanitizeState: tips kept when valid, junk dropped, absent stays absent', (
     day: { date: '2026-11-05', id: 'protein-murah', why: 'lowProtein' }, next: null, hidden: '',
     seen: { 'protein-murah': '2026-11-05' }, votes: { 'gula-jus': -1 }, saved: ['air-botol'], fbq: [{ id: 'gula-jus', v: -1, why: 'sweet' }] });
 });
+
+test('pickWeightTips: one tip per weight signal, general weight tip otherwise, skips disliked', () => {
+  const { pickWeightTips, tipById } = require('../tips.js');
+  const date = '2026-11-15';
+  let out = pickWeightTips({ date, signals: new Set(['plateau', 'gain', 'lowVeg']) });
+  assert.deepEqual(out.map(p => p.why), ['gain', 'plateau']);
+  out.forEach(p => assert(tipById(p.id).on.includes(p.why)));
+  out = pickWeightTips({ date, signals: new Set(['lowVeg']) });
+  assert.equal(out.length, 1); assert.equal(out[0].why, ''); assert.equal(tipById(out[0].id).cat, 'berat');
+  for (const d of ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06']) {
+    const x = tipById(pickWeightTips({ date: d, signals: new Set() })[0].id);
+    assert(!['berat-plateau', 'berat-naik', 'berat-pinggang'].includes(x.id), x.id);
+  }
+  assert.deepEqual(pickWeightTips({ date, signals: new Set(['plateau']) }), pickWeightTips({ date, signals: new Set(['plateau']) }));   // stable within a day
+  const first = pickWeightTips({ date, signals: new Set(['plateau']) })[0].id;
+  assert.notEqual(pickWeightTips({ date, signals: new Set(['plateau']), votes: { [first]: -1 } })[0]?.id, first);
+});
