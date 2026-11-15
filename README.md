@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.10.0
+**Versi semasa:** 1.11.0
 
 ## Ciri utama
 
@@ -20,6 +20,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Makan v1.10** – anak panah ‹ › untuk lihat & log **hingga 7 hari lepas** (makanan yang terlupa) dengan nota *Anda sedang lihat log semalam · Balik ke hari ini*; tekan item untuk **ubah hidangan** atau padam; padam ada butang **Batal** (6 saat); baris **imbangan pinggan** (sayur/protein/karbo) dengan satu teguran ringkas (tanpa AI); **sasaran kcal** pada waktu makan yang belum dilog hari ini; *Idea menu* sentiasa ada untuk hari ini; **Sama macam semalam** — salin satu waktu makan dari hari sebelumnya dengan satu tekan.
 - **Tips lebih tepat (v1.10)** – hari dalam log hanya dikira bila ada sekurang-kurangnya 2 waktu makan utama (snek tak dikira); tip *kalori terlalu rendah* perlukan ketiga-tiga waktu makan utama dilog, supaya waktu makan yang terlupa log tak dianggap makan terlalu sikit.
 - **Scan makanan (v1.7)** – dalam sheet *Tambah*, ambil gambar atau pilih dari galeri; AI anggar item & kalori, padankan dengan preset app bila boleh. Pengguna **semak dan betulkan** (portion ½–5×, buang item) sebelum simpan — tiada apa dilog terus. Lihat bahagian *Scan makanan* di bawah.
+- **Scan + penerangan & Tulis makanan (v1.11)** – lepas ambil gambar, pengguna boleh *Terangkan sikit (pilihan)* (jenis lauk, cara masak, saiz, kurang manis) sebelum tekan *Anggar kalori*; AI ikut penerangan untuk jenis makanan dan gambar untuk saiz yang tak disebut. Butang **Tulis makanan** pula untuk log tanpa gambar (cth "nasi lemak ayam goreng, teh o ais kurang manis") — skrin semak sama macam scan, kuota sendiri yang lebih longgar. Pada skrin semak, **Simpan sebagai makanan sendiri** menyimpan item yang bukan preset ke kategori *Sendiri* (nama & sukatan sama → dikemas kini, bukan berganda).
 - **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
 - **Tips hari ini (v1.8)** – satu tip sehari di Utama (bawah peringatan), dipilih dalam telefon ikut log 3 hari lepas, berat dan musim perayaan. Tekan untuk sheet penuh: sebab tip dipilih, *Tip ni membantu?* (👍/👎 dihantar ke Supabase), simpan, dan *Tanya Coach* dengan soalan siap. Semua tips ada di Panduan → *Koleksi tips*. Lihat bahagian *Tips hari ini* di bawah.
@@ -174,6 +175,8 @@ Butang **Scan makanan dengan kamera** dalam sheet *Tambah*. Gambar dikecilkan da
 | `SCAN_DISABLED` | `1` = tutup scan serta-merta (app papar "ditutup sementara"). Tak perlu ubah kod. |
 | `SCAN_PER_DAY` | Scan setiap telefon sehari (lalai: 10). |
 | `SCAN_PER_WINDOW` / `SCAN_WINDOW_MIN` | Scan dalam satu tempoh (lalai: 5 setiap 10 minit). |
+| `TEXT_PER_DAY` | *Tulis makanan* setiap telefon sehari (lalai: 20). Bajet berasingan dari scan gambar (kunci `td:` / `tip:`). |
+| `TEXT_PER_WINDOW` | *Tulis makanan* dalam satu tempoh `SCAN_WINDOW_MIN` (lalai: 8). |
 | `SCAN_MODEL` | Model untuk scan (lalai: `OPENAI_MODEL`, kemudian `gpt-6-luna`). Mesti menyokong input gambar. |
 | `SCAN_REASONING_EFFORT` | Lalai `low` (kenal pasti hidangan & portion). |
 | `SCAN_IMAGE_DETAIL` | `low` / `high` / `auto` (lalai: `high`, supaya tulisan kecil pada label boleh dibaca). |
