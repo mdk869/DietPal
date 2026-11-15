@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.12.0
+**Versi semasa:** 1.12.1
 
 ## Ciri utama
 
@@ -19,6 +19,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
 - **Makan v1.10** – anak panah ‹ › untuk lihat & log **hingga 7 hari lepas** (makanan yang terlupa) dengan nota *Anda sedang lihat log semalam · Balik ke hari ini*; tekan item untuk **ubah hidangan** atau padam; padam ada butang **Batal** (6 saat); baris **imbangan pinggan** (sayur/protein/karbo) dengan satu teguran ringkas (tanpa AI); **sasaran kcal** pada waktu makan yang belum dilog hari ini; *Idea menu* sentiasa ada untuk hari ini; **Sama macam semalam** — salin satu waktu makan dari hari sebelumnya dengan satu tekan.
 - **Piramid Makanan & menu lebih sihat (v1.12)** – setiap preset ada bilangan **sajian Piramid Makanan Malaysia 2020** (karbo, sayur, buah, ikan, ayam/telur/daging, kekacang, susu), **cara masak** (goreng / santan / bakar-rebus-kukus-sup), bijirin penuh dan tinggi garam. Page Makan papar kad **Piramid Makanan hari ini** (sajian vs saranan KKM + air 6–8 gelas, dengan *Apa itu sajian?*). Cadangan menu kini bukan sekadar kcal: + bakar/rebus/sup & bijirin penuh, − goreng/santan & garam (lebih untuk darah tinggi), + buah/ikan/kekacang/susu bila masih kurang hari ini; kad menu tunjuk tag (cth *Bakar / rebus / sup*, *Ada buah*, *Ada goreng*). Scan & Tulis makanan pulangkan sajian Piramid & cara masak, dan skrin semak papar pecahan setiap item + jumlah hidangan, dengan butang **+ Ulam** bila tiada sayur. Coach AI terima senarai kumpulan yang masih kurang hari ini. Teguran pinggan baru: banyak goreng/santan, belum ada buah.
+- **Tips Piramid Makanan (v1.12.1)** – isyarat tip baru dari log 3 hari lepas: **kurang buah** (bawah 1 sajian), **tiada ikan** (tidak dicetus jika pengguna tak makan ikan), **banyak goreng / santan**. 7 tips baru dalam kategori *Buah*, *Cara masak* dan *Protein* (ikan).
 - **Tips lebih tepat (v1.10)** – hari dalam log hanya dikira bila ada sekurang-kurangnya 2 waktu makan utama (snek tak dikira); tip *kalori terlalu rendah* perlukan ketiga-tiga waktu makan utama dilog, supaya waktu makan yang terlupa log tak dianggap makan terlalu sikit.
 - **Scan makanan (v1.7)** – dalam sheet *Tambah*, ambil gambar atau pilih dari galeri; AI anggar item & kalori, padankan dengan preset app bila boleh. Pengguna **semak dan betulkan** (portion ½–5×, buang item) sebelum simpan — tiada apa dilog terus. Lihat bahagian *Scan makanan* di bawah.
 - **Scan + penerangan & Tulis makanan (v1.11)** – lepas ambil gambar, pengguna boleh *Terangkan sikit (pilihan)* (jenis lauk, cara masak, saiz, kurang manis) sebelum tekan *Anggar kalori*; AI ikut penerangan untuk jenis makanan dan gambar untuk saiz yang tak disebut. Butang **Tulis makanan** pula untuk log tanpa gambar (cth "nasi lemak ayam goreng, teh o ais kurang manis") — skrin semak sama macam scan, kuota sendiri yang lebih longgar. Pada skrin semak, **Simpan sebagai makanan sendiri** menyimpan item yang bukan preset ke kategori *Sendiri* (nama & sukatan sama → dikemas kini, bukan berganda).
@@ -57,7 +58,7 @@ app.js          Logik app: data menu, enjin cadangan, profil & tetapan, ikon, Co
 foods.js        69 preset makanan Malaysia — dikongsi app & api/coach.js
 app.css         CSS Tailwind yang dijana (jangan edit terus)
 tailwind.config.js, src/app.input.css   Sumber untuk jana app.css
-tips.js         47 tips diet & kesihatan + logik pilih tip harian
+tips.js         64 tips diet & kesihatan + logik pilih tip harian
 tests/          Ujian unit (node --test): data backup, pengesanan pantang, kuota & origin Coach AI
 .github/workflows/test.yml   CI: sintaks, ujian, app.css terkini, deno check fungsi push
 manifest.json   Konfigurasi PWA
