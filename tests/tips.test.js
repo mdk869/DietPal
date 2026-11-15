@@ -100,23 +100,35 @@ test('pickTip: always returns something, even when everything was seen recently'
 
 function signals(days, extra = {}) {
   const S = { profile: { kcalMin: 1400, kcalMax: 1700, waterGoal: 2500, targetWeight: 60, setupAt: Date.parse('2026-01-01'), ...extra.profile }, days, weights: extra.weights || [] };
-  const ctx = load(['todayKey', 'parseKey', 'peekDay', 'kcalOf', 'mealMix', 'plateCounts', 'sortedWeights', 'currentWeight', 'addDays', 'weightTrend', 'effPace', 'canAuto', 'tipSignals'],
+  const ctx = load(['todayKey', 'parseKey', 'peekDay', 'kcalOf', 'mainMeals', 'mealMix', 'plateCounts', 'sortedWeights', 'currentWeight', 'addDays', 'weightTrend', 'effPace', 'canAuto', 'tipSignals'],
     { S, FOODS, isSweetMeal, tipDayDiff: T.tipDayDiff });
   return [...ctx.tipSignals(extra.date || '2026-11-20')].sort();
 }
-const meal = (foodId, kcal, n = 1) => ({ foodId, name: foodId, kcal, qty: n, plate: 'lain', meal: 'tengahari' });
+const meal = (foodId, kcal, n = 1, when = 'tengahari') => ({ foodId, name: foodId, kcal, qty: n, plate: 'lain', meal: when });
+const MAINS = ['sarapan', 'tengahari', 'malam'];
+// Spreads the items over the main meals (sarapan, tengah hari, malam, sarapan…) so the day counts as logged.
+const spread = (...items) => items.map((x, i) => ({ ...x, meal: MAINS[i % 3] }));
 
 test('tipSignals: reads the 3 days before, ignores days with too little logged', () => {
-  const carbsOnly = { meals: [meal('nasip', 900), meal('nasip', 900)], water: 2600 };          // over target, no protein/veg
+  const carbsOnly = { meals: spread(meal('nasip', 900), meal('nasip', 900)), water: 2600 };          // over target, no protein/veg
   assert.deepEqual(signals({ '2026-11-19': carbsOnly, '2026-11-18': carbsOnly }), ['lowProtein', 'lowVeg', 'over']);
   assert.deepEqual(signals({ '2026-11-19': carbsOnly }), []);                                  // one day is not a pattern
   assert.deepEqual(signals({ '2026-11-20': carbsOnly, '2026-11-19': { meals: [meal('nasip', 900)], water: 0 } }), []);   // today & thin days don't count
-  const sweet = { meals: [meal('tehtarik', 120), meal('agrill', 300), meal('sayurr', 80), meal('nasip', 130), meal('telurr', 75), meal('agrill', 300), meal('nasip', 130), meal('sayurr', 80), meal('tehtarik', 120), meal('nasip', 130)], water: 500 };
+  const sweet = { meals: spread(meal('tehtarik', 120), meal('agrill', 300), meal('sayurr', 80), meal('nasip', 130), meal('telurr', 75), meal('agrill', 300), meal('nasip', 130), meal('sayurr', 80), meal('tehtarik', 120), meal('nasip', 130)), water: 500 };
   assert.deepEqual(signals({ '2026-11-19': sweet, '2026-11-17': sweet }), ['lowWater', 'sweet']);
 });
 
+test('tipSignals: a day counts only with 2+ main meals; "too little" needs all 3 (v1.10)', () => {
+  const low2 = { meals: spread(meal('nasi1', 300), meal('agrill', 300)), water: 2600 };                 // 600 kcal over 2 main meals
+  const low3 = { meals: spread(meal('nasi1', 300), meal('agrill', 300), meal('ikanb', 300)), water: 2600 };
+  assert(!signals({ '2026-11-19': low2, '2026-11-18': low2 }).includes('under'));       // probably a meal not logged
+  assert(signals({ '2026-11-19': low3, '2026-11-18': low3 }).includes('under'));
+  const snacks = { meals: [meal('nasip', 900, 1, 'tengahari'), meal('kuih', 900, 1, 'snek'), meal('kuih', 900, 1, 'snek')], water: 2600 };
+  assert.deepEqual(signals({ '2026-11-19': snacks, '2026-11-18': snacks }), []);       // one main meal + snacks: not enough to judge
+});
+
 test('tipSignals: lapse, weekend, weight gain & plateau, first week', () => {
-  const day = { meals: [meal('nasip', 900), meal('agrill', 900)], water: 2500 };
+  const day = { meals: spread(meal('nasip', 900), meal('agrill', 900)), water: 2500 };
   assert(signals({ '2026-11-10': day }).includes('lapse'));
   assert(signals({ '2026-11-14': day }, { date: '2026-11-20' }).includes('weekend'));          // 20 Nov 2026 is a Friday; 14 Nov the Saturday before
   assert(!signals({ '2026-11-14': day }, { date: '2026-11-19' }).includes('weekend'));         // only on Fri/Sat
@@ -165,7 +177,7 @@ test('tipSignals: weight trend vs chosen pace → fast / slowEat / slowMove', ()
   const s1 = signals({}, { weights: slowW, profile: { pace: '0.5' } });
   assert(s1.includes('slowMove') && !s1.includes('plateau') && !s1.includes('slowEat'), s1.join());
   assert(!signals({}, { weights: slowW, profile: { pace: '0.25' } }).some(k => k.startsWith('slow')));   // 0.2 is fine for a 0.25 pace
-  const over = { meals: [meal('nasip', 1000), meal('agrill', 900)], water: 2500 };
+  const over = { meals: spread(meal('nasip', 1000), meal('agrill', 900)), water: 2500 };
   const days = Object.fromEntries(['2026-11-08', '2026-11-10', '2026-11-12', '2026-11-14', '2026-11-16'].map(d => [d, over]));
   assert(signals(days, { weights: slowW, profile: { pace: '0.5' } }).includes('slowEat'));                // over target → food tip first
   const fastW = [w('2026-10-22', 90), w('2026-10-29', 88.6), w('2026-11-05', 87.2), w('2026-11-12', 85.8), w('2026-11-19', 84.4)];

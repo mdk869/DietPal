@@ -3,7 +3,7 @@
 // Token quota: SUPABASE_URL, SUPABASE_SECRET_KEY (or legacy SUPABASE_ANON_KEY), COACH_QUOTA_SECRET (+ optional COACH_* limits, see README).
 // The key never reaches the browser or the repo.
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-6-luna';
 // Newer reasoning models (gpt-5.1+, gpt-6…): Coach answers are short lookups, so reasoning is off by default.
 // Override with OPENAI_REASONING_EFFORT (e.g. "low"). Older models (gpt-4.1-mini) don't take this parameter.
 const REASONING = /^gpt-(5\.\d|[6-9])/.test(MODEL) ? (process.env.OPENAI_REASONING_EFFORT || 'none') : null;
