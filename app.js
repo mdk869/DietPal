@@ -901,16 +901,17 @@ function sheetCustom() {
 
 /* ---------- WEIGHT ---------- */
 function viewWeight() {
-  const p = S.profile, ws = sortedWeights(), cur = currentWeight(), b = bmi(cur);
-  const wk = weeklyChange();
+  const p = S.profile, ws = sortedWeights(), cur = currentWeight(), b = bmi(cur), start = p.startWeight || cur;
+  const ch = weeklyChange(), wk = ch && ch.kg, rate = ch && ch.kg / ch.days * 7;   // rate: kg per week
+  const since = ch && (ch.days <= 10 ? '7 hari lepas' : `Sejak ${niceDate(ch.date)}`);
   return `
   ${card(`
     <div class="grid grid-cols-3 gap-2 text-center">
       <div><div class="text-[12px] text-slate-500">Semasa</div><div class="text-xl font-extrabold">${cur.toFixed(1)}</div><div class="text-[12px] text-slate-500">kg</div></div>
-      <div><div class="text-[12px] text-slate-500">Dah turun</div><div class="text-xl font-extrabold text-brand-700">${Math.max(0, p.startWeight - cur).toFixed(1)}</div><div class="text-[12px] text-slate-500">dari ${p.startWeight} kg</div></div>
+      <div><div class="text-[12px] text-slate-500">Dah turun</div><div class="text-xl font-extrabold text-brand-700">${Math.max(0, start - cur).toFixed(1)}</div><div class="text-[12px] text-slate-500">dari ${fmtKg(start)} kg</div></div>
       <div><div class="text-[12px] text-slate-500">BMI</div><div class="text-xl font-extrabold">${b.toFixed(1)}</div><div class="text-[12px] text-slate-500">${bmiLabel(b)}</div></div>
     </div>
-    ${wk !== null ? `<div class="mt-3 text-[13px] text-center rounded-xl py-2 ${wk <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}">7 hari lepas: ${wk <= 0 ? '↓' : '↑'} ${Math.abs(wk).toFixed(1)} kg ${wk > 0 ? '— biasa naik turun sebab air & garam, tengok trend minggu ke minggu' : wk < -1.2 ? `— laju! Pastikan makan cukup, jangan bawah ${fmt(kcalFloor())} kcal selalu` : '— kadar sihat'}</div>` : ''}`)}
+    ${ch ? `<div class="mt-3 text-[13px] text-center rounded-xl py-2 ${wk <= 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}">${since}: ${wk <= 0 ? '↓' : '↑'} ${Math.abs(wk).toFixed(1)} kg ${wk > 0 ? '— biasa naik turun sebab air & garam, tengok trend minggu ke minggu' : rate < -1.2 ? `— laju! Pastikan makan cukup, jangan bawah ${fmt(kcalFloor())} kcal selalu` : '— kadar sihat'}</div>` : ''}`)}
 
   ${card(`
     <div class="font-bold text-[16px] mb-3">Log berat</div>
@@ -944,27 +945,29 @@ function viewWeight() {
 }
 
 function bmiLabel(b) { return b < 18.5 ? 'kurang' : b < 23 ? 'normal' : b < 27.5 ? 'berlebihan' : 'obes'; } // Asian cut-offs (KKM)
+// Change vs the weigh-in closest to 7 days before the latest one (5–10 days back). If none, the newest weigh-in
+// 11–35 days back, so the label can say "since <date>" instead of pretending it is 7 days. null = nothing to compare.
 function weeklyChange() {
   const ws = sortedWeights(); if (ws.length < 2) return null;
-  const last = ws[ws.length - 1]; const target = parseKey(last.date); target.setDate(target.getDate() - 7);
-  let ref = null;
-  for (const w of ws) { if (parseKey(w.date) <= target) ref = w; }
-  if (!ref) return null;
-  return last.kg - ref.kg;
+  const last = ws[ws.length - 1], gap = w => Math.round((parseKey(last.date) - parseKey(w.date)) / 864e5);
+  const near = ws.filter(w => gap(w) >= 5 && gap(w) <= 10).sort((a, b) => Math.abs(gap(a) - 7) - Math.abs(gap(b) - 7))[0];
+  const ref = near || ws.filter(w => gap(w) > 10 && gap(w) <= 35).pop();
+  return ref ? { kg: last.kg - ref.kg, days: gap(ref), date: ref.date } : null;
 }
+function fmtKg(kg) { return Math.round(kg * 10) / 10; }
 function milestoneRow(m, i) {
   const p = S.profile, cur = currentWeight();
-  const from = i === 0 ? p.startWeight : p.milestones[i - 1].kg;
+  const from = i === 0 ? (p.startWeight || cur) : p.milestones[i - 1].kg;
   const done = cur <= m.kg;
-  const pct = Math.max(0, Math.min(100, ((from - cur) / (from - m.kg)) * 100));
-  const left = cur - m.kg;
+  const span = from - m.kg, pct = span > 0 ? Math.max(0, Math.min(100, ((from - cur) / span) * 100)) : 0;
+  const left = cur - m.kg, pace = parseFloat(p.pace) || 0.5;
   const active = !done && (i === 0 || cur <= p.milestones[i - 1].kg);
   return `
   <div class="${!done && !active ? 'opacity-60' : ''}">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full grid place-items-center text-[14px] ${done ? 'bg-green-500 text-white' : active ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-500'}">${done ? icon('check', 'w-4 h-4', 3) : i + 1}</div>
       <div><div class="font-semibold text-[14px]">${esc(m.name)}: ${esc(m.kg)} kg</div>
-      <div class="text-[12px] text-slate-500">${done ? 'Tercapai' : `${left.toFixed(1)} kg lagi · anggaran ${Math.ceil(left / 1)}–${Math.ceil(left / 0.5)} minggu`}</div></div></div>
+      <div class="text-[12px] text-slate-500">${done ? 'Tercapai' : `${left.toFixed(1)} kg lagi · anggaran ${Math.ceil(left / pace)} minggu`}</div></div></div>
       <div class="text-[13px] font-bold ${done ? 'text-green-600' : 'text-slate-500'}">${Math.round(done ? 100 : pct)}%</div>
     </div>
     <div class="h-2 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full rounded-full ${done ? 'bg-green-500' : 'bg-brand-500'}" style="width:${done ? 100 : pct}%"></div></div>
@@ -1817,7 +1820,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.8.3';
+const APP_VERSION = '1.8.4';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2364,7 +2367,7 @@ document.addEventListener('click', (e) => {
       const hit = S.profile.milestones.find(m => before > m.kg && currentWeight() <= m.kg);
       render(); toast(hit ? `Tahniah! ${hit.name} (${hit.kg} kg) tercapai!` : 'Berat disimpan'); break;
     }
-    case 'delWeight': if (confirm('Padam catatan berat ini?')) { S.weights = S.weights.filter(w => w.date !== el.dataset.date); save(); render(); } break;
+    case 'delWeight': if (confirm('Padam catatan berat ini?')) { S.weights = S.weights.filter(w => w.date !== el.dataset.date); recalcTargets(); save(); render(); } break;
     case 'rescue': sheetRescue(); break;
     case 'sym': { const k = el.dataset.s; UI.sym.has(k) ? UI.sym.delete(k) : UI.sym.add(k); refreshSheet(); break; }
     case 'rescueGo': UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;

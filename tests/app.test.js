@@ -148,3 +148,37 @@ test('recent AI menus: newest first, deduped, capped at 10, survive bad storage'
   store['dietpal.aiRecent'] = '{bad json';
   assert.deepEqual([...recentAIMenus()], []);
 });
+
+test('weeklyChange: compares with ~7 days back, says "since" for older, ignores very old', () => {
+  const { weeklyChange } = load(['parseKey', 'sortedWeights', 'weeklyChange'], { S: { weights: [] } });
+  const run = ws => { const ctx = load(['parseKey', 'sortedWeights', 'weeklyChange'], { S: { weights: ws } }); return ctx.weeklyChange(); };
+  assert.equal(weeklyChange(), null);
+  // weekly logger: picks the weigh-in 7 days back, not the one 14 days back
+  let r = run([{ date: '2026-11-01', kg: 90 }, { date: '2026-11-08', kg: 89.5 }, { date: '2026-11-15', kg: 89 }]);
+  assert.deepEqual({ ...r }, { kg: -0.5, days: 7, date: '2026-11-08' });
+  // only an old weigh-in 20 days back: real gap is reported
+  r = run([{ date: '2026-10-26', kg: 91 }, { date: '2026-11-15', kg: 89 }]);
+  assert.equal(r.days, 20); assert.equal(r.date, '2026-10-26');
+  // 2 months back: nothing to compare (used to be shown as "7 hari lepas")
+  assert.equal(run([{ date: '2026-09-15', kg: 95 }, { date: '2026-11-15', kg: 89 }]), null);
+  // only 2 days apart: too short to call a weekly change
+  assert.equal(run([{ date: '2026-11-13', kg: 89.4 }, { date: '2026-11-15', kg: 89 }]), null);
+});
+
+test('milestoneRow: weeks follow the chosen pace, no NaN when start is missing or equal', () => {
+  const mk = profile => load(['esc', 'icon', 'parseKey', 'sortedWeights', 'currentWeight', 'milestoneRow'], {
+    S: { profile, weights: [{ date: '2026-11-15', kg: 90 }] } });
+  let html = mk({ startWeight: 100, pace: '0.25', milestones: [{ name: 'Fasa 1', kg: 85 }] }).milestoneRow({ name: 'Fasa 1', kg: 85 }, 0);
+  assert.match(html, /5\.0 kg lagi · anggaran 20 minggu/);
+  html = mk({ startWeight: 100, pace: '0.5', milestones: [{ name: 'Fasa 1', kg: 85 }] }).milestoneRow({ name: 'Fasa 1', kg: 85 }, 0);
+  assert.match(html, /anggaran 10 minggu/);
+  for (const p of [{ startWeight: null, pace: '0.5' }, { startWeight: 85, pace: '0.5' }]) {
+    html = mk({ ...p, milestones: [{ name: 'F', kg: 85 }] }).milestoneRow({ name: 'F', kg: 85 }, 0);
+    assert(!html.includes('NaN'), html);
+  }
+});
+
+test('deleting a weight recalculates targets', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+  assert.match(src, /case 'delWeight':[^\n]*recalcTargets\(\)/);
+});
