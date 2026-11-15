@@ -203,3 +203,42 @@ test('pace 1 kg/week survives backup restore; effPace is limited by the calorie 
   assert.equal(mk(p).effPace(p), 1);
   assert.equal(mk({ pace: '0.75' }).effPace({ pace: '0.75' }), 0.75);   // no profile data: chosen pace
 });
+
+test('Makan: foodDay shows today or up to 7 days back, never the future (v1.10)', () => {
+  const UI = { fday: null }, S = { days: {} };
+  const ctx = load(['todayKey', 'parseKey', 'addDays', 'FOOD_BACK_DAYS', 'foodDay', 'niceDate', 'BULAN', 'HARI', 'dayLabel'], { UI, S });
+  const t = ctx.todayKey();
+  assert.equal(ctx.foodDay(), t);
+  UI.fday = ctx.addDays(t, -3); assert.equal(ctx.foodDay(), UI.fday);
+  UI.fday = ctx.addDays(t, -7); assert.equal(ctx.foodDay(), UI.fday);
+  UI.fday = ctx.addDays(t, -8); assert.equal(ctx.foodDay(), t);       // too old → back to today
+  UI.fday = ctx.addDays(t, 1); assert.equal(ctx.foodDay(), t);        // future → today
+  UI.fday = 'junk'; assert.equal(ctx.foodDay(), t);
+  assert.equal(ctx.dayLabel(t), 'hari ini');
+  assert.equal(ctx.dayLabel(ctx.addDays(t, -1)), 'semalam');
+  assert.match(ctx.dayLabel(ctx.addDays(t, -3)), /^(Ahad|Isnin|Selasa|Rabu|Khamis|Jumaat|Sabtu), \d+ \w+$/);
+});
+
+test('Makan: "Sama macam semalam" copies items with new ids and the drink water (v1.10)', () => {
+  const S = { customFoods: [] };
+  const { copyMealItems } = load(['uid', 'allFoods', 'findFood', 'copyMealItems'], { S, FOODS });
+  const from = [
+    { id: 'a1', foodId: 'airkosong', name: 'Air kosong', unit: '1 gelas', qty: 2, kcal: 0, plate: 'lain', meal: 'sarapan', t: 1 },
+    { id: 'a2', foodId: 'scan_x', name: 'Nasi lemak (scan)', unit: '1 bungkus', qty: 1, kcal: 450, plate: 'lain', meal: 'sarapan', t: 1, mix: { karbo: 1, protein: 0.5 } }
+  ];
+  const d = { meals: [], water: 100 };
+  copyMealItems(d, from);
+  assert.equal(d.meals.length, 2);
+  assert(d.meals.every((m, i) => m.id !== from[i].id && m.meal === 'sarapan' && m.kcal === from[i].kcal));
+  assert.deepEqual(d.meals[1].mix, { karbo: 1, protein: 0.5 });
+  assert.equal(d.water, 100 + 500);
+  assert.equal(from[0].id, 'a1');                                        // source day untouched
+});
+
+test('mainMeals: counts different main meals, not snacks', () => {
+  const { mainMeals } = load(['mainMeals']);
+  const d = (...ws) => ({ meals: ws.map(meal => ({ meal, kcal: 100 })) });
+  assert.equal(mainMeals(d('sarapan', 'sarapan', 'snek')), 1);
+  assert.equal(mainMeals(d('sarapan', 'malam', 'snek', 'snek')), 2);
+  assert.equal(mainMeals(d()), 0);
+});

@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.9.0
+**Versi semasa:** 1.10.0
 
 ## Ciri utama
 
@@ -17,6 +17,8 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 **Harian**
 - **Home baru (v1.6)** – reka bentuk dari Sleek: header hijau pandan dengan streak, ring kalori berbentuk pinggan (imbangan sayur/protein/karbo) + bar kemajuan ke sasaran, chip waktu makan, *Cadangan Coach* (mesej coach + satu menu), kad air & berat ringkas, dan pautan *Rasa tak selesa?* yang tenang.
 - **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
+- **Makan v1.10** – anak panah ‹ › untuk lihat & log **hingga 7 hari lepas** (makanan yang terlupa); tekan item untuk **ubah hidangan** atau padam; padam ada butang **Batal** (6 saat); baris **imbangan pinggan** (sayur/protein/karbo) dengan satu teguran ringkas (tanpa AI); **sasaran kcal** pada waktu makan yang belum dilog hari ini; *Idea menu* sentiasa ada untuk hari ini; **Sama macam semalam** — salin satu waktu makan dari hari sebelumnya dengan satu tekan.
+- **Tips lebih tepat (v1.10)** – hari dalam log hanya dikira bila ada sekurang-kurangnya 2 waktu makan utama (snek tak dikira); tip *kalori terlalu rendah* perlukan ketiga-tiga waktu makan utama dilog, supaya waktu makan yang terlupa log tak dianggap makan terlalu sikit.
 - **Scan makanan (v1.7)** – dalam sheet *Tambah*, ambil gambar atau pilih dari galeri; AI anggar item & kalori, padankan dengan preset app bila boleh. Pengguna **semak dan betulkan** (portion ½–5×, buang item) sebelum simpan — tiada apa dilog terus. Lihat bahagian *Scan makanan* di bawah.
 - **Preset makanan Malaysia** – 69 item (nasi 1 senduk, ayam grill, ulam, roti canai, teh tarik, Milo ais, dll.) + makanan sendiri.
 - **Cadangan menu (Enjin A)** – 58 gabungan menu di rumah atau di luar (gerai, mamak, nasi campur, kopitiam, makanan segera, kenduri, kedai serbaneka), dipilih ikut baki kalori, imbangan pinggan dan pilihan makanan. Butang *Cadangan lain* menggilirkan menu seterusnya dari senarai penuh. Berfungsi offline.
@@ -57,7 +59,7 @@ tips.js         47 tips diet & kesihatan + logik pilih tip harian
 tests/          Ujian unit (node --test): data backup, pengesanan pantang, kuota & origin Coach AI
 .github/workflows/test.yml   CI: sintaks, ujian, app.css terkini, deno check fungsi push
 manifest.json   Konfigurasi PWA
-sw.js           Service worker (cache dietpal-v18, terima & buka notifikasi)
+sw.js           Service worker (cache dietpal-v32, terima & buka notifikasi)
 vercel.json     Fungsi Vercel (maxDuration 60 s) + header keselamatan (CSP dll.)
 supabase/       Fungsi push (Edge Function) & setup.sql untuk notifikasi
 api/coach.js    Fungsi Vercel untuk Coach AI (OpenAI)
@@ -114,7 +116,7 @@ Permintaan dihantar ke fungsi Vercel `api/coach.js`, yang memanggil OpenAI Chat 
 | Nama | Wajib | Keterangan |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Ya | API key OpenAI. Jangan letak dalam kod. |
-| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-4.1-mini`, kini *deprecated* oleh OpenAI). Calon pengganti: `gpt-6-luna` — murah ($0.10 / $0.50 setiap 1M token), menyokong Chat Completions & Structured Outputs. |
+| `OPENAI_MODEL` | Tidak | Model yang digunakan (lalai: `gpt-6-luna` — murah, $0.10 / $0.50 setiap 1M token, menyokong Chat Completions & Structured Outputs). Jika env ini terpadam, Coach tetap guna `gpt-6-luna`. |
 | `OPENAI_REASONING_EFFORT` | Tidak | Hanya untuk model reasoning (`gpt-5.x`, `gpt-6…`). Lalai `none` — jawapan Coach ringkas, jadi tiada token "berfikir". Cuba `low` jika kualiti kurang. |
 | `SUPABASE_URL` | Ya | `https://jlbdtmzccrebjmlrjvgh.supabase.co` |
 | `SUPABASE_SECRET_KEY` | Disyorkan | *Secret key* projek Supabase **dietpal** (`sb_secret_…`, Project Settings → API Keys). Bila diset, fungsi kuota tak perlu akses awam — lepas itu pasang migration `supabase/migrations/20261105_coach_usage_private.sql`. |

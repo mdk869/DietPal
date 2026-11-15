@@ -238,6 +238,18 @@ function parseKey(k) { const [y, m, d] = k.split('-').map(Number); return new Da
 function day(k = todayKey()) { if (!S.days[k]) S.days[k] = { meals: [], water: 0 }; return S.days[k]; }
 function peekDay(k) { return S.days[k] || { meals: [], water: 0 }; }
 function kcalOf(d) { return Math.round(d.meals.reduce((a, m) => a + m.kcal, 0)); }
+// How many different main meals (not snacks) a day has in the log. Tips read a day only when it looks complete enough.
+function mainMeals(d) { return new Set(d.meals.filter(m => m.meal !== 'snek').map(m => m.meal)).size; }
+// Makan tab can show the last 7 days, so a forgotten meal can still be logged. UI.fday = null means today.
+const FOOD_BACK_DAYS = 7;
+function foodDay() {
+  const t = todayKey(), k = UI.fday;
+  return k && k < t && k >= addDays(t, -FOOD_BACK_DAYS) ? k : t;
+}
+function dayLabel(k) {
+  const t = todayKey();
+  return k === t ? 'hari ini' : k === addDays(t, -1) ? 'semalam' : `${HARI[parseKey(k).getDay()]}, ${niceDate(k)}`;
+}
 function guessMeal() {
   const mt = mealTimes(), n = new Date(), now = n.getHours() * 60 + n.getMinutes();
   const s = mins(mt.sarapan), t = mins(mt.tengahari), m = mins(mt.malam);
@@ -260,9 +272,24 @@ function streak() {
   while (peekDay(todayKey(d)).meals.length) { n++; d.setDate(d.getDate() - 1); }
   return n;
 }
-function toast(msg) {
-  const t = document.getElementById('toast'); t.innerHTML = `<span class="text-green-400">${icon('check', 'w-4 h-4', 2.5)}</span><span>${esc(msg)}</span>`; t.classList.remove('hidden'); t.classList.add('flex');
-  clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.add('hidden'); t.classList.remove('flex'); }, 2200);
+function toast(msg, undo = false) {
+  const t = document.getElementById('toast'); t.innerHTML = `<span class="text-green-400">${icon('check', 'w-4 h-4', 2.5)}</span><span>${esc(msg)}</span>${undo
+    ? '<button data-act="undo" class="tap ml-2 -my-1 px-2 py-1 rounded-lg font-bold text-green-300 underline underline-offset-2">Batal</button>' : ''}`;
+  t.classList.remove('hidden'); t.classList.add('flex');
+  if (!undo) UI.undo = null;
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.add('hidden'); t.classList.remove('flex'); UI.undo = null; }, undo ? 6000 : 2200);
+}
+// Change one day's log with a one-step "Batal": the day is put back as it was, unless it has changed again since.
+function withUndo(dk, msg, change) {
+  const d = day(dk), before = JSON.stringify(d);
+  change(d); save();
+  toast(msg, true);
+  UI.undo = { dk, before, after: JSON.stringify(d) };
+}
+function undoLast() {
+  const u = UI.undo; UI.undo = null;
+  if (!u || JSON.stringify(peekDay(u.dk)) !== u.after) { toast('Tak dapat batal — log dah berubah'); return; }
+  S.days[u.dk] = JSON.parse(u.before); save(); render(); toast('Dibatalkan');
 }
 // Plate groups of one logged item. App presets are looked up so mixed dishes (nasi lemak, mee goreng…)
 // count by their estimated make-up (foods.js `mix`); scanned mixed dishes carry their own `mix`;
@@ -515,10 +542,10 @@ function homeSuggest(c) {
   </section>`;
 }
 
-function statusText(k) {
+function statusText(k, today = true) {
   const p = S.profile;
-  if (k === 0) return 'Belum log makanan hari ini';
-  if (k < p.kcalMin) return `Baki ~${fmt(p.kcalMax - k)} kcal`;
+  if (k === 0) return today ? 'Belum log makanan hari ini' : 'Tiada makanan dilog';
+  if (k < p.kcalMin) return today ? `Baki ~${fmt(p.kcalMax - k)} kcal` : `Bawah sasaran ${fmt(p.kcalMin)}–${fmt(p.kcalMax)} kcal`;
   if (k <= p.kcalMax) return 'Dalam sasaran';
   return `Lebih ${fmt(k - p.kcalMax)} kcal — tak apa, 80/20`;
 }
@@ -587,9 +614,11 @@ function addDays(k, n) { const d = parseKey(k); d.setDate(d.getDate() + n); retu
 function tipSignals(dk = todayKey()) {
   const p = S.profile, sig = new Set();
   const prev = [1, 2, 3].map(i => peekDay(addDays(dk, -i)));
-  const logged = prev.filter(d => d.meals.length >= 2);   // a day with 0–1 items logged says nothing about the diet
+  // A day with fewer than 2 main meals logged says nothing about the diet. "Too little" needs all 3 main meals:
+  // a meal that was eaten but not logged is the usual reason a day looks low.
+  const logged = prev.filter(d => mainMeals(d) >= 2), full = prev.filter(d => mainMeals(d) >= 3);
   const most = f => logged.length >= 2 && logged.filter(f).length >= 2;
-  if (most(d => kcalOf(d) < p.kcalMin)) sig.add('under');
+  if (full.length >= 2 && full.filter(d => kcalOf(d) < p.kcalMin).length >= 2) sig.add('under');
   if (most(d => kcalOf(d) > p.kcalMax)) sig.add('over');
   // 'lain' = own food / AI menu we can't break down: don't call protein or veg low on those days
   if (most(d => { const c = plateCounts(d); return c.protein < 1.5 && c.lain < 1; })) sig.add('lowProtein');
@@ -600,7 +629,7 @@ function tipSignals(dk = todayKey()) {
   const wd = parseKey(dk).getDay();
   if (wd === 5 || wd === 6) {   // Friday / Saturday: was last weekend over target?
     const sat = addDays(dk, -(wd + 1));
-    if ([sat, addDays(sat, 1)].some(k => { const d = peekDay(k); return d.meals.length >= 2 && kcalOf(d) > p.kcalMax; })) sig.add('weekend');
+    if ([sat, addDays(sat, 1)].some(k => { const d = peekDay(k); return mainMeals(d) >= 2 && kcalOf(d) > p.kcalMax; })) sig.add('weekend');
   }
   const ws = sortedWeights().filter(w => w.date <= dk), last = ws[ws.length - 1];
   if (last && tipDayDiff(last.date, dk) <= 3) {
@@ -617,7 +646,7 @@ function tipSignals(dk = todayKey()) {
   if (tr && tr.span >= 20) {
     if (tr.rate <= -1.2) sig.add('fast');
     else if (!sig.has('plateau') && !sig.has('gain') && (!p.targetWeight || last.kg > p.targetWeight + 0.5) && tr.rate > -0.5 * effPace(p)) {
-      const d14 = Array.from({ length: 14 }, (_, i) => peekDay(addDays(dk, -1 - i))).filter(d => d.meals.length >= 2);
+      const d14 = Array.from({ length: 14 }, (_, i) => peekDay(addDays(dk, -1 - i))).filter(d => mainMeals(d) >= 2);
       sig.add(d14.length >= 4 && d14.filter(d => kcalOf(d) > p.kcalMax).length * 2 >= d14.length ? 'slowEat' : 'slowMove');
     }
   }
@@ -771,43 +800,119 @@ function foodRow(f) {
     </button>`;
 }
 
-/* ---------- MAKAN: today's log first; adding happens in a sheet ---------- */
+/* ---------- MAKAN: the day's log first (today, or up to 7 days back); adding happens in a sheet ---------- */
 function viewFood() {
-  const d = peekDay(todayKey()), k = kcalOf(d), p = S.profile;
+  const dk = foodDay(), t = todayKey(), isToday = dk === t, d = peekDay(dk), k = kcalOf(d), p = S.profile;
   const pct = Math.min(100, k / p.kcalMax * 100);
   const barColor = k > p.kcalMax ? '#d97706' : k >= p.kcalMin ? '#16a34a' : '#1e6b4a';
+  const prevK = addDays(dk, -1), prevD = peekDay(prevK), prevName = prevK === addDays(t, -1) ? 'semalam' : niceDate(prevK);
+  const now = MEAL_FLOW.indexOf(guessMeal());
+  const navBtn = (act, off, ic, label) => `<button data-act="${act}" ${off ? 'disabled' : ''} class="tap w-10 h-10 shrink-0 grid place-items-center rounded-full border border-slate-200 bg-white ${off ? 'opacity-30' : 'text-slate-700'}" aria-label="${label}">${icon(ic, 'w-5 h-5', 2.5)}</button>`;
   return `
   <div class="px-1">
-    <div class="flex items-baseline justify-between">
-      <h1 class="text-xl font-extrabold">Makan hari ini</h1>
-      <div class="text-[14px] font-bold">${fmt(k)} <span class="text-slate-500 font-semibold">/ ${fmt(p.kcalMax)} kcal</span></div>
+    <div class="flex items-center justify-between gap-2">
+      ${navBtn('fdayPrev', dk <= addDays(t, -FOOD_BACK_DAYS), 'chevL', 'Hari sebelumnya')}
+      <h1 class="text-xl font-extrabold text-center min-w-0 truncate">Makan ${isToday ? 'hari ini' : dayLabel(dk)}</h1>
+      ${navBtn('fdayNext', isToday, 'chevR', 'Hari seterusnya')}
     </div>
-    <div class="h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden"><div class="h-full rounded-full transition-all" style="width:${pct}%;background:${barColor}"></div></div>
-    <div class="text-[13px] font-semibold mt-1.5 ${statusColor(k)}">${statusText(k)}</div>
+    <div class="flex items-baseline justify-between gap-2 mt-3">
+      <div class="text-[13px] font-semibold ${statusColor(k)}">${statusText(k, isToday)}</div>
+      <div class="text-[14px] font-bold shrink-0">${fmt(k)} <span class="text-slate-500 font-semibold">/ ${fmt(p.kcalMax)} kcal</span></div>
+    </div>
+    <div class="h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden"><div class="h-full rounded-full transition-all" style="width:${pct}%;background:${barColor}"></div></div>
+    ${plateLine(d, isToday)}
+    ${!isToday ? `<div class="mt-3 text-[13px] bg-brand-50 text-brand-800 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+      <span>Makanan yang ditambah akan disimpan ke <b>${dayLabel(dk)}</b>.</span>
+      <button data-act="fdayToday" class="tap shrink-0 font-bold underline underline-offset-2">Ke hari ini</button></div>` : ''}
   </div>
 
   ${MEALS.map(m => {
     const items = d.meals.filter(x => x.meal === m.id);
     const mk = items.reduce((a, x) => a + x.kcal, 0);
+    // Target only for meals still ahead today (snacks have none: no nudge to snack)
+    const target = isToday && !items.length && m.id !== 'snek' && MEAL_FLOW.indexOf(m.id) >= now ? mealTarget(m.id).ideal : 0;
+    const prev = items.length ? [] : prevD.meals.filter(x => x.meal === m.id);
+    const prevKcal = prev.reduce((a, x) => a + x.kcal, 0);
     return card(`
       <div class="flex items-center justify-between">
         <div class="font-bold text-[16px] flex items-center gap-2"><span class="text-slate-500">${icon(MEAL_ICON[m.id], 'w-5 h-5')}</span>${m.label}</div>
-        <div class="text-[14px] font-bold ${mk ? 'text-slate-700' : 'text-slate-400'}">${mk ? fmt(mk) + ' kcal' : '–'}</div>
+        ${mk ? `<div class="text-[14px] font-bold text-slate-700">${fmt(mk)} kcal</div>`
+          : target ? `<div class="text-[13px] font-semibold text-slate-500">sasaran ~${fmt(target)} kcal</div>`
+          : '<div class="text-[14px] font-bold text-slate-400">–</div>'}
       </div>
       ${items.length ? `<div class="mt-1">${items.map(x => `
-        <div class="flex items-center gap-2 py-2 border-t border-slate-100">
-          <span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[x.plate || 'lain'].color}"></span>
-          <div class="flex-1 min-w-0 text-[14px] text-slate-700 leading-snug">${esc(x.name)} <span class="text-slate-500 text-[13px]">· ${x.qty !== 1 ? x.qty + ' × ' : ''}${esc(x.unit || '')}</span></div>
-          <div class="text-[14px] font-semibold">${fmt(x.kcal)}</div>
-          <button data-act="delMeal" data-id="${esc(x.id)}" class="tap w-8 h-8 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Padam">${icon('x', 'w-4 h-4')}</button>
+        <div class="flex items-center gap-1 border-t border-slate-100">
+          <button data-act="editMeal" data-id="${esc(x.id)}" class="tap flex-1 min-w-0 flex items-center gap-2 py-2 text-left" aria-label="Ubah ${esc(x.name)}">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background:${PLATE[x.plate || 'lain'].color}"></span>
+            <span class="flex-1 min-w-0 text-[14px] text-slate-700 leading-snug">${esc(x.name)} <span class="text-slate-500 text-[13px]">· ${x.qty !== 1 ? x.qty + ' × ' : ''}${esc(x.unit || '')}</span></span>
+            <span class="text-[14px] font-semibold">${fmt(x.kcal)}</span>
+          </button>
+          <button data-act="delMeal" data-id="${esc(x.id)}" class="tap w-9 h-9 shrink-0 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Padam ${esc(x.name)}">${icon('x', 'w-4 h-4')}</button>
         </div>`).join('')}</div>` : ''}
+      ${prev.length ? `<button data-act="copyMeal" data-meal="${m.id}" class="tap mt-2 w-full flex items-center gap-2.5 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-left">
+        <span class="text-brand-700">${icon('refresh', 'w-4 h-4')}</span>
+        <span class="flex-1 min-w-0"><span class="block text-[14px] font-semibold text-brand-700">Sama macam ${prevName}</span>
+          <span class="block text-[12px] text-slate-500 truncate">${prev.map(x => esc(x.name)).join(', ')}</span></span>
+        <span class="text-[13px] font-semibold text-slate-600 shrink-0">${fmt(prevKcal)} kcal</span>
+      </button>` : ''}
       <div class="flex items-center gap-2 mt-2">
         <button data-act="openAdd" data-meal="${m.id}" class="tap btn btn-secondary py-2 px-4 text-[14px]">${icon('plus', 'w-4 h-4')}Tambah</button>
-        ${!items.length ? `<button data-act="ideaMenu" data-meal="${m.id}" class="tap btn btn-text py-2 text-[14px]">Idea menu${icon('chevR', 'w-4 h-4')}</button>` : ''}
+        ${isToday ? `<button data-act="ideaMenu" data-meal="${m.id}" class="tap btn btn-text py-2 text-[14px]">Idea menu${icon('chevR', 'w-4 h-4')}</button>` : ''}
       </div>`, 'py-3');
   }).join('')}
 
-  <p class="text-[12px] text-slate-500 text-center px-4">Nilai kalori ialah anggaran purata. Saiz hidangan kedai berbeza-beza.</p>`;
+  <p class="text-[12px] text-slate-500 text-center px-4">Tekan makanan untuk ubah hidangan. Nilai kalori ialah anggaran purata — saiz hidangan kedai berbeza-beza.</p>`;
+}
+// Plate balance for the day shown in Makan, with one short nudge (same rules as the Home coach, no AI).
+function plateLine(d, isToday) {
+  if (!d.meals.length) return '';
+  const pc = plateCounts(d), gap = plateGap(d, pc);
+  const sweet = d.meals.filter(isSweetMeal).reduce((a, m) => a + (m.kcal || 0), 0);
+  const dot = (key, label) => `<span class="inline-flex items-center gap-1.5 ${pc[key] ? '' : 'text-slate-400'}"><span class="w-2.5 h-2.5 rounded-full" style="background:${PLATE[key].color};${pc[key] ? '' : 'opacity:.35'}"></span>${label} ${Math.round(pc[key] * 10) / 10}</span>`;
+  const when = isToday ? '' : ' hari itu';
+  const [msg, ok] = gap === 'sayur' ? [isToday ? 'Belum ada sayur — tambah sayur atau ulam waktu makan seterusnya.' : 'Kurang sayur hari itu.', false]
+    : gap === 'protein' ? [isToday ? 'Protein masih kurang — tambah telur, ikan, ayam atau tauhu.' : 'Protein kurang hari itu.', false]
+    : sweet >= 100 ? [`Air manis${when} ~${fmt(sweet)} kcal — ${isToday ? 'cuba' : 'lain kali cuba'} kurang manis atau kosong.`, false]
+    : pc.serat >= 1 && pc.protein >= 1 ? [isToday ? 'Pinggan seimbang setakat ini.' : 'Pinggan seimbang.', true] : ['', true];
+  return `<div class="mt-3 rounded-xl bg-slate-50 px-3 py-2">
+    <div class="flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-semibold text-slate-600">${dot('serat', 'Sayur')}${dot('protein', 'Protein')}${dot('karbo', 'Karbo')}</div>
+    ${msg ? `<div class="text-[13px] mt-1 ${ok ? 'text-green-700' : 'text-amber-800'}">${msg}</div>` : ''}
+  </div>`;
+}
+// Edit a logged item: change the serving, or delete it.
+function sheetEdit(id) {
+  const dk = foodDay(), m = peekDay(dk).meals.find(x => x.id === id); if (!m) return;
+  const f = m.foodId ? findFood(m.foodId) : null;
+  UI.edit = { id, dk, qty: m.qty || 1, per: f ? f.kcal : m.kcal / (m.qty || 1) };
+  openSheet(() => {
+    const e = UI.edit, x = peekDay(e.dk).meals.find(y => y.id === e.id); if (!x) return '';
+    return `
+    <div class="p-5">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div class="text-[12px] font-semibold text-brand-700">${MEALS.find(y => y.id === x.meal)?.label || ''}${e.dk !== todayKey() ? ' · ' + dayLabel(e.dk) : ''}</div>
+          <div class="font-bold text-xl leading-tight">${esc(x.name)}</div>
+          <div class="text-[14px] text-slate-500">${esc(x.unit || '1 hidangan')} · ${fmt(e.per)} kcal</div>
+        </div>
+        <button data-act="closeSheet" class="tap w-9 h-9 shrink-0 grid place-items-center rounded-xl text-slate-500" aria-label="Tutup">${icon('x')}</button>
+      </div>
+      <div class="mt-5 flex items-center justify-between bg-slate-50 rounded-xl p-2">
+        <button data-act="editQty" data-d="-0.5" class="tap w-12 h-12 rounded-xl bg-white border border-slate-200 grid place-items-center" aria-label="Kurang">${icon('minus')}</button>
+        <div class="text-center"><div class="text-2xl font-extrabold">${e.qty}</div><div class="text-[12px] text-slate-500">hidangan</div></div>
+        <button data-act="editQty" data-d="0.5" class="tap w-12 h-12 rounded-xl bg-white border border-slate-200 grid place-items-center" aria-label="Tambah">${icon('plus')}</button>
+      </div>
+      <button data-act="editSave" class="tap mt-5 w-full btn btn-primary py-3.5 text-[16px]">Simpan · ${fmt(e.per * e.qty)} kcal</button>
+      <button data-act="delMeal" data-id="${esc(x.id)}" class="tap mt-2 w-full btn btn-text py-3 text-[14px] text-red-600">${icon('x', 'w-4 h-4')}Padam dari log</button>
+    </div>`;
+  });
+}
+// Copy one meal from the day before (e.g. the same breakfast every day). Presets keep their drink water.
+function copyMealItems(d, from) {
+  from.forEach(x => {
+    d.meals.push({ ...x, id: uid(), t: Date.now() });
+    const f = x.foodId ? findFood(x.foodId) : null;
+    if (f?.water) d.water += Math.round(f.water * (x.qty || 1));
+  });
 }
 
 // The add sheet: search first, then frequent items, one category filter, one flat list
@@ -821,12 +926,12 @@ function addResultsHtml() {
     : `<div class="py-6 text-center text-[14px] text-slate-500">Tiada padanan untuk "${esc(UI.q)}".</div>`;
 }
 function addSheetBody() {
-  const m = MEALS.find(x => x.id === UI.meal), freq = frequentFoods();
+  const freq = frequentFoods();
   const showFreq = freq.length && !UI.q.trim() && UI.cat === 'Semua';
   return `
   <div class="sticky top-0 bg-white z-10 px-5 pt-4 pb-3 border-b border-slate-100">
     <div class="flex items-center justify-between">
-      <div class="font-bold text-xl">Tambah ke ${m.label}</div>
+      <div class="font-bold text-xl">Tambah ke ${addWhere()}</div>
       <button data-act="closeSheet" class="tap w-9 h-9 grid place-items-center rounded-xl text-slate-500" aria-label="Tutup">${icon('x')}</button>
     </div>
     <div class="relative mt-3">
@@ -849,6 +954,8 @@ function addSheetBody() {
     <button data-act="customFood" class="tap mt-3 w-full btn btn-secondary border-dashed py-3 text-[14px]">${icon('plus', 'w-4 h-4')}Tambah makanan sendiri</button>
   </div>`;
 }
+// "Sarapan" or, when adding to an earlier day, "Sarapan · 14 Nov"
+function addWhere() { const m = MEALS.find(x => x.id === UI.meal), dk = foodDay(); return m.label + (dk !== todayKey() ? ' · ' + niceDate(dk) : ''); }
 function openAdd(meal) {
   UI.meal = meal; UI.q = ''; UI.cat = 'Semua';
   openSheet(addSheetBody, true);
@@ -869,7 +976,7 @@ function sheetFood(id) {
     <div class="p-5">
       <button data-act="backToAdd" class="tap btn btn-text text-[14px] -ml-1 mb-2">${icon('chevL', 'w-4 h-4')}Kembali</button>
       <div>
-        <div class="text-[12px] font-semibold text-brand-700">Tambah ke ${MEALS.find(m => m.id === UI.meal).label}</div>
+        <div class="text-[12px] font-semibold text-brand-700">Tambah ke ${addWhere()}</div>
         <div class="font-bold text-xl leading-tight">${esc(f.name)}</div>
         <div class="text-[14px] text-slate-500">${esc(f.unit)} · ${esc(f.kcal)} kcal</div>
         <div class="text-[12px] font-semibold mt-1 flex items-center gap-1.5 text-slate-600"><span class="w-2 h-2 rounded-full" style="background:${PLATE[f.plate || 'lain'].color}"></span>${PLATE[f.plate || 'lain'].label}</div>
@@ -904,7 +1011,7 @@ function sheetCustom() {
       <select id="cfPlate" class="w-full mt-1 bg-slate-50 rounded-xl px-3 py-3 outline-none">
         <option value="lain">Lain-lain / hidangan campur</option><option value="serat">Sayur & serat</option><option value="protein">Protein</option><option value="karbo">Karbo</option>
       </select>
-      <button data-act="saveCustom" class="tap mt-5 w-full btn btn-primary py-3.5">Simpan & log ke ${MEALS.find(m => m.id === UI.meal).label}</button>
+      <button data-act="saveCustom" class="tap mt-5 w-full btn btn-primary py-3.5">Simpan & log ke ${addWhere()}</button>
     </div>`);
 }
 
@@ -1871,7 +1978,7 @@ function scanBody() {
         </div>
       </div>`; }).join('')}</div>
     ${r.note ? `<div class="mt-2 text-[13px] bg-slate-50 text-slate-700 rounded-xl p-3">${esc(r.note)}</div>` : ''}
-    <button data-act="scanLog" class="tap mt-4 w-full btn btn-primary py-3.5 text-[16px]">Simpan ke ${m.label} · ~${fmt(total)} kcal</button>
+    <button data-act="scanLog" class="tap mt-4 w-full btn btn-primary py-3.5 text-[16px]">Simpan ke ${addWhere()} · ~${fmt(total)} kcal</button>
     <div class="flex gap-2 mt-2">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div>
     <p class="text-[12px] text-slate-500 mt-3">${r.items.every(x => x.source === 'label') ? 'Dibaca oleh AI dari label — pastikan nombor sama dengan label sebenar.' : 'Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.'}${r.left !== null && r.left !== undefined ? ` Baki scan hari ini: ${r.left}.` : ''}</p>
   </div>`;
@@ -1879,9 +1986,8 @@ function scanBody() {
 function scanLog() {
   const r = UI.scan.result; if (!r || !r.items.length) return;
   // Presets are logged as the preset itself (plate make-up, water from drinks); other dishes as one-off items.
-  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId)) || { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix }, x.qty, UI.meal));
-  const m = MEALS.find(x => x.id === UI.meal);
-  toast(`Disimpan ke ${m.label} (~${fmt(scanTotal(r.items))} kcal)`);
+  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId)) || { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix }, x.qty, UI.meal, foodDay()));
+  toast(`Disimpan ke ${addWhere()} (~${fmt(scanTotal(r.items))} kcal)`);
   closeSheet(); render();
 }
 
@@ -1892,7 +1998,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2392,8 +2498,8 @@ function closeSheet() { sheetFn = null; document.getElementById('sheetWrap').cla
 /* ============================================================
    ACTIONS
    ============================================================ */
-function addMeal(f, qty, meal) {
-  const d = day();
+function addMeal(f, qty, meal, dk = todayKey()) {
+  const d = day(dk);
   const own = f.mix && !FOODS.some(x => x.id === f.id);   // presets keep their mix in foods.js
   d.meals.push({ id: uid(), foodId: f.id, name: f.name, unit: f.unit, qty, kcal: Math.round(f.kcal * qty), plate: f.plate || 'lain', meal, t: Date.now(),
     ...(own ? { mix: f.mix } : {}) });
@@ -2406,8 +2512,13 @@ document.addEventListener('click', (e) => {
   const a = el.dataset.act;
   if (handleProfileAction(a, el)) return;
   switch (a) {
-    case 'tab': UI.tab = el.dataset.tab; if (UI.tab !== 'food') UI.q = ''; render(); window.scrollTo({ top: 0 }); break;
-    case 'quickMeal': if (sheetFn) closeSheet(); UI.tab = 'food'; render(); window.scrollTo({ top: 0 }); openAdd(el.dataset.meal); break;
+    case 'tab': UI.tab = el.dataset.tab; if (UI.tab !== 'food') { UI.q = ''; UI.fday = null; } render(); window.scrollTo({ top: 0 }); break;
+    case 'fdayPrev': case 'fdayNext': {
+      const t = todayKey(), k = addDays(foodDay(), a === 'fdayPrev' ? -1 : 1);
+      UI.fday = k >= t ? null : k < addDays(t, -FOOD_BACK_DAYS) ? foodDay() : k; render(); break;
+    }
+    case 'fdayToday': UI.fday = null; render(); window.scrollTo({ top: 0 }); break;
+    case 'quickMeal': if (sheetFn) closeSheet(); UI.tab = 'food'; UI.fday = null; render(); window.scrollTo({ top: 0 }); openAdd(el.dataset.meal); break;
     case 'openAdd': openAdd(el.dataset.meal); break;
     case 'backToAdd': openSheet(addSheetBody, true); break;
     case 'addCat': UI.cat = el.dataset.cat; refreshSheet(); break;
@@ -2415,18 +2526,39 @@ document.addEventListener('click', (e) => {
     case 'pickFood': sheetFood(el.dataset.id); break;
     case 'qty': UI.pick.qty = Math.max(0.5, Math.min(10, UI.pick.qty + parseFloat(el.dataset.d))); refreshSheet(); break;
     case 'addFood': {
-      const f = findFood(UI.pick.id); addMeal(f, UI.pick.qty, UI.meal);
+      const f = findFood(UI.pick.id); addMeal(f, UI.pick.qty, UI.meal, foodDay());
       render(); openSheet(addSheetBody, true); toast(`${f.name} ditambah (${fmt(f.kcal * UI.pick.qty)} kcal)`); break;
     }
-    case 'delMeal': { const d = day(); const m = d.meals.find(x => x.id === el.dataset.id);
-      if (m) { const f = findFood(m.foodId); if (f?.water) d.water = Math.max(0, d.water - Math.round(f.water * m.qty)); }
-      d.meals = d.meals.filter(x => x.id !== el.dataset.id); save(); render(); toast('Dipadam'); break; }
+    case 'delMeal': {
+      const dk = foodDay(), id = el.dataset.id, m = peekDay(dk).meals.find(x => x.id === id); if (!m) break;
+      if (sheetFn) closeSheet();
+      withUndo(dk, `${m.name} dipadam`, d => {
+        const f = findFood(m.foodId); if (f?.water) d.water = Math.max(0, d.water - Math.round(f.water * m.qty));
+        d.meals = d.meals.filter(x => x.id !== id);
+      });
+      render(); break;
+    }
+    case 'editMeal': sheetEdit(el.dataset.id); break;
+    case 'editQty': UI.edit.qty = Math.max(0.5, Math.min(10, UI.edit.qty + parseFloat(el.dataset.d))); refreshSheet(); break;
+    case 'editSave': {
+      const e = UI.edit, d = day(e.dk), m = d.meals.find(x => x.id === e.id); if (!m) { closeSheet(); break; }
+      const f = m.foodId ? findFood(m.foodId) : null;
+      if (f?.water) d.water = Math.max(0, d.water + Math.round(f.water * e.qty) - Math.round(f.water * (m.qty || 1)));
+      m.qty = e.qty; m.kcal = Math.round(e.per * e.qty); save(); closeSheet(); render(); toast(`${m.name} dikemas kini (${fmt(m.kcal)} kcal)`); break;
+    }
+    case 'copyMeal': {
+      const dk = foodDay(), meal = el.dataset.meal, from = peekDay(addDays(dk, -1)).meals.filter(x => x.meal === meal);
+      if (!from.length || peekDay(dk).meals.some(x => x.meal === meal)) break;
+      withUndo(dk, `${MEALS.find(x => x.id === meal).label} disalin (${fmt(from.reduce((a, x) => a + x.kcal, 0))} kcal)`, d => copyMealItems(d, from));
+      render(); break;
+    }
+    case 'undo': undoLast(); break;
     case 'customFood': sheetCustom(); break;
     case 'saveCustom': {
       const name = document.getElementById('cfName').value.trim(), kcal = parseFloat(document.getElementById('cfKcal').value);
       if (!name || !(kcal >= 0)) { toast('Isi nama & kalori dulu'); return; }
       const f = { id: 'c_' + uid(), name, kcal: Math.round(kcal), unit: document.getElementById('cfUnit').value.trim() || '1 hidangan', plate: document.getElementById('cfPlate').value };
-      S.customFoods.push(f); addMeal(f, 1, UI.meal); render(); openSheet(addSheetBody, true); toast('Disimpan & dilog'); break;
+      S.customFoods.push(f); addMeal(f, 1, UI.meal, foodDay()); render(); openSheet(addSheetBody, true); toast('Disimpan & dilog'); break;
     }
     case 'water': { const d = day(); const ml = parseInt(el.dataset.ml, 10);
       const before = d.water; d.water = Math.max(0, d.water + ml); save(); render();
@@ -2445,7 +2577,7 @@ document.addEventListener('click', (e) => {
     case 'rescue': sheetRescue(); break;
     case 'sym': { const k = el.dataset.s; UI.sym.has(k) ? UI.sym.delete(k) : UI.sym.add(k); refreshSheet(); break; }
     case 'rescueGo': UI.rescueDone = true; refreshSheet(); document.getElementById('sheet').scrollTop = 0; break;
-    case 'rescueOther': UI.tab = 'food'; render(); window.scrollTo({ top: 0 }); openAdd('snek'); break;
+    case 'rescueOther': UI.tab = 'food'; UI.fday = null; render(); window.scrollTo({ top: 0 }); openAdd('snek'); break;
     case 'rescueLog': { const f = findFood(el.dataset.id); addMeal(f, 1, 'snek'); render(); toast(`${f.name} dilog`); el.classList.add('ring-2', 'ring-green-400'); break; }
     case 'closeSheet': closeSheet(); render(); break;
     case 'export': {
@@ -2756,7 +2888,7 @@ function openFromLink(search = location.search) {
   const tip = q.get('tip');
   if (S.profile.setupDone && tip && tipById(tip)) { UI.tab = 'home'; used = true; setTimeout(() => openTip(tip), 50); }
   const meal = q.get('meal');
-  if (S.profile.setupDone && MEALS.some(m => m.id === meal)) { UI.tab = 'food'; used = true; setTimeout(() => openAdd(meal), 50); }
+  if (S.profile.setupDone && MEALS.some(m => m.id === meal)) { UI.tab = 'food'; UI.fday = null; used = true; setTimeout(() => openAdd(meal), 50); }
   if (used || q.has('dev')) history.replaceState(null, '', location.pathname);
 }
 navigator.serviceWorker?.addEventListener('message', (e) => {
