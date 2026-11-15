@@ -67,6 +67,7 @@ CADANGAN MENU (bila pengguna minta cadangan makan, atau soalan memerlukannya)
 
 BERAT BADAN & AKTIVITI FIZIKAL (bila soalan tentang berat, kadar turun berat atau senaman)
 - Jawab dalam "reply", "menus" kosong. Guna "Trend berat" dari konteks app jika ada; jangan teka nombor berat.
+- Jika diminta pelan (contoh pelan seminggu): satu baris pendek bagi setiap hari atau langkah, dipisah dengan baris baru (contoh "Isnin: jalan laju 30 minit"), maksimum 8 baris + satu ayat penutup. Jangan lebih 1,200 aksara.
 - Kadar selamat 0.5–1 kg seminggu (CPG Obesiti KKM). Jangan galakkan lebih laju dari 1 kg seminggu. Jika trend lebih laju, ingatkan makan cukup dan protein.
 - Berat turun perlahan: semak makanan dulu (saiz hidangan, minuman manis, minyak) — kesan makanan lebih besar dari senaman. Senaman tidak menggantikan sasaran kalori; jangan suruh makan lebih pada hari bersenam.
 - Cadangan aktiviti untuk orang biasa: jalan laju, kurang duduk lama, sasaran 150 minit seminggu (naik perlahan ke 300), senaman kekuatan guna berat badan 2 kali seminggu. Berat badan tinggi → aktiviti kurang hentakan (jalan, berenang, basikal statik). Mula perlahan, naik sikit-sikit. Jangan cadang program ekstrem, puasa, pil kurus atau suplemen.
@@ -95,7 +96,7 @@ const SCHEMA = {
   additionalProperties: false,
   required: ['reply', 'meal', 'menus', 'safety_note'],
   properties: {
-    reply: { type: 'string', description: 'Jawapan terus & spesifik kepada soalan, 1–3 ayat.' },
+    reply: { type: 'string', description: 'Jawapan terus & spesifik kepada soalan, 1–3 ayat. Pelan: satu baris setiap hari/langkah, maksimum 8 baris.' },
     meal: { type: 'string', enum: ['sarapan', 'tengahari', 'malam', 'snek', 'tiada'], description: 'Waktu makan untuk menu yang dicadangkan.' },
     safety_note: { type: 'string', description: 'Amaran keselamatan jika perlu; jika tiada, string kosong.' },
     menus: {
@@ -130,6 +131,17 @@ const SCHEMA = {
 // ---------- helpers ----------
 // Strips control chars and scripts that never belong in BM/English answers (guards against stray tokens from small models).
 const ODD_SCRIPT = /[\u0400-\u04ff\u0590-\u05ff\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]+/g;
+// Coach reply: keeps line breaks (one line per day in a weekly plan) and, if too long, ends at the last full sentence
+// instead of cutting mid-word.
+function replyText(v, max = 1500) {
+  if (typeof v !== 'string') return '';
+  let t = v.replace(/\r/g, '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ' ').replace(ODD_SCRIPT, '')
+    .split('\n').map(l => l.replace(/\s{2,}/g, ' ').trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (t.length <= max) return t;
+  t = t.slice(0, max);
+  const end = Math.max(t.lastIndexOf('. '), t.lastIndexOf('.\n'), t.lastIndexOf('! '), t.lastIndexOf('? '), t.lastIndexOf('\n'));
+  return end > max * 0.5 ? t.slice(0, end + 1).trim() : t.replace(/\s+\S*$/, '') + '…';
+}
 const str = (v, max = 80) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').replace(ODD_SCRIPT, '').replace(/\s{2,}/g, ' ').trim().slice(0, max) : '');
 const dec = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n)) * 10) / 10 : null; };
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : null; };
@@ -342,7 +354,7 @@ function clean(out, catalog = []) {
     return { name: sentenceCase(str(m.name, 70)), tip: str(m.tip, 200), items, kcal: menuTotal(items) };
   }).filter(m => m.name && m.items.length) : [];
   const meal = MEALS[out.meal] ? out.meal : null;
-  return { reply: str(out.reply, 600), safety_note: str(out.safety_note, 300), meal, menus };
+  return { reply: replyText(out.reply), safety_note: str(out.safety_note, 300), meal, menus };
 }
 
 // Light-touch portion fit: only when a menu is clearly outside the range, nudge portions

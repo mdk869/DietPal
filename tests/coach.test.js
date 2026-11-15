@@ -107,3 +107,14 @@ test('v1.12: pyramid gap line — whitelisted groups only, fixed wording, in the
   assert.equal(pyramidGapLine('buah'), ''); assert.equal(pyramidGapLine([]), '');
   assert.match(buildUserMessage({ question: 'Apa nak makan?', context: { meal: 'malam', pyramidGap: ['sayur'] } }), /masih kurang: sayur\./);
 });
+
+test('clean: long plan replies are not cut at 600 chars; line breaks kept; over-long ends at a full sentence', () => {
+  const { clean } = require('../api/coach.js')._test;
+  const plan = ['Isnin: jalan laju 30 minit.', 'Selasa: senaman kekuatan 15 minit.', 'Rabu: jalan laju 30 minit.', 'Khamis: jalan santai 20 minit.',
+    'Jumaat: jalan laju 30 minit selepas makan malam, atau naik tangga di pejabat sebanyak lima kali.', 'Sabtu: senaman kekuatan 15 minit — duduk-bangun dari kerusi, tolak dinding dan angkat botol air.', 'Ahad: rehat aktif dengan regangan ringan atau berjalan santai bersama keluarga di taman berhampiran rumah.', 'Minum air kosong yang cukup sepanjang hari dan tidur awal supaya badan cepat pulih untuk minggu seterusnya.', 'Mula perlahan dan tambah masa sedikit demi sedikit; untuk bantu cukupkan pemakanan hari ini yang kurang sayur dan protein, pilih ikan bakar dan sayur.'].join('\n');
+  const r = clean({ reply: plan + '\n\n\n', menus: [] }).reply;
+  assert(plan.length > 600); assert.equal(r, plan);
+  const long = clean({ reply: 'Ayat pendek yang lengkap. '.repeat(80), menus: [] }).reply;
+  assert(long.length <= 1500); assert(long.endsWith('lengkap.'), long.slice(-30));
+  assert.equal(clean({ reply: 'a\u0007b', menus: [] }).reply, 'a b');
+});
