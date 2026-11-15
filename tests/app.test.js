@@ -242,3 +242,16 @@ test('mainMeals: counts different main meals, not snacks', () => {
   assert.equal(mainMeals(d('sarapan', 'malam', 'snek', 'snek')), 2);
   assert.equal(mainMeals(d()), 0);
 });
+
+test('"Simpan sebagai makanan sendiri": reuses same name & serving, keeps plate make-up through backup (v1.11)', () => {
+  const S = { customFoods: [{ id: 'c_old', name: 'Nasi lemak kedai Kak Ros', unit: '1 bungkus', kcal: 400, plate: 'lain' }] };
+  const { keepAsOwnFood } = load(['uid', 'keepAsOwnFood'], { S });
+  const a = keepAsOwnFood({ name: 'nasi lemak kedai kak ros', unit: '1  bungkus', kcal: 455.4, plate: 'lain', mix: { karbo: 1.5, protein: 0.5 } });
+  assert.equal(a.id, 'c_old'); assert.equal(a.kcal, 455); assert.deepEqual(a.mix, { karbo: 1.5, protein: 0.5 });
+  assert.equal(S.customFoods.length, 1);
+  const b = keepAsOwnFood({ name: 'Teh O ais kurang manis', unit: '1 gelas', kcal: 60, plate: 'lain' });
+  assert.match(b.id, /^c_/); assert.equal(S.customFoods.length, 2); assert(!('mix' in b));
+  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const out = sanitizeState({ profile: {}, customFoods: S.customFoods });
+  assert.deepEqual(out.customFoods[0].mix, { karbo: 1.5, protein: 0.5 });
+});

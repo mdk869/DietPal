@@ -139,6 +139,7 @@ function sanitizeState(d) {
     if (!ID.test(f.id) || !name || kcal === null) return null;
     const out = { id: f.id, name, kcal: Math.round(kcal), unit: s(f.unit, 40) || '1 hidangan', plate: oneOf(f.plate, PLATES, 'lain') };
     const water = n(f.water, 0, 5000); if (water) out.water = Math.round(water);
+    const mx = mixOf(f.mix); if (mx) out.mix = mx;   // own foods saved from scan / "Tulis makanan" keep their plate make-up
     return out;
   }).filter(Boolean);
   const bk = obj(src.backup);
@@ -186,6 +187,7 @@ const IC = {
   chevD: '<path d="m6 9 6 6 6-6"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.7L21 8"/><path d="M21 3v5h-5"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/>',
   droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
   sunrise: '<path d="M12 2v6M4.9 10.9l1.4 1.4M2 18h2M20 18h2M19.1 10.9l-1.4 1.4M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/>',
@@ -938,7 +940,10 @@ function addSheetBody() {
       <input id="addSearch" value="${esc(UI.q)}" placeholder="Cari makanan… (cth: nasi, ayam, teh)" autocomplete="off" class="w-full bg-slate-50 rounded-xl px-4 py-3 pl-10 text-[16px] outline-none focus:ring-2 focus:ring-brand-500">
       <span class="absolute left-3.5 top-3.5 text-slate-500">${icon('search', 'w-5 h-5')}</span>
     </div>
-    ${SCAN_ENDPOINT ? `<button data-act="scanOpen" class="tap mt-2 w-full btn btn-secondary py-2.5 text-[14px]">${icon('camera', 'w-4 h-4')}Scan makanan dengan kamera</button>` : ''}
+    ${SCAN_ENDPOINT ? `<div class="grid grid-cols-2 gap-2 mt-2">
+      <button data-act="scanOpen" class="tap btn btn-secondary py-2.5 text-[14px]">${icon('camera', 'w-4 h-4')}Scan gambar</button>
+      <button data-act="writeOpen" class="tap btn btn-secondary py-2.5 text-[14px]">${icon('edit', 'w-4 h-4')}Tulis makanan</button>
+    </div>` : ''}
     <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mt-3">
       ${CATS.map(c => `<button data-act="addCat" data-cat="${c}" class="tap chip ${UI.cat === c ? 'chip-on' : ''}">${c}</button>`).join('')}
     </div>
@@ -1719,7 +1724,7 @@ function privacyBody() {
     ${sec('Dalam telefon anda', '<p>Profil, makanan, air, berat dan tetapan disimpan dalam telefon ini sahaja. DietPal tiada akaun dan tiada salinan di server. Padam bila-bila masa: Tetapan → <b>Padam semua data</b>.</p>')}
     ${sec('Notifikasi (Supabase, Singapura)', '<p>Untuk hantar peringatan pada masa yang betul: alamat notifikasi telefon, zon waktu, waktu makan & pilihan peringatan, dan status hari ini (waktu makan yang dah dilog — ya/tidak, jumlah air, jumlah kalori, tarikh timbang terakhir).</p><p>Nama, berat dan senarai makanan <b>tidak</b> dihantar. Data ini dipadam bila notifikasi dimatikan atau data dipadam.</p>')}
     ${sec('Coach AI (OpenAI, Amerika Syarikat)', `<p>Hanya bila anda bertanya: soalan, makanan yang dilog hari ini, sasaran kalori, pantang & alahan, makanan sendiri, trend berat mingguan (cth turun 0.3 kg seminggu)${(S.profile.health || []).length ? ', dan nota kesihatan jika dibenarkan' : ''}. Nama dan berat tidak dihantar.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>`)}
-    ${sec('Scan makanan (OpenAI, Amerika Syarikat)', '<p>Hanya bila anda scan: gambar makanan (dikecilkan dalam telefon dulu) dihantar ke OpenAI untuk anggaran kalori. DietPal <b>tidak</b> menyimpan gambar itu — ia tidak disimpan di server kami dan tidak dimasukkan ke backup.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>')}
+    ${sec('Scan & tulis makanan (OpenAI, Amerika Syarikat)', '<p>Hanya bila anda guna: gambar makanan (dikecilkan dalam telefon dulu) berserta penerangan jika ada, atau apa yang anda tulis dalam <i>Tulis makanan</i>, dihantar ke OpenAI untuk anggaran kalori. DietPal <b>tidak</b> menyimpan gambar atau tulisan itu — ia tidak disimpan di server kami dan tidak dimasukkan ke backup.</p><p>OpenAI tidak guna data API untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan sebelum dipadam.</p>')}
     ${sec('Tips hari ini', '<p>Tip dipilih dalam telefon ini berdasarkan log anda — log tidak dihantar ke mana-mana. Jika peringatan tips hidup, tajuk tip hari ini & esok dihantar bersama status notifikasi.</p><p>Bila anda tekan <b>membantu / tak membantu</b>, server simpan tip yang dinilai, undian anda dan ID rawak telefon dalam bentuk hash — tanpa nama atau data diet — supaya kami tahu tip mana yang berguna.</p>')}
     ${sec('Had penggunaan Coach AI', '<p>Untuk had soalan dan had scan, server simpan ID rawak telefon (bukan nama atau nombor telefon) dan alamat IP dalam bentuk hash, bersama kiraan token. Rekod dipadam selepas 2 hari tidak digunakan.</p>')}
     ${sec('Hosting (Vercel)', '<p>Seperti laman web biasa, pelayan mencatat log akses teknikal (cth alamat IP) untuk keselamatan.</p>')}
@@ -1848,11 +1853,14 @@ const SCAN_ERRORS = {
   not_configured: 'Scan makanan belum disediakan di server.',
   quota_unavailable: 'Scan rehat sekejap. Cuba lagi dalam beberapa minit.',
   timeout: 'Scan ambil masa terlalu lama. Cuba lagi.',
+  bad_text: 'Tulis nama makanan dulu — sekurang-kurangnya 3 huruf.',
   default: 'Scan tak berjaya sekarang. Cuba lagi sekejap lagi, atau cari dalam senarai.'
 };
-UI.scan = { img: '', loading: false, result: null, error: '' };
-function sheetScan() {
-  UI.scan = { img: '', loading: false, result: null, error: '' };
+// mode 'gambar' = photo (+ optional description); 'teks' = "Tulis makanan", a written description only.
+const newScan = (mode = 'gambar') => ({ mode, img: '', desc: '', text: '', loading: false, prep: false, result: null, error: '', keep: false });
+UI.scan = newScan();
+function sheetScan(mode = 'gambar') {
+  UI.scan = newScan(mode);
   openSheet(scanBody, true);
 }
 // Phone photo → small JPEG data URL (~1024 px, enough to read nutrition labels). Keeps upload fast and cheap; the original never leaves the phone.
@@ -1878,80 +1886,118 @@ async function scanPrepImage(file) {
   }
   throw new Error('read');
 }
+// Picking a photo only prepares it: the user can add a description before it is sent.
 async function scanFile(file) {
   if (!file || UI.scan.loading) return;
-  if (!navigator.onLine) { UI.scan.error = SCAN_ERRORS.offline; refreshSheet(); return; }
-  UI.scan = { img: '', loading: true, result: null, error: '' }; refreshSheet();
+  Object.assign(UI.scan, { img: '', result: null, error: '', loading: true, prep: true }); refreshSheet();
+  try { UI.scan.img = await scanPrepImage(file); }
+  catch (e) { UI.scan.error = SCAN_ERRORS[e.message] || SCAN_ERRORS.read; }
+  UI.scan.loading = false; UI.scan.prep = false;
+  if (sheetFn === scanBody) refreshSheet();
+}
+async function scanSend() {
+  const sc = UI.scan, teks = sc.mode === 'teks';
+  if (sc.loading) return;
+  if (teks && sc.text.trim().length < 3) { toast('Tulis apa yang anda makan dulu'); return; }
+  if (!teks && !sc.img) return;
+  if (!navigator.onLine) { sc.error = SCAN_ERRORS.offline; refreshSheet(); return; }
+  Object.assign(sc, { loading: true, error: '', result: null, keep: false }); refreshSheet();
   try {
-    UI.scan.img = await scanPrepImage(file); if (sheetFn === scanBody) refreshSheet();
     const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 55000);
-    const r = await fetch(SCAN_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
-      body: JSON.stringify({ image: UI.scan.img, device: deviceId() }) });
+    const body = teks ? { text: sc.text.trim().slice(0, 300), device: deviceId() }
+      : { image: sc.img, desc: sc.desc.trim().slice(0, 200), device: deviceId() };
+    const r = await fetch(SCAN_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal, body: JSON.stringify(body) });
     clearTimeout(timer);
     const data = await r.json().catch(() => ({}));
-    if (r.status === 429 && data.error === 'quota') UI.scan.error = data.scope === 'day'
-      ? 'Had scan untuk hari ini dah habis. Boleh scan lagi esok — atau cari dalam senarai.'
-      : `Scan rehat sekejap. Boleh scan lagi ${waitText(data.retry_after)}.`;
+    if (r.status === 429 && data.error === 'quota') sc.error = data.scope === 'day'
+      ? `Had ${teks ? 'tulis makanan' : 'scan'} untuk hari ini dah habis. Boleh cuba lagi esok — atau cari dalam senarai.`
+      : `${teks ? 'Tulis makanan' : 'Scan'} rehat sekejap. Boleh cuba lagi ${waitText(data.retry_after)}.`;
     else if (!r.ok) throw new Error(data.error || 'default');
-    else UI.scan.result = { ...data, items: (data.items || []).map(x => ({ ...x })) };
+    else sc.result = { ...data, items: (data.items || []).map(x => ({ ...x })) };
   } catch (e) {
-    UI.scan.error = SCAN_ERRORS[e.name === 'AbortError' ? 'timeout' : e.message] || SCAN_ERRORS.default;
+    sc.error = SCAN_ERRORS[e.name === 'AbortError' ? 'timeout' : e.message] || SCAN_ERRORS.default;
   }
-  UI.scan.loading = false;
+  sc.loading = false;
   if (sheetFn === scanBody) refreshSheet();
 }
 const scanTotal = items => Math.round(items.reduce((a, x) => a + x.kcal * x.qty, 0));
 // Allergy / avoid check: presets use their tags, other dishes are checked by name (same as Coach AI).
 function scanConflicts(x) { const f = x.foodId ? findFood(x.foodId) : null; return f ? foodConflicts(f) : aiConflicts(x.name); }
-function scanPickLabel(again) {
+function scanPickLabel(again, label = 'Scan semula') {
   return `<label class="tap ${again ? 'flex-1 btn btn-secondary py-3 text-[14px]' : 'w-full rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/40 py-8 flex flex-col items-center gap-2 text-brand-700'} cursor-pointer">
     <input id="scanFile" type="file" accept="image/*" class="sr-only">
-    ${again ? `${icon('camera', 'w-4 h-4')}Scan semula` : `${icon('camera', 'w-9 h-9', 1.75)}<span class="font-bold text-[16px]">Ambil gambar makanan</span><span class="text-[13px] text-slate-500 font-normal">atau pilih dari galeri</span>`}
+    ${again ? `${icon('camera', 'w-4 h-4')}${label}` : `${icon('camera', 'w-9 h-9', 1.75)}<span class="font-bold text-[16px]">Ambil gambar makanan</span><span class="text-[13px] text-slate-500 font-normal">atau pilih dari galeri</span>`}
   </label>`;
 }
+// "Try again" for the current mode: new photo, or back to the text box (text kept).
+const scanAgain = () => UI.scan.mode === 'teks'
+  ? `<button data-act="writeAgain" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('edit', 'w-4 h-4')}Tulis semula</button>` : scanPickLabel(true);
+const scanSearch = `<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button>`;
 function scanBody() {
-  const sc = UI.scan, m = MEALS.find(x => x.id === UI.meal), r = sc.result;
+  const sc = UI.scan, r = sc.result, teks = sc.mode === 'teks';
   const head = `<div class="sticky top-0 bg-white z-10 px-5 pt-4 pb-3 border-b border-slate-100">
     <div class="flex items-center justify-between">
       <button data-act="backToAdd" class="tap btn btn-text text-[14px] -ml-1">${icon('chevL', 'w-4 h-4')}Kembali</button>
       <button data-act="closeSheet" class="tap w-9 h-9 grid place-items-center rounded-xl text-slate-500" aria-label="Tutup">${icon('x')}</button>
     </div>
-    <div class="font-bold text-xl">Scan makanan</div>
-    <div class="text-[13px] text-slate-500">Untuk ${m.label} · kalori ialah anggaran</div>
+    <div class="font-bold text-xl">${teks ? 'Tulis makanan' : 'Scan makanan'}</div>
+    <div class="text-[13px] text-slate-500">Untuk ${addWhere()} · kalori ialah anggaran</div>
   </div>`;
+  const tick = t => `<li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}${t}</li>`;
   if (!S.settings.ai?.scanConsent) return head + `<div class="px-5 pb-6 pt-4">
-    <div class="font-bold text-[16px]">Sebelum scan</div>
-    <p class="text-[14px] text-slate-600 mt-1 leading-relaxed">Gambar makanan dihantar ke <b>OpenAI</b> (Amerika Syarikat) untuk dianggar kalorinya.</p>
+    <div class="font-bold text-[16px]">Sebelum mula</div>
+    <p class="text-[14px] text-slate-600 mt-1 leading-relaxed">${teks ? 'Apa yang anda tulis' : 'Gambar makanan (dan penerangan, jika ada)'} dihantar ke <b>OpenAI</b> (Amerika Syarikat) untuk dianggar kalorinya.</p>
     <ul class="mt-2 space-y-1.5 text-[14px] text-slate-700">
-      <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}Gambar dikecilkan dalam telefon dulu</li>
-      <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}DietPal tidak simpan gambar ini</li>
-      <li class="flex gap-2">${icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-brand-700', 2.5)}Anda semak dan betulkan dulu sebelum disimpan</li>
+      ${teks ? '' : tick('Gambar dikecilkan dalam telefon dulu')}
+      ${tick(`DietPal tidak simpan ${teks ? 'tulisan' : 'gambar'} ini`)}
+      ${tick('Anda semak dan betulkan dulu sebelum disimpan')}
     </ul>
-    <p class="text-[13px] text-slate-500 mt-2">OpenAI tidak guna data ini untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan. Elak gambar yang ada muka orang atau maklumat peribadi.</p>
+    <p class="text-[13px] text-slate-500 mt-2">OpenAI tidak guna data ini untuk melatih model, dan menyimpannya hingga 30 hari untuk kawalan penyalahgunaan. ${teks ? 'Tulis tentang makanan sahaja — jangan masukkan maklumat peribadi.' : 'Elak gambar yang ada muka orang atau maklumat peribadi.'}</p>
     <button data-act="scanConsent" class="tap mt-4 w-full btn btn-primary py-3 text-[16px]">Setuju & teruskan</button>
     <button data-act="privacy" class="tap mt-2 w-full btn btn-text py-2 text-[14px]">Baca notis privasi</button>
   </div>`;
   const thumb = sc.img ? `<img src="${sc.img}" alt="Gambar makanan" class="w-full max-h-56 object-cover rounded-2xl bg-slate-100">` : '';
-  if (sc.loading) return head + `<div class="px-5 pb-6 pt-4">${thumb}
-    <div class="mt-4 text-[14px] font-semibold text-slate-600">${sc.img ? 'Sedang menganggar kalori…' : 'Menyediakan gambar…'}</div>
+  // What the user told us, shown above the result so they can see what the AI worked from
+  const said = teks ? sc.text.trim() : sc.desc.trim();
+  const saidBox = said ? `<div class="${thumb ? 'mt-2 ' : ''}text-[13px] text-slate-600 bg-slate-50 rounded-xl px-3 py-2"><span class="font-semibold text-slate-700">${teks ? 'Anda tulis' : 'Penerangan anda'}:</span> ${esc(said)}</div>` : '';
+  if (sc.loading) return head + `<div class="px-5 pb-6 pt-4">${thumb}${sc.prep ? '' : saidBox}
+    <div class="mt-4 text-[14px] font-semibold text-slate-600">${sc.prep ? 'Menyediakan gambar…' : 'Sedang menganggar kalori…'}</div>
     <div class="mt-2 space-y-2">${[1, 2, 3].map(() => '<div class="h-12 rounded-xl bg-slate-100 animate-pulse"></div>').join('')}</div></div>`;
   if (sc.error) return head + `<div class="px-5 pb-6 pt-4">${thumb}
-    <div class="mt-4 text-[14px] bg-amber-50 text-amber-800 rounded-xl p-3">${esc(sc.error)}</div>
-    <div class="flex gap-2 mt-3">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div></div>`;
-  if (!r) return head + `<div class="px-5 pb-6 pt-4">
+    <div class="${thumb ? 'mt-4 ' : ''}text-[14px] bg-amber-50 text-amber-800 rounded-xl p-3">${esc(sc.error)}</div>
+    ${(teks || sc.img) && sc.error !== SCAN_ERRORS.read && sc.error !== SCAN_ERRORS.bad_image ? `<button data-act="scanSend" class="tap mt-3 w-full btn btn-primary py-3 text-[15px]">Cuba lagi</button>` : ''}
+    <div class="flex gap-2 mt-2">${scanAgain()}${scanSearch}</div></div>`;
+  if (!r && teks) return head + `<div class="px-5 pb-6 pt-4">
+    <label for="writeText" class="block font-bold text-[16px]">Apa yang anda makan?</label>
+    <textarea id="writeText" maxlength="300" rows="3" placeholder="Cth: nasi lemak ayam goreng, teh o ais kurang manis" class="mt-2 w-full bg-slate-50 rounded-xl px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-brand-500 resize-none">${esc(sc.text)}</textarea>
+    <button data-act="scanSend" class="tap mt-3 w-full btn btn-primary py-3.5 text-[16px]">Kira kalori</button>
+    <div class="mt-4 text-[13px] text-slate-600 bg-slate-50 rounded-xl p-3 space-y-1">
+      <div class="font-semibold text-slate-700">Untuk anggaran lebih tepat</div>
+      <div>• Sebut saiz — separuh pinggan, 2 keping, mangkuk besar</div>
+      <div>• Sebut cara masak — goreng, bakar, masak lemak</div>
+      <div>• Minuman: biasa, kurang manis atau kosong</div>
+      <div>• Malas taip? Tekan ikon mikrofon pada papan kekunci</div>
+    </div></div>`;
+  if (!r && !sc.img) return head + `<div class="px-5 pb-6 pt-4">
     ${scanPickLabel(false)}
     <div class="mt-4 text-[13px] text-slate-600 bg-slate-50 rounded-xl p-3 space-y-1">
       <div class="font-semibold text-slate-700">Untuk anggaran lebih tepat</div>
       <div>• Ambil dari atas, nampak seluruh pinggan atau mangkuk</div>
       <div>• Cahaya cukup, satu hidangan setiap gambar</div>
-      <div>• Ambil sebelum mula makan</div>
+      <div>• Boleh tambah penerangan ringkas selepas ambil gambar</div>
       <div>• Makanan bungkus? Scan label <b>Maklumat Pemakanan</b> di belakang — nilai lebih tepat</div>
     </div></div>`;
-  if (!r.items.length) return head + `<div class="px-5 pb-6 pt-4">${thumb}
-    <div class="mt-4 text-[14px] bg-slate-50 text-slate-700 rounded-xl p-3">${r.is_food === false && !r.note ? 'Tak nampak makanan dalam gambar ini.' : 'Tiada makanan untuk disimpan.'}${r.note ? ' ' + esc(r.note) : ''} Cuba ambil semula dengan cahaya cukup, atau cari dalam senarai.</div>
-    <div class="flex gap-2 mt-3">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div></div>`;
-  const total = scanTotal(r.items);
-  return head + `<div class="px-5 pb-6 pt-4">${thumb}
+  if (!r) return head + `<div class="px-5 pb-6 pt-4">${thumb}
+    <label for="scanDesc" class="block mt-4 font-bold text-[15px]">Terangkan sikit <span class="font-semibold text-slate-500">(pilihan)</span></label>
+    <p class="text-[13px] text-slate-500">Bantu AI: jenis lauk, cara masak, saiz, kurang manis…</p>
+    <textarea id="scanDesc" maxlength="200" rows="2" placeholder="Cth: nasi separuh pinggan, ayam masak merah 1 ketul, teh o ais kurang manis" class="mt-2 w-full bg-slate-50 rounded-xl px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-brand-500 resize-none">${esc(sc.desc)}</textarea>
+    <button data-act="scanSend" class="tap mt-3 w-full btn btn-primary py-3.5 text-[16px]">Anggar kalori</button>
+    <div class="flex gap-2 mt-2">${scanPickLabel(true, 'Tukar gambar')}</div></div>`;
+  if (!r.items.length) return head + `<div class="px-5 pb-6 pt-4">${thumb}${saidBox}
+    <div class="mt-4 text-[14px] bg-slate-50 text-slate-700 rounded-xl p-3">${teks ? 'Tak dapat kenal pasti makanan dari tulisan ini.' : r.is_food === false && !r.note ? 'Tak nampak makanan dalam gambar ini.' : 'Tiada makanan untuk disimpan.'}${r.note ? ' ' + esc(r.note) : ''} ${teks ? 'Cuba tulis nama makanan dengan lebih jelas, atau cari dalam senarai.' : 'Cuba ambil semula dengan cahaya cukup, atau cari dalam senarai.'}</div>
+    <div class="flex gap-2 mt-3">${scanAgain()}${scanSearch}</div></div>`;
+  const total = scanTotal(r.items), canKeep = r.items.some(x => !x.foodId);
+  return head + `<div class="px-5 pb-6 pt-4">${thumb}${saidBox}
     <div class="mt-4 flex items-baseline justify-between">
       <div class="font-bold text-[16px]">Semak & betulkan</div>
       <div class="font-extrabold text-[18px]">~${fmt(total)} <span class="text-[13px] font-semibold text-slate-500">kcal</span></div>
@@ -1978,16 +2024,33 @@ function scanBody() {
         </div>
       </div>`; }).join('')}</div>
     ${r.note ? `<div class="mt-2 text-[13px] bg-slate-50 text-slate-700 rounded-xl p-3">${esc(r.note)}</div>` : ''}
+    ${canKeep ? `<button data-act="scanKeep" role="checkbox" aria-checked="${sc.keep}" class="tap mt-3 w-full flex items-start gap-3 rounded-xl border ${sc.keep ? 'border-brand-500 bg-brand-50' : 'border-slate-200'} p-3 text-left">
+      <span class="mt-0.5 w-5 h-5 shrink-0 rounded-md border-2 grid place-items-center ${sc.keep ? 'bg-brand-700 border-brand-700 text-white' : 'border-slate-300'}">${sc.keep ? icon('check', 'w-3.5 h-3.5', 3) : ''}</span>
+      <span><span class="block text-[14px] font-semibold">Simpan sebagai makanan sendiri</span>
+        <span class="block text-[12px] text-slate-500">Lain kali cari terus dalam senarai — tak perlu ${teks ? 'tulis' : 'scan'} lagi.</span></span>
+    </button>` : ''}
     <button data-act="scanLog" class="tap mt-4 w-full btn btn-primary py-3.5 text-[16px]">Simpan ke ${addWhere()} · ~${fmt(total)} kcal</button>
-    <div class="flex gap-2 mt-2">${scanPickLabel(true)}<button data-act="backToAdd" class="tap flex-1 btn btn-secondary py-3 text-[14px]">${icon('search', 'w-4 h-4')}Cari dalam senarai</button></div>
-    <p class="text-[12px] text-slate-500 mt-3">${r.items.every(x => x.source === 'label') ? 'Dibaca oleh AI dari label — pastikan nombor sama dengan label sebenar.' : 'Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.'}${r.left !== null && r.left !== undefined ? ` Baki scan hari ini: ${r.left}.` : ''}</p>
+    <div class="flex gap-2 mt-2">${scanAgain()}${scanSearch}</div>
+    <p class="text-[12px] text-slate-500 mt-3">${teks ? 'Anggaran oleh AI dari tulisan anda — semak saiz hidangan.' : r.items.every(x => x.source === 'label') ? 'Dibaca oleh AI dari label — pastikan nombor sama dengan label sebenar.' : 'Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.'}${r.left !== null && r.left !== undefined ? ` Baki ${teks ? 'tulis makanan' : 'scan'} hari ini: ${r.left}.` : ''}</p>
   </div>`;
+}
+// Own food from a scanned / written item: reuse one with the same name & serving, else add a new one.
+function keepAsOwnFood(x) {
+  const key = f => (f.name + '|' + f.unit).toLowerCase().replace(/\s+/g, ' ').trim();
+  const f = { name: x.name, unit: x.unit || '1 hidangan', kcal: Math.round(x.kcal), plate: x.plate || 'lain', ...(x.mix ? { mix: x.mix } : {}) };
+  const old = S.customFoods.find(c => key(c) === key(f));
+  if (old) { Object.assign(old, f); return old; }
+  const nf = { id: 'c_' + uid(), ...f }; S.customFoods.push(nf); return nf;
 }
 function scanLog() {
   const r = UI.scan.result; if (!r || !r.items.length) return;
   // Presets are logged as the preset itself (plate make-up, water from drinks); other dishes as one-off items.
-  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId)) || { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix }, x.qty, UI.meal, foodDay()));
-  toast(`Disimpan ke ${addWhere()} (~${fmt(scanTotal(r.items))} kcal)`);
+  // Kept items are logged as the own food, so "Kerap dimakan" counts them too.
+  const keep = UI.scan.keep;
+  r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId))
+    || (keep ? keepAsOwnFood(x) : { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix }), x.qty, UI.meal, foodDay()));
+  if (keep) save();
+  toast(`Disimpan ke ${addWhere()} (~${fmt(scanTotal(r.items))} kcal)${keep ? ' · ada dalam "Sendiri"' : ''}`);
   closeSheet(); render();
 }
 
@@ -1998,7 +2061,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2371,7 +2434,7 @@ function viewSettings() {
       ${toggleRow('aiToggle', 'health', st.ai?.health !== false, 'Kongsi nota kesihatan dengan Coach AI', 'Supaya cadangan elak gula, garam atau pedas ikut keadaan anda')}
     </div>
     <div class="text-[13px] text-slate-600 mt-2">${st.ai?.consent ? `Persetujuan Coach AI: diberi${st.ai.consentAt ? ' pada ' + niceDate(todayKey(new Date(st.ai.consentAt))) : ''}.` : 'Persetujuan Coach AI: belum diberi (akan ditanya sebelum soalan pertama).'}</div>
-    <div class="text-[13px] text-slate-600 mt-1">${st.ai?.scanConsent ? 'Persetujuan scan makanan: diberi.' : 'Persetujuan scan makanan: belum diberi (akan ditanya sebelum scan pertama).'}</div>
+    <div class="text-[13px] text-slate-600 mt-1">${st.ai?.scanConsent ? 'Persetujuan scan & tulis makanan: diberi.' : 'Persetujuan scan & tulis makanan: belum diberi (akan ditanya sebelum guna kali pertama).'}</div>
     <div class="grid grid-cols-2 gap-2 mt-3">
       <button data-act="privacy" class="tap btn btn-secondary py-2.5 text-[14px]">Notis privasi</button>
       <button data-act="aiRevoke" class="tap btn btn-secondary py-2.5 text-[14px]" ${st.ai?.consent || st.ai?.scanConsent ? '' : 'disabled'}>Tarik balik</button>
@@ -2637,6 +2700,10 @@ document.addEventListener('click', (e) => {
     case 'aiLogTo': aiLog(Number(el.dataset.i), el.dataset.meal); break;
     case 'aiFallback': sheetSuggest(); break;
     case 'scanOpen': sheetScan(); break;
+    case 'writeOpen': sheetScan('teks'); break;
+    case 'scanSend': scanSend(); break;
+    case 'writeAgain': Object.assign(UI.scan, { result: null, error: '' }); refreshSheet(); document.getElementById('writeText')?.focus(); break;
+    case 'scanKeep': UI.scan.keep = !UI.scan.keep; refreshSheet(); break;
     case 'scanConsent': S.settings.ai = { ...S.settings.ai, scanConsent: true }; save(); refreshSheet(); break;
     case 'scanQty': { const x = UI.scan.result?.items?.[Number(el.dataset.i)];
       if (x) { x.qty = Math.max(0.5, Math.min(5, x.qty + parseFloat(el.dataset.d))); refreshSheet(); } break; }
@@ -2653,6 +2720,8 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.id === 'aiQ') UI.ai.q = e.target.value.slice(0, 300);
+  if (e.target.id === 'scanDesc') UI.scan.desc = e.target.value.slice(0, 200);
+  if (e.target.id === 'writeText') UI.scan.text = e.target.value.slice(0, 300);
   if (e.target.id === 'addSearch') {
     UI.q = e.target.value;
     const box = document.getElementById('addResults'); if (box) box.innerHTML = addResultsHtml();
