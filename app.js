@@ -822,8 +822,8 @@ function viewFood() {
     <div class="h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden"><div class="h-full rounded-full transition-all" style="width:${pct}%;background:${barColor}"></div></div>
     ${plateLine(d, isToday)}
     ${!isToday ? `<div class="mt-3 text-[13px] bg-brand-50 text-brand-800 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-      <span>Makanan yang ditambah akan disimpan ke <b>${dayLabel(dk)}</b>.</span>
-      <button data-act="fdayToday" class="tap shrink-0 font-bold underline underline-offset-2">Ke hari ini</button></div>` : ''}
+      <span>Anda sedang lihat log <b>${dayLabel(dk)}</b>.</span>
+      <button data-act="fdayToday" class="tap shrink-0 font-bold underline underline-offset-2">Balik ke hari ini</button></div>` : ''}
   </div>
 
   ${MEALS.map(m => {
