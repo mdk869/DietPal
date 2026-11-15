@@ -1130,6 +1130,8 @@ function viewWeight() {
     <div class="flex justify-between items-center mb-2"><div class="font-bold text-[16px]">Trend berat</div><div class="text-[12px] text-slate-500">${ws.length} catatan</div></div>
     ${weightChart(ws)}`)}
 
+  ${boostCard()}
+
   ${weightTipsCard()}
 
   ${card(`
@@ -1164,6 +1166,145 @@ function weightTipsCard() {
         <span class="inline-flex items-center gap-1 mt-1.5 text-[13px] font-bold text-brand-700">Baca lagi ${ph('caret-right-bold', 13)}</span>
       </button>`).join('')}
     </div>`);
+}
+// ---------- "Nak turun lebih cepat?" (Berat page) ----------
+// Extra kcal burned above resting: (MET − 1) × kg × hours. MET values: Compendium of Physical Activities (adult).
+// low: low-impact, shown for everyone; the rest only when BMI < 27.5 (Asia cut-off for obesity), to protect the knees.
+const BOOST_ACTS = [
+  { n: 'Jalan laju (5–6 km/j)', met: 4.3, low: true },
+  { n: 'Basikal statik ringan', met: 3.5, low: true },
+  { n: 'Berenang santai', met: 6.0, low: true },
+  { n: 'Senamrobik dalam air', met: 5.5, low: true },
+  { n: 'Naik tangga perlahan', met: 4.0, low: true },
+  { n: 'Senaman kekuatan (berat badan)', met: 3.5, low: true },
+  { n: 'Badminton santai', met: 5.5 },
+  { n: 'Jogging', met: 7.0 },
+  { n: 'Senaman litar (circuit)', met: 8.0 },
+  { n: 'Lompat tali perlahan', met: 8.8 }
+];
+const BOOST_WALK_MET = 4.3;
+const MAX_PACE = 1;
+function actKcal(met, kg, min) { return Math.round((met - 1) * kg * min / 60); }
+// kg per week the calorie target alone allows at `pace` (auto targets recalculated for that pace).
+function paceReach(p, pace) {
+  if (!canAuto(p) || !(p.height > 0)) return parseFloat(pace);
+  const t = calcTargets({ ...p, pace }), ach = (t.tdee - (t.min + t.max) / 2) * 7 / 7700;
+  return Math.max(0, Math.min(parseFloat(pace), Math.round(ach * 20) / 20));
+}
+// Everything the card and sheet show, from the current weight, BMI, chosen pace and calorie targets.
+function boostPlan(p = S.profile, kg = currentWeight()) {
+  const h = (p.height || 170) / 100, b = kg / (h * h), lowImpact = b >= 27.5;
+  const pace = parseFloat(p.pace) || 0.5, reach = effPace(p), gap = Math.max(0, Math.round((pace - reach) * 100) / 100);
+  const acts = BOOST_ACTS.filter(a => a.low || !lowImpact).map(a => ({ ...a, kcal: actKcal(a.met, kg, 30) }));
+  const perMin = (BOOST_WALK_MET - 1) * kg / 60;
+  // Walking that closes the gap left by the calorie floor; else what 30 min a day adds (never past 1 kg/week in total).
+  const extraKcal = gap >= 0.05 ? Math.round(gap * 7700 / 7) : 0;
+  const walkMin = extraKcal ? Math.ceil(extraKcal / perMin / 5) * 5 : 30;
+  const gainFor = min => Math.min(Math.max(0, MAX_PACE - reach), Math.round(perMin * min * 7 / 7700 * 20) / 20);
+  const walkGain = gainFor(30), cardMin = extraKcal ? Math.min(60, walkMin) : 30, cardGain = gainFor(cardMin);
+  return { kg, bmi: b, lowImpact, pace, reach, gap, acts, extraKcal, walkMin, walkGain, cardMin, cardGain,
+    reach1: pace < MAX_PACE ? paceReach(p, '1.0') : reach, manual: p.kcalMode !== 'auto' };
+}
+function boostCard() {
+  const p = S.profile; if (!p.setupDone || !currentWeight()) return '';
+  const sig = tipSignals(), slow = ['slowEat', 'slowMove', 'plateau'].some(k => sig.has(k)), b = boostPlan();
+  const line = b.cardGain >= 0.05 ? `Jalan laju ${b.cardMin} minit sehari ≈ +${b.cardGain} kg seminggu`
+    : 'Kekalkan aktif 150 minit seminggu dan makan ikut sasaran';
+  return card(`
+    <div class="flex items-start gap-3">
+      <span class="w-10 h-10 rounded-full ${slow ? 'bg-amber-100 text-amber-700' : 'bg-brand-100 text-brand-700'} grid place-items-center shrink-0">${icon('zap', 'w-5 h-5')}</span>
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-[16px]">Nak turun lebih cepat?</div>
+        <div class="text-[13px] ${slow ? 'text-amber-700 font-semibold' : 'text-slate-500'}">${slow ? 'Progress perlahan — cuba pelan ini' : 'Cara selamat, sehingga 1 kg seminggu'}</div>
+      </div>
+    </div>
+    <div class="mt-3 text-[14px] text-slate-700 leading-snug">Kadar anda: <b>${b.pace} kg seminggu</b>${b.reach < b.pace ? ` (makan sahaja ~${b.reach} kg)` : ''} · had selamat 1 kg</div>
+    <div class="mt-1 text-[14px] text-slate-700 leading-snug">${esc(line)}</div>
+    <button data-act="boostOpen" class="tap mt-3 w-full btn ${slow ? 'btn-primary' : 'btn-secondary'} h-12 text-[15px]">Lihat pelan</button>`);
+}
+function boostBody() {
+  const p = S.profile, b = boostPlan(), floor = kcalFloor(p).toLocaleString('en');
+  const h3 = (ic, t) => `<h3 class="mt-6 font-bold text-[17px] flex items-center gap-2">${icon(ic, 'w-5 h-5 text-brand-700')}${t}</h3>`;
+  const li = t => `<li class="flex gap-2"><span class="text-brand-700 font-bold">•</span><span>${t}</span></li>`;
+  const warn = t => `<p class="mt-2 text-[13px] bg-amber-50 text-amber-800 rounded-xl p-3 leading-snug">${t}</p>`;
+  const paceBox = b.pace >= MAX_PACE
+    ? `<p class="mt-2 text-[14px] text-slate-600">Anda dah guna kadar paling laju yang selamat: <b>1 kg seminggu</b>.</p>`
+    : b.manual
+      ? `<p class="mt-2 text-[14px] text-slate-600">Sasaran kalori anda ditetapkan sendiri. Untuk kadar 1 kg seminggu, tukar kadar dan sasaran kalori di Profil.</p>`
+      : `<button data-act="boostPace" class="tap mt-3 w-full btn btn-primary h-12 text-[15px]">Tukar ke 1 kg seminggu</button>
+         <p class="mt-2 text-[13px] text-slate-500">Sasaran kalori akan dikira semula. Boleh tukar balik di Profil.</p>`;
+  const reachNote = b.reach1 < MAX_PACE - 0.04
+    ? warn(`Dengan had kalori minimum (${floor} kcal), makan sahaja boleh bawa ~${b.reach1} kg seminggu pada kadar 1 kg. Selebihnya boleh datang dari aktiviti — lihat di bawah. Kadar lebih perlahan tetap kemajuan.`) : '';
+  const plan = b.extraKcal && b.walkMin <= 60
+    ? `Untuk capai <b>${b.pace} kg seminggu</b>, tambah ~${b.extraKcal} kcal sehari dari aktiviti ≈ <b>jalan laju ${b.walkMin} minit sehari</b>.`
+    : b.extraKcal
+    ? `Untuk ${b.pace} kg seminggu, perlu ~${b.extraKcal} kcal sehari dari aktiviti — terlalu banyak untuk diharapkan. Sasaran realistik: <b>jalan laju 60 minit sehari</b> ≈ +${b.cardGain} kg, jadi jumlah <b>~${Math.round((b.reach + b.cardGain) * 20) / 20} kg seminggu</b>. Itu tetap kemajuan yang baik.`
+    : b.walkGain >= 0.05 ? `Tambah <b>jalan laju 30 minit sehari</b> ≈ +${b.walkGain} kg seminggu (jumlah jangan lebih 1 kg seminggu).`
+    : `Kadar anda dah di had selamat. Aktif 150–300 minit seminggu bantu kekalkan otot dan elak berat naik semula.`;
+  const fastNotes = [hasHealth('diabetes') && 'Ada kencing manis dan guna insulin atau ubat yang turunkan gula? Tanya doktor dulu sebelum berpuasa lama — risiko gula rendah.',
+    hasHealth('gastrik') && 'Ada gastrik? Puasa lama boleh cetuskan sakit. Mula dengan tempoh pendek atau pilih cara lain.'].filter(Boolean);
+  return `<div class="p-5">
+    <div class="w-10 h-1.5 rounded-full bg-slate-200 mx-auto mb-4"></div>
+    <h2 class="font-heading text-[21px] font-bold leading-snug">Nak turun lebih cepat?</h2>
+    <p class="text-[14px] text-slate-600 mt-1">Paling laju yang selamat ialah 1 kg seminggu (CPG Obesiti KKM). Gabungan makan, aktiviti dan kesabaran.</p>
+
+    ${h3('scale', '1. Kadar turun berat')}
+    <p class="mt-2 text-[14px] text-slate-600">Sekarang: <b>${b.pace} kg seminggu</b>${b.reach < b.pace ? `, tapi had kalori minimum hadkan kepada ~${b.reach} kg` : ''}.</p>
+    ${paceBox}${b.pace < MAX_PACE && !b.manual ? reachNote : ''}
+
+    ${h3('pulse', `2. Senaman ikut berat anda (${fmtKg(b.kg)} kg)`)}
+    ${b.lowImpact ? `<p class="mt-2 text-[13px] text-slate-500">Pilihan mesra lutut sahaja sebab BMI anda ${b.bmi.toFixed(1)} (≥27.5). Jogging dan lompat boleh dicuba bila berat dah turun.</p>` : ''}
+    <div class="mt-2 rounded-xl border border-slate-200 divide-y divide-slate-100">
+      ${b.acts.map(a => `<div class="flex items-center justify-between gap-3 px-3 py-2.5 text-[14px]"><span>${a.n}</span><span class="font-semibold text-slate-700 whitespace-nowrap">~${a.kcal} kcal</span></div>`).join('')}
+    </div>
+    <p class="mt-1 text-[12px] text-slate-500">Kalori tambahan untuk 30 minit, anggaran. Jangan tambah makan sebab dah bersenam.</p>
+    <p class="mt-3 text-[14px] text-slate-700 leading-snug">${plan}</p>
+    <ul class="mt-2 space-y-1 text-[14px] text-slate-600">
+      ${li('<b>Minggu 1–2:</b> 10–15 minit sehari')}
+      ${li('<b>Minggu 3–4:</b> 20–30 minit sehari')}
+      ${li('<b>Selepas itu:</b> sasaran di atas + senaman kekuatan 2 kali seminggu')}
+    </ul>
+    ${hasHealth('bp') ? warn('Ada darah tinggi? Pilih intensiti sederhana, jangan tahan nafas, dan tanya doktor dulu jika tekanan darah belum terkawal.') : ''}
+    ${warn('Berhenti jika sakit atau ketat di dada, sesak nafas luar biasa atau pening. Sakit dada yang tak hilang bila berehat — hubungi 999.')}
+
+    ${h3('utensils', '3. Kawal makan — tegas tapi sihat')}
+    <ul class="mt-2 space-y-1.5 text-[14px] text-slate-600">
+      ${li('Protein setiap kali makan (ikan, ayam, telur, tauhu, kekacang) — kenyang lebih lama, jaga otot.')}
+      ${li('Pinggan suku-suku separuh: separuh sayur dan buah, suku nasi, suku lauk.')}
+      ${li('Air kosong, teh O atau kopi O kosong. Air manis ialah kalori paling mudah dibuang.')}
+      ${li('Pilih bakar, kukus, rebus atau sup berbanding goreng dan santan.')}
+      ${li('Makan malam lebih awal dan elak snek lewat malam.')}
+      ${li(`Jangan skip makan atau makan bawah ${floor} kcal — biasanya berakhir dengan makan berlebihan.`)}
+    </ul>
+    <div class="mt-3 rounded-xl bg-slate-50 p-3">
+      <div class="font-semibold text-[14px]">Nak lebih agresif? Cuba puasa berselang</div>
+      <p class="mt-1 text-[13px] text-slate-600 leading-snug">Makan dalam tempoh 8 jam sehari (16:8), atau puasa sunat Isnin dan Khamis. Kajian menunjukkan kesannya setanding diet biasa — asalkan jumlah kalori sehari tetap ikut sasaran dan berbuka dengan makanan seimbang.</p>
+      <p class="mt-1 text-[13px] text-slate-600 leading-snug">Tak sesuai untuk ibu mengandung atau menyusu, dan sesiapa yang pernah ada masalah makan.</p>
+      ${fastNotes.map(warn).join('')}
+    </div>
+
+    <details class="mt-6 rounded-xl border border-slate-200 group">
+      <summary class="tap list-none cursor-pointer px-3 py-3 font-bold text-[15px] flex items-center justify-between gap-2">
+        <span class="flex items-center gap-2">${icon('alert', 'w-5 h-5 text-amber-700')}4. Kaedah ekstrem — kenapa kami tak cadangkan</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">${icon('chevD', 'w-4 h-4')}</span>
+      </summary>
+      <div class="px-3 pb-3 text-[14px] text-slate-600 leading-snug">
+        <p>Kaedah yang selalu dicuba untuk turun cepat:</p>
+        <ul class="mt-1.5 space-y-1">
+          ${li('Diet kalori sangat rendah (bawah 800 kcal sehari) atau crash diet')}
+          ${li('Puasa berhari-hari tanpa makan')}
+          ${li('Pil kurus, teh atau kopi "pelangsing", ubat tanpa preskripsi — KKM pernah mengharamkan produk pelangsing yang dicampur ubat terlarang')}
+          ${li('"Detox" atau minum jus sahaja')}
+        </ul>
+        <p class="mt-2">Risikonya: hilang otot, batu karang hempedu, gangguan elektrolit dan rentak jantung, rambut gugur, letih dan pening — dan berat biasanya naik semula (yo-yo).</p>
+        <p class="mt-2 rounded-xl bg-brand-50 text-brand-800 p-3"><b>Ada BMI tinggi dan perlu turun lebih laju?</b> Diet kalori sangat rendah dan ubat obesiti memang ada dalam CPG Obesiti KKM — tetapi hanya di bawah pengawasan doktor atau pegawai dietetik. Tanya di klinik kesihatan berhampiran.</p>
+      </div>
+    </details>
+
+    <button data-act="boostAsk" class="tap mt-5 w-full btn btn-secondary h-12 text-[15px]">${icon('message', 'w-5 h-5')}Tanya Coach tentang pelan ini</button>
+    <p class="mt-3 text-[12px] text-slate-500 text-center">Panduan umum, bukan nasihat perubatan. Rujuk doktor jika ada masalah kesihatan.</p>
+    <button data-act="closeSheet" class="tap mt-1 w-full btn btn-text h-11 text-[14px]">Tutup</button>
+  </div>`;
 }
 function bmiLabel(b) { return b < 18.5 ? 'kurang' : b < 23 ? 'normal' : b < 27.5 ? 'berlebihan' : 'obes'; } // Asian cut-offs (KKM)
 // Change vs the weigh-in closest to 7 days before the latest one (5–10 days back). If none, the newest weigh-in
@@ -1322,6 +1463,8 @@ const SOURCES = [
     url: 'https://agris.fao.org/search/ar/records/65de26fe7c7033e84be9ee76' },
   { title: 'Garis panduan aktiviti fizikal WHO (2020)', use: 'senaman kekuatan',
     url: 'https://www.ncbi.nlm.nih.gov/books/NBK566048/' },
+  { title: 'Compendium of Physical Activities', use: 'kalori senaman',
+    url: 'https://pacompendium.com/' },
   { title: 'Panduan hipoglisemia antarabangsa', use: 'nota kencing manis',
     url: 'https://ruor.uottawa.ca/bitstreams/25132578-f3be-4701-96d9-702abc7eb43b/download' }
 ];
@@ -2193,7 +2336,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.12.1';
+const APP_VERSION = '1.13.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2823,6 +2966,10 @@ document.addEventListener('click', (e) => {
       t.fbq = [...t.fbq.filter(x => x.id !== id), { id, v: nv, why: t.day?.id === id ? t.day.why : '' }].slice(-50);
       save(); refreshSheet(); sendTipFeedback();
       if (nv) toast(nv === 1 ? 'Terima kasih atas maklum balas' : 'Faham — tip ni tak akan dipilih lagi untuk anda'); break; }
+    case 'boostOpen': openSheet(boostBody, true); break;
+    case 'boostPace': { const p = S.profile; if (p.kcalMode !== 'auto') break;
+      p.pace = '1.0'; recalcTargets(); save(); render(); refreshSheet(); toast('Kadar ditukar ke 1 kg seminggu. Sasaran kalori dikira semula.'); break; }
+    case 'boostAsk': sheetAI('umum'); UI.ai.q = 'Bagi pelan seminggu untuk turun berat lebih cepat tapi selamat, dengan senaman yang sesuai untuk saya'; refreshSheet(); break;
     case 'tipAsk': { const x = tipById(el.dataset.id); if (!x) break; sheetAI('umum'); UI.ai.q = x.ask; refreshSheet(); break; }
     case 'aiAsk': aiAsk(); break;
     case 'aiChip': UI.ai.q = (UI.ai.meal === 'umum' ? AI_CHIPS_GENERAL : AI_CHIPS)[Number(el.dataset.i)]; refreshSheet(); break;
