@@ -37,6 +37,18 @@ const MEALS = [
   { id:'malam', label:'Makan malam', short:'Malam' },
   { id:'snek', label:'Snek' }
 ];
+// Piramid Makanan Malaysia 2020 — daily servings (1,500–2,300 kcal). daging = ayam, telur & daging.
+const PYRAMID = [
+  { k: 'karbo', label: 'Nasi, roti & bijirin', short: 'Karbo', min: 3, max: 5 },
+  { k: 'sayur', label: 'Sayur', short: 'Sayur', min: 3, plus: true },
+  { k: 'buah', label: 'Buah', short: 'Buah', min: 2 },
+  { k: 'ikan', label: 'Ikan', short: 'Ikan', min: 1 },
+  { k: 'daging', label: 'Ayam, telur & daging', short: 'Ayam/daging', min: 1, max: 2 },
+  { k: 'kekacang', label: 'Kekacang', short: 'Kekacang', min: 1 },
+  { k: 'susu', label: 'Susu & yogurt', short: 'Susu', min: 2 }
+];
+const PY_KEYS = PYRAMID.map(g => g.k);
+const COOKS = ['goreng', 'lemak', 'sihat'];
 const PLATE = {
   serat:   { label:'Sayur & serat', color:'#6ba539', bg:'bg-green-50',  text:'text-green-700' },
   protein: { label:'Protein',       color:'#e0573f', bg:'bg-rose-50',   text:'text-rose-600' },
@@ -88,6 +100,10 @@ function sanitizeState(d) {
   // Plate make-up of a mixed dish from scan (servings per group, 0–3); empty → none.
   const mixOf = v => { const o = {}; ['serat', 'protein', 'karbo'].forEach(k => { const x = Number(obj(v)[k]); if (Number.isFinite(x) && x > 0) o[k] = Math.min(3, Math.round(x * 4) / 4); });
     return Object.keys(o).length ? o : null; };
+  // Food pyramid servings (Piramid Makanan 2020) of one serving of an item from scan / "Tulis makanan"; empty → none.
+  const pyClean = v => { const o = {}; PY_KEYS.forEach(k => { const x = Number(obj(v)[k]); if (Number.isFinite(x) && x > 0) o[k] = Math.min(5, Math.round(x * 20) / 20); });
+    return Object.keys(o).length ? o : null; };
+  const extra = m => ({ ...(mixOf(m.mix) ? { mix: mixOf(m.mix) } : {}), ...(pyClean(m.py) ? { py: pyClean(m.py) } : {}), ...(COOKS.includes(m.cook) ? { cook: m.cook } : {}) });
   const base = structuredClone(DEFAULTS), src = obj(d);
 
   const p = obj(src.profile), bp = base.profile;
@@ -124,7 +140,7 @@ function sanitizeState(d) {
     if (!name || kcal === null) return null;
     return { id: ID.test(m.id) ? m.id : uid(), foodId: ID.test(m.foodId) ? m.foodId : '', name, unit: s(m.unit, 40) || '1 hidangan',
       qty: n(m.qty, 0.1, 50, 1), kcal: Math.round(kcal), plate: oneOf(m.plate, PLATES, 'lain'), meal: oneOf(m.meal, MEAL_IDS, 'snek'), t: n(m.t, 0, 9e15, 0),
-      ...(mixOf(m.mix) ? { mix: mixOf(m.mix) } : {}) };
+      ...extra(m) };
   };
   const days = {};
   for (const [k, v] of Object.entries(obj(src.days)).slice(-3660)) {
@@ -139,7 +155,7 @@ function sanitizeState(d) {
     if (!ID.test(f.id) || !name || kcal === null) return null;
     const out = { id: f.id, name, kcal: Math.round(kcal), unit: s(f.unit, 40) || '1 hidangan', plate: oneOf(f.plate, PLATES, 'lain') };
     const water = n(f.water, 0, 5000); if (water) out.water = Math.round(water);
-    const mx = mixOf(f.mix); if (mx) out.mix = mx;   // own foods saved from scan / "Tulis makanan" keep their plate make-up
+    Object.assign(out, extra(f));   // own foods saved from scan / "Tulis makanan" keep their plate & pyramid make-up
     return out;
   }).filter(Boolean);
   const bk = obj(src.backup);
@@ -314,6 +330,19 @@ function plateGap(d, pc = plateCounts(d)) {
   if (pc.karbo >= 2 && pc.protein < 1 && !hasDish) return 'protein';
   return '';
 }
+
+// Piramid Makanan servings of one logged item: presets from foods.js, others as saved with the log (scan / tulis).
+function pyOf(m) { const f = m.foodId ? FOODS.find(x => x.id === m.foodId) : null; return (f ? f.py : m.py) || {}; }
+function cookOf(m) { const f = m.foodId ? FOODS.find(x => x.id === m.foodId) : null; return (f ? f.cook : m.cook) || ''; }
+function pyAdd(c, py, q = 1) { Object.entries(py || {}).forEach(([k, v]) => { if (k in c) c[k] += v * q; }); return c; }
+const pyZero = () => Object.fromEntries(PY_KEYS.map(k => [k, 0]));
+function pyCounts(d) { const c = pyZero(); d.meals.forEach(m => pyAdd(c, pyOf(m), m.qty || 1)); return c; }
+// Servings in quarters, as people say them: 0.25 → ¼, 1.5 → 1½
+const fmtSv = v => { const q = Math.round(v * 4) / 4, w = Math.floor(q), f = ['', '¼', '½', '¾'][Math.round((q - w) * 4)]; return w ? w + f : f || '0'; };
+// Groups still under the daily minimum (karbo left out: no nudge to eat more rice when losing weight).
+function pyramidGap(d) { const c = pyCounts(d); return PYRAMID.filter(g => g.k !== 'karbo' && c[g.k] < g.min).map(g => g.k); }
+// Fried / santan servings today
+function heavyCount(d) { return d.meals.reduce((a, m) => a + (['goreng', 'lemak'].includes(cookOf(m)) ? (m.qty || 1) : 0), 0); }
 
 /* ============================================================
    AI COACH (rule-based)
@@ -863,23 +892,70 @@ function viewFood() {
       </div>`, 'py-3');
   }).join('')}
 
+  ${pyramidCard(d, isToday, dk)}
+
   <p class="text-[12px] text-slate-500 text-center px-4">Tekan makanan untuk ubah hidangan. Nilai kalori ialah anggaran purata — saiz hidangan kedai berbeza-beza.</p>`;
+}
+// Piramid Makanan Malaysia 2020 for the day shown: servings per group vs the daily recommendation.
+function pyramidCard(d, isToday, dk) {
+  if (!d.meals.length) return '';
+  const c = pyCounts(d), water = (d.water || 0) / 250;
+  const rows = [...PYRAMID.map(g => ({ ...g, v: c[g.k] })), { k: 'air', label: 'Air kosong (gelas)', min: 6, max: 8, v: water }];
+  // Presets are all annotated (a drink with no group is fine); only own foods / Coach AI menus can be unknown.
+  const noData = d.meals.filter(m => !FOODS.some(f => f.id === m.foodId) && !Object.keys(pyOf(m)).length && m.kcal >= 150).length;
+  return card(`<div id="pyramid"></div>
+    <div class="flex items-center justify-between gap-2">
+      <div><div class="font-bold text-[16px]">Piramid Makanan ${isToday ? 'hari ini' : dayLabel(dk)}</div>
+        <div class="text-[12px] text-slate-500">Bilangan sajian · saranan KKM sehari</div></div>
+      <button data-act="pyInfo" class="tap shrink-0 text-[13px] font-semibold text-brand-700 underline underline-offset-2">Apa itu sajian?</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-3">${rows.map(g => {
+      const ok = g.v >= g.min && (!g.max || g.v <= g.max + 0.01), over = g.max && g.v > g.max + 0.01;
+      const pct = Math.min(100, g.v / (g.max || g.min) * 100);
+      const goal = g.max ? `${g.min}–${g.max}` : `${g.min}${g.plus ? '+' : ''}`;
+      return `<div class="rounded-xl px-3 py-2 ${ok ? 'bg-green-50' : over ? 'bg-amber-50' : 'bg-slate-50'}">
+        <div class="flex items-baseline justify-between gap-1">
+          <span class="text-[12px] font-semibold ${ok ? 'text-green-800' : over ? 'text-amber-800' : 'text-slate-600'} leading-tight">${g.label}</span>
+          <span class="text-[13px] font-bold shrink-0 ${ok ? 'text-green-700' : over ? 'text-amber-700' : 'text-slate-700'}">${fmtSv(g.v)}<span class="text-[11px] font-semibold text-slate-500">/${goal}</span></span>
+        </div>
+        <div class="h-1 bg-white rounded-full mt-1.5 overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${ok ? '#16a34a' : over ? '#d97706' : '#94a3b8'}"></div></div>
+      </div>`; }).join('')}</div>
+    <p class="text-[12px] text-slate-500 mt-2">${noData ? `${noData} makanan tanpa pecahan (makanan sendiri / dari Coach AI) tak dikira. ` : ''}Hadkan lemak, minyak, gula & garam.</p>`, 'py-3');
+}
+function pyInfoBody() {
+  const row = (t, d) => `<div class="py-2 border-t border-slate-100"><div class="font-semibold text-[14px]">${t}</div><div class="text-[13px] text-slate-600">${d}</div></div>`;
+  return `<div class="p-5">
+    <div class="flex items-center justify-between"><div class="font-bold text-xl">Apa itu 1 sajian?</div>
+      <button data-act="closeSheet" class="tap w-9 h-9 grid place-items-center rounded-xl text-slate-500" aria-label="Tutup">${icon('x')}</button></div>
+    <p class="text-[14px] text-slate-600 mt-1">Piramid Makanan Malaysia 2020 (KKM) sarankan bilangan sajian setiap kumpulan makanan sehari. Contoh 1 sajian:</p>
+    <div class="mt-3">
+      ${row('Nasi, roti & bijirin · 3–5 sajian', 'Nasi 2 senduk (1 cawan) · roti 2 keping · mee 1 cawan · pilih bijirin penuh bila boleh')}
+      ${row('Sayur · 3 sajian atau lebih', 'Sayur masak ½ cawan · ulam 1 cawan')}
+      ${row('Buah · 2 sajian', 'Pisang / epal / oren 1 biji · betik, tembikai atau nanas 1 hiris')}
+      ${row('Ikan · 1 sajian', 'Ikan kembung 1 ekor sederhana · tuna ½ tin')}
+      ${row('Ayam, telur & daging · 1–2 sajian', 'Ayam 1 ketul (peha) · telur 2 biji · daging 2 hiris')}
+      ${row('Kekacang · 1 sajian', 'Tauhu 1 keping · tempe 2 keping · dal 1 cawan · kacang 1 genggam')}
+      ${row('Susu & yogurt · 2 sajian', 'Susu rendah lemak 1 gelas · yogurt 1 cawan')}
+      ${row('Air kosong · 6–8 gelas', '1 gelas = 250 ml')}
+    </div>
+    <p class="text-[12px] text-slate-500 mt-3">Bilangan dalam app ialah anggaran dari sukatan makanan yang dilog. Sumber: Panduan Diet Malaysia & Piramid Makanan Malaysia 2020, KKM.</p>
+  </div>`;
 }
 // Plate balance for the day shown in Makan, with one short nudge (same rules as the Home coach, no AI).
 function plateLine(d, isToday) {
   if (!d.meals.length) return '';
   const pc = plateCounts(d), gap = plateGap(d, pc);
   const sweet = d.meals.filter(isSweetMeal).reduce((a, m) => a + (m.kcal || 0), 0);
-  const dot = (key, label) => `<span class="inline-flex items-center gap-1.5 ${pc[key] ? '' : 'text-slate-400'}"><span class="w-2.5 h-2.5 rounded-full" style="background:${PLATE[key].color};${pc[key] ? '' : 'opacity:.35'}"></span>${label} ${Math.round(pc[key] * 10) / 10}</span>`;
   const when = isToday ? '' : ' hari itu';
   const [msg, ok] = gap === 'sayur' ? [isToday ? 'Belum ada sayur — tambah sayur atau ulam waktu makan seterusnya.' : 'Kurang sayur hari itu.', false]
     : gap === 'protein' ? [isToday ? 'Protein masih kurang — tambah telur, ikan, ayam atau tauhu.' : 'Protein kurang hari itu.', false]
+    : heavyCount(d) >= 2 ? [isToday ? 'Banyak goreng / santan hari ini — makan seterusnya pilih bakar, rebus, kukus atau sup.' : 'Banyak goreng / santan hari itu.', false]
     : sweet >= 100 ? [`Air manis${when} ~${fmt(sweet)} kcal — ${isToday ? 'cuba' : 'lain kali cuba'} kurang manis atau kosong.`, false]
+    : isToday && new Date().getHours() >= 12 && pyCounts(d).buah < 1 ? ['Belum ada buah hari ini — pisang, epal atau betik sesuai untuk snek.', false]
     : pc.serat >= 1 && pc.protein >= 1 ? [isToday ? 'Pinggan seimbang setakat ini.' : 'Pinggan seimbang.', true] : ['', true];
-  return `<div class="mt-3 rounded-xl bg-slate-50 px-3 py-2">
-    <div class="flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-semibold text-slate-600">${dot('serat', 'Sayur')}${dot('protein', 'Protein')}${dot('karbo', 'Karbo')}</div>
-    ${msg ? `<div class="text-[13px] mt-1 ${ok ? 'text-green-700' : 'text-amber-800'}">${msg}</div>` : ''}
-  </div>`;
+  return msg ? `<div class="mt-3 rounded-xl ${ok ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'} px-3 py-2 text-[13px] flex items-start gap-2">
+    <span class="mt-0.5 shrink-0">${icon(ok ? 'check' : 'alert', 'w-4 h-4', 2.25)}</span><span>${msg} <button data-act="pyJump" class="tap font-semibold underline underline-offset-2">Lihat piramid</button></span>
+  </div>` : '';
 }
 // Edit a logged item: change the serving, or delete it.
 function sheetEdit(id) {
@@ -1232,6 +1308,8 @@ function viewGuide() {
 const guideRow = (c, t, d) => `<div class="flex gap-3 items-start"><span class="w-3 h-3 rounded-full mt-1 shrink-0" style="background:${c}"></span><div><div class="font-semibold text-[14px]">${t}</div><div class="text-[13px] text-slate-500 leading-snug">${d}</div></div></div>`;
 // Only what the app actually uses.
 const SOURCES = [
+  { title: 'Panduan Diet Malaysia & Piramid Makanan Malaysia 2020 (KKM)', use: 'bilangan sajian sehari & saiz 1 sajian',
+    url: 'https://hq.moh.gov.my/nutrition/wp-content/uploads/2023/12/Piramid-Makanan-Malaysia-2020-BI.pdf' },
   { title: 'Pinggan Sihat Malaysia (KKM)', use: 'Suku-Suku Separuh',
     url: 'https://iku.moh.gov.my/images/teknikal-report/album-makanan-malaysia-edisi-kedua-2024-1.pdf' },
   { title: 'CPG Pengurusan Obesiti 2023 (KKM)', use: 'kategori BMI, kadar turun berat & aktiviti',
@@ -1528,6 +1606,7 @@ function suggestMenus(venue) {
   const eatenToday = new Set(d.meals.map(x => x.foodId));
   const needVeg = pc.serat < Math.max(1, (pc.protein + pc.karbo) / 2);
   const avoid = avoidSet();
+  const pyc = pyCounts(d);
   let pool = MENUS.filter(m => m.meals.includes(code) && m.loc === s.loc && (s.loc === 'rumah' || m.venue === venue)
     && !menuItems(m).some(x => foodTags(x.f).some(t => avoid.has(t))));
   const scored = pool.map(m => {
@@ -1539,10 +1618,33 @@ function suggestMenus(venue) {
     its.forEach(x => { if (eatenToday.has(x.f.id) && x.f.plate !== 'serat' && x.f.id !== 'kopio') score -= 8; });
     if (hasHealth('diabetes')) its.forEach(x => { if (['kurma', 'tehtarik', 'milo', 'sirap', 'rotibakar'].includes(x.f.id)) score -= 40; if (x.f.id === 'nasib') score += 6; });
     if (hasHealth('gastrik')) its.forEach(x => { if (foodTags(x.f).includes('pedas')) score -= 10; });
+    const q = menuQuality(its, pyc, s.meal);
+    score += q.score;
     score += seeded(todayKey() + s.meal + s.loc + venue + m.id) * 22; // daily variety
-    return { m, kc, score };
+    return { m, kc, score, tags: q.tags };
   }).sort((a, b) => b.score - a.score);
   return { list: scored, t, needVeg };
+}
+
+// Healthier, not just the right kcal: cooking method, whole grains, salt, and food-pyramid groups still missing today.
+function menuQuality(its, pyc, meal) {
+  let score = 0; const tags = [];
+  const py = pyZero(); its.forEach(x => pyAdd(py, x.f.py, x.qty));
+  const cooks = its.map(x => x.f.cook || '');
+  const heavy = cooks.filter(c => c === 'goreng' || c === 'lemak').length;
+  score -= heavy * 5;
+  score += Math.min(3, cooks.filter(c => c === 'sihat').length) * 2;
+  if (its.some(x => x.f.whole)) { score += 4; tags.push(['ok', 'Bijirin penuh']); }
+  its.forEach(x => { if (x.f.salty) score -= hasHealth('bp') ? 8 : 3; });
+  const snack = meal === 'snek';
+  if (pyc.buah < 2 && py.buah > 0) { score += snack ? 12 : 8; tags.push(['ok', 'Ada buah']); }
+  if (pyc.ikan < 1 && py.ikan > 0) { score += 6; tags.push(['ok', 'Ikan']); }
+  if (pyc.kekacang < 1 && py.kekacang >= 0.5) { score += 4; tags.push(['ok', 'Kekacang']); }
+  if (pyc.susu < 2 && py.susu > 0 && (snack || meal === 'sarapan')) { score += 4; tags.push(['ok', 'Susu']); }
+  if (pyc.daging >= 2 && py.daging >= 1) score -= 6;
+  if (!heavy && cooks.includes('sihat')) tags.unshift(['ok', 'Bakar / rebus / sup']);
+  if (heavy) tags.push(['warn', cooks.includes('lemak') && !cooks.includes('goreng') ? 'Ada santan' : 'Ada goreng']);
+  return { score, tags: tags.slice(0, 3) };
 }
 
 function venuesFor(meal) {
@@ -1579,7 +1681,7 @@ function suggestBlock(inSheet = false) {
     : needVeg && s.meal !== 'snek' ? `<div class="mt-3 text-[13px] bg-green-50 text-green-800 rounded-xl px-3 py-2">Hari ini kurang sayur — cadangan diutamakan yang ada sayur.</div>` : ''}
 
   <div class="space-y-2.5 mt-3">
-    ${shown.map(({ m, kc }, i) => {
+    ${shown.map(({ m, kc, tags }, i) => {
       const its = menuItems(m); const fit = Math.abs(kc - t.ideal) <= t.ideal * 0.2;
       return `
       <div class="rounded-xl border ${i === 0 ? 'border-brand-200 bg-brand-50/40' : 'border-slate-200'} p-3">
@@ -1593,6 +1695,7 @@ function suggestBlock(inSheet = false) {
           </div>
           <div class="text-right shrink-0"><div class="font-extrabold text-[16px]">${fmt(kc)}</div><div class="text-[12px] ${fit ? 'text-green-700 font-semibold' : 'text-slate-500'}">${fit ? 'sesuai' : 'kcal'}</div></div>
         </div>
+        ${tags?.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${tags.map(([t, l]) => `<span class="text-[11px] font-semibold rounded-full px-2 py-0.5 ${t === 'ok' ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}">${l}</span>`).join('')}</div>` : ''}
         <div class="text-[13px] text-slate-600 mt-2"><b class="font-semibold">Tip:</b> ${esc(m.tip)}</div>
         <button data-act="logMenu" data-id="${m.id}" class="tap mt-2.5 w-full btn ${i === 0 ? 'btn-primary' : 'btn-secondary'} py-2 text-[14px]">${icon('plus', 'w-4 h-4')}Log menu ini</button>
       </div>`; }).join('') || `<div class="text-center text-[14px] text-slate-500 py-4">Tiada menu yang sesuai dengan pilihan makanan anda di sini. Cuba tempat lain atau ubah pilihan di Profil.</div>`}
@@ -1618,7 +1721,7 @@ function buildAIContext(extra = {}, meal = UI.sug.meal) {
     health: S.settings.ai?.health === false ? [] : (p.health || []),   // user can choose not to share health notes
     // The app presets (foods.js) already live on the server; only the user's own foods are sent.
     catalog: S.customFoods.filter(f => !foodConflicts(f).length).slice(0, 60).map(f => ({ name: f.name, unit: f.unit, kcal: f.kcal })),
-    recentMenus: recentAIMenus(), weightTrend: weightTrendForAI(), ...extra
+    recentMenus: recentAIMenus(), weightTrend: weightTrendForAI(), pyramidGap: d.meals.length ? pyramidGap(d) : [], ...extra
   };
 }
 
@@ -2011,6 +2114,7 @@ function scanBody() {
             <div class="text-[14px] font-semibold leading-snug">${esc(x.name)}</div>
             <div class="text-[12px] text-slate-500">${esc(x.unit)} · ${fmt(x.kcal)} kcal${x.source === 'label' ? ' · <span class="text-green-700 font-semibold">dari label</span>' : ''}${x.confidence === 'rendah' ? ' · <span class="text-amber-700 font-semibold">kurang pasti</span>' : ''}</div>
             ${c.length ? `<div class="text-[12px] font-semibold text-amber-700 flex items-center gap-1 mt-0.5">${icon('alert', 'w-3.5 h-3.5')}Ada ${c.map(t => TAG_LABEL[t]).join(', ')}</div>` : ''}
+            ${pyChips(pyOf(x), cookOf(x))}
           </div>
           <button data-act="scanDel" data-i="${i}" class="tap w-8 h-8 grid place-items-center text-slate-400 hover:text-red-600" aria-label="Buang">${icon('x', 'w-4 h-4')}</button>
         </div>
@@ -2023,6 +2127,7 @@ function scanBody() {
           <div class="text-[14px] font-bold">${fmt(x.kcal * x.qty)} kcal</div>
         </div>
       </div>`; }).join('')}</div>
+    ${scanSummary(r.items)}
     ${r.note ? `<div class="mt-2 text-[13px] bg-slate-50 text-slate-700 rounded-xl p-3">${esc(r.note)}</div>` : ''}
     ${canKeep ? `<button data-act="scanKeep" role="checkbox" aria-checked="${sc.keep}" class="tap mt-3 w-full flex items-start gap-3 rounded-xl border ${sc.keep ? 'border-brand-500 bg-brand-50' : 'border-slate-200'} p-3 text-left">
       <span class="mt-0.5 w-5 h-5 shrink-0 rounded-md border-2 grid place-items-center ${sc.keep ? 'bg-brand-700 border-brand-700 text-white' : 'border-slate-300'}">${sc.keep ? icon('check', 'w-3.5 h-3.5', 3) : ''}</span>
@@ -2034,10 +2139,33 @@ function scanBody() {
     <p class="text-[12px] text-slate-500 mt-3">${teks ? 'Anggaran oleh AI dari tulisan anda — semak saiz hidangan.' : r.items.every(x => x.source === 'label') ? 'Dibaca oleh AI dari label — pastikan nombor sama dengan label sebenar.' : 'Anggaran oleh AI dari gambar — boleh tersasar, terutama minyak, santan dan gula yang tak nampak.'}${r.left !== null && r.left !== undefined ? ` Baki ${teks ? 'tulis makanan' : 'scan'} hari ini: ${r.left}.` : ''}</p>
   </div>`;
 }
+// Pyramid servings of one item (per serving × portion shown separately), plus the cooking method.
+function pyChips(py, cook) {
+  const parts = PYRAMID.filter(g => (py || {})[g.k] > 0).map(g => `<span class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-slate-100 text-slate-700">${g.short} ${fmtSv(py[g.k])}</span>`);
+  if (cook === 'goreng' || cook === 'lemak') parts.push(`<span class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-amber-50 text-amber-800">${cook === 'goreng' ? 'Goreng' : 'Santan / berlemak'}</span>`);
+  else if (cook === 'sihat') parts.push('<span class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-green-50 text-green-800">Bakar / rebus / sup</span>');
+  return parts.length ? `<div class="flex flex-wrap gap-1 mt-1">${parts.join('')}</div>` : '';
+}
+// What this meal adds to the day (pyramid servings incl. portions), with a one-tap veg add when there is none.
+function scanSummary(items) {
+  const py = pyZero(); items.forEach(x => pyAdd(py, pyOf(x), x.qty || 1));
+  const mains = py.karbo + py.ikan + py.daging + py.kekacang;
+  if (!mains && !py.sayur && !py.buah && !py.susu) return '';
+  const noVeg = py.sayur === 0 && mains > 0;
+  return `<div class="mt-3 rounded-xl ${noVeg ? 'bg-amber-50' : 'bg-slate-50'} px-3 py-2.5">
+    <div class="text-[12px] font-semibold text-slate-500">Dalam hidangan ini (sajian Piramid Makanan)</div>
+    <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] font-semibold text-slate-700 mt-0.5">
+      ${PYRAMID.filter(g => py[g.k] > 0 || g.k === 'sayur').map(g => `<span class="${py[g.k] ? '' : 'text-amber-700'}">${g.short} ${fmtSv(py[g.k])}</span>`).join('')}
+    </div>
+    ${noVeg ? `<div class="flex items-center justify-between gap-2 mt-1.5"><span class="text-[13px] text-amber-800">Tiada sayur — nak tambah ulam atau timun?</span>
+      <button data-act="scanAddVeg" class="tap shrink-0 btn btn-secondary py-1.5 px-3 text-[13px]">${icon('plus', 'w-3.5 h-3.5')}Ulam</button></div>` : ''}
+  </div>`;
+}
 // Own food from a scanned / written item: reuse one with the same name & serving, else add a new one.
 function keepAsOwnFood(x) {
   const key = f => (f.name + '|' + f.unit).toLowerCase().replace(/\s+/g, ' ').trim();
-  const f = { name: x.name, unit: x.unit || '1 hidangan', kcal: Math.round(x.kcal), plate: x.plate || 'lain', ...(x.mix ? { mix: x.mix } : {}) };
+  const f = { name: x.name, unit: x.unit || '1 hidangan', kcal: Math.round(x.kcal), plate: x.plate || 'lain',
+    ...(x.mix ? { mix: x.mix } : {}), ...(x.py ? { py: x.py } : {}), ...(x.cook ? { cook: x.cook } : {}) };
   const old = S.customFoods.find(c => key(c) === key(f));
   if (old) { Object.assign(old, f); return old; }
   const nf = { id: 'c_' + uid(), ...f }; S.customFoods.push(nf); return nf;
@@ -2048,7 +2176,7 @@ function scanLog() {
   // Kept items are logged as the own food, so "Kerap dimakan" counts them too.
   const keep = UI.scan.keep;
   r.items.forEach(x => addMeal((x.foodId && findFood(x.foodId))
-    || (keep ? keepAsOwnFood(x) : { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix }), x.qty, UI.meal, foodDay()));
+    || (keep ? keepAsOwnFood(x) : { id: 'scan_' + uid(), name: x.name, unit: x.unit, kcal: x.kcal, plate: x.plate, mix: x.mix, py: x.py, cook: x.cook }), x.qty, UI.meal, foodDay()));
   if (keep) save();
   toast(`Disimpan ke ${addWhere()} (~${fmt(scanTotal(r.items))} kcal)${keep ? ' · ada dalam "Sendiri"' : ''}`);
   closeSheet(); render();
@@ -2061,7 +2189,7 @@ function sheetSuggest() {
 /* ============================================================
    PROFILE, TARGETS, FOOD PREFERENCES, HEALTH, SETTINGS
    ============================================================ */
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 const ACTIVITY = {
   rendah:    { label: 'Kurang aktif', d: 'Kerja pejabat, jarang bersenam', f: 1.2 },
   sederhana: { label: 'Sederhana', d: 'Banyak berjalan / senam ringan 1–3 kali seminggu', f: 1.375 },
@@ -2563,9 +2691,9 @@ function closeSheet() { sheetFn = null; document.getElementById('sheetWrap').cla
    ============================================================ */
 function addMeal(f, qty, meal, dk = todayKey()) {
   const d = day(dk);
-  const own = f.mix && !FOODS.some(x => x.id === f.id);   // presets keep their mix in foods.js
+  const own = !FOODS.some(x => x.id === f.id);   // presets keep their mix / pyramid / cooking in foods.js
   d.meals.push({ id: uid(), foodId: f.id, name: f.name, unit: f.unit, qty, kcal: Math.round(f.kcal * qty), plate: f.plate || 'lain', meal, t: Date.now(),
-    ...(own ? { mix: f.mix } : {}) });
+    ...(own && f.mix ? { mix: f.mix } : {}), ...(own && f.py && Object.keys(f.py).length ? { py: f.py } : {}), ...(own && COOKS.includes(f.cook) ? { cook: f.cook } : {}) });
   if (f.water) d.water += Math.round(f.water * qty);
   save();
 }
@@ -2616,6 +2744,8 @@ document.addEventListener('click', (e) => {
       render(); break;
     }
     case 'undo': undoLast(); break;
+    case 'pyInfo': openSheet(pyInfoBody); break;
+    case 'pyJump': document.getElementById('pyramid')?.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); break;
     case 'customFood': sheetCustom(); break;
     case 'saveCustom': {
       const name = document.getElementById('cfName').value.trim(), kcal = parseFloat(document.getElementById('cfKcal').value);
@@ -2703,6 +2833,9 @@ document.addEventListener('click', (e) => {
     case 'writeOpen': sheetScan('teks'); break;
     case 'scanSend': scanSend(); break;
     case 'writeAgain': Object.assign(UI.scan, { result: null, error: '' }); refreshSheet(); document.getElementById('writeText')?.focus(); break;
+    case 'scanAddVeg': { const f = findFood('ulam'), r = UI.scan.result; if (!f || !r) break;
+      r.items.push({ foodId: f.id, name: f.name, unit: f.unit, kcal: f.kcal, plate: f.plate, qty: 1, confidence: 'tinggi', source: 'tambah' });
+      refreshSheet(); toast('Ulam ditambah'); break; }
     case 'scanKeep': UI.scan.keep = !UI.scan.keep; refreshSheet(); break;
     case 'scanConsent': S.settings.ai = { ...S.settings.ai, scanConsent: true }; save(); refreshSheet(); break;
     case 'scanQty': { const x = UI.scan.result?.items?.[Number(el.dataset.i)];

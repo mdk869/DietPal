@@ -141,7 +141,7 @@ test('tipSignals: lapse, weekend, weight gain & plateau, first week', () => {
 });
 
 test('sanitizeState: tips kept when valid, junk dropped, absent stays absent', () => {
-  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
   assert(!('tips' in sanitizeState({ profile: { setupDone: true } })));
   const evil = '"><img onerror=x>';
   const out = sanitizeState({ tips: {

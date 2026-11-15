@@ -100,3 +100,10 @@ test('Coach AI gets the weekly weight trend only — whitelisted, never a weight
   assert.doesNotMatch(buildUserMessage({ question: 'x', context: { weightTrend: { ratePerWeek: -1, status: '<b>hack' } } }), /Trend berat/);
   assert.doesNotMatch(buildUserMessage({ question: 'x', context: {} }), /Trend berat/);
 });
+
+test('v1.12: pyramid gap line — whitelisted groups only, fixed wording, in the user message', () => {
+  const { pyramidGapLine, buildUserMessage } = require('../api/coach.js')._test;
+  assert.equal(pyramidGapLine(['buah', 'ikan', 'evil<script>', 'buah']), 'Piramid Makanan Malaysia hari ini — masih kurang: buah, ikan. Bila sesuai dengan soalan, utamakan menu yang menambah kumpulan ini.');
+  assert.equal(pyramidGapLine('buah'), ''); assert.equal(pyramidGapLine([]), '');
+  assert.match(buildUserMessage({ question: 'Apa nak makan?', context: { meal: 'malam', pyramidGap: ['sayur'] } }), /masih kurang: sayur\./);
+});

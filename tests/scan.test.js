@@ -191,3 +191,19 @@ test('userText: one line, no angle brackets, capped', () => {
   assert.equal(userText('x'.repeat(500), 300).length, 300);
   assert.equal(userText(null, 10), '');
 });
+
+test('v1.12: pyramid servings & cooking from AI kept for non-presets (capped), presets use foods.js', () => {
+  const out = clean({ is_food: true, note: '', items: [
+    { source: 'gambar', preset: '', name: 'Laksa penang', unit: '1 mangkuk', kcal: 450, qty: 1, plate: 'lain', mix: { karbo: 1, protein: 0.5, serat: 0.5 },
+      kumpulan: { karbo: 1, sayur: 0.5, buah: 0, ikan: 0.52, daging: 0, kekacang: 0, susu: 0 }, masak: 'sihat', confidence: 'tinggi' },
+    { source: 'gambar', preset: '', name: 'Teh tarik', unit: '1 cawan', kcal: 150, qty: 1, plate: 'lain', mix: { karbo: 0, protein: 0, serat: 0 },
+      kumpulan: { karbo: 0, sayur: 0, buah: 0, ikan: 0, daging: 0, kekacang: 0, susu: 9 }, masak: 'lain', confidence: 'tinggi' },
+    { source: 'gambar', preset: 'agoreng', name: 'x', unit: 'x', kcal: 1, qty: 1, plate: 'protein', kumpulan: { daging: 3 }, masak: 'sihat', confidence: 'tinggi' }
+  ] });
+  assert.deepEqual(out.items[0].py, { karbo: 1, sayur: 0.5, ikan: 0.5 }); assert.equal(out.items[0].cook, 'sihat');
+  assert.deepEqual(out.items[1].py, { susu: 5 }); assert(!('cook' in out.items[1]));
+  assert(!('py' in out.items[2]) && !('cook' in out.items[2]));            // preset: the app uses foods.js
+  const sch = handler._test.SCHEMA.properties.items.items;
+  assert(sch.required.includes('kumpulan') && sch.required.includes('masak'));
+  assert.match(handler._test.SYSTEM_MESSAGE, /Piramid Makanan Malaysia 2020/);
+});
