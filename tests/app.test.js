@@ -3,7 +3,7 @@ const { load } = require('./helpers');
 const { FOODS, isSweetMeal } = require('../foods.js');
 
 test('sanitizeState: strips markup, junk and unknown fields', () => {
-  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
   const evil = '"><img src=x onerror=alert(1)>';
   const out = sanitizeState({
     profile: { setupDone: true, name: 'Ali', sex: 'L', age: '30', milestones: [{ name: evil, kg: evil }, { name: 'F1', kg: 80 }], avoid: ['ayam', evil] },
@@ -31,12 +31,12 @@ test('sanitizeState: strips markup, junk and unknown fields', () => {
 });
 
 test('sanitizeState: never throws on garbage', () => {
-  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
   for (const g of [null, 1, 'x', [], { profile: 5, days: [], weights: {}, customFoods: 'a', settings: [] }]) sanitizeState(g);
 });
 
 test('sanitizeState: keeps a normal backup exactly', () => {
-  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
   const good = {
     profile: { setupDone: true, setupAt: 1, name: 'Siti', sex: 'P', age: 40, height: 155, startWeight: 80, targetWeight: 60, activity: 'aktif', pace: '0.25', kcalMode: 'manual', waterMode: 'auto', kcalMin: 1300, kcalMax: 1500, waterGoal: 2400, waterIdeal: 2600, milestones: [{ name: 'Fasa 1', kg: 70 }], avoid: ['daging'], allergies: ['susu'], noSpicy: true, health: ['diabetes'] },
     settings: { theme: 'dark', textSize: 'big', mealTimes: { sarapan: '08:00', tengahari: '13:00', malam: '20:00' }, reminders: { water: false, meals: true, weigh: true, summary: false, tips: false, weighDay: 3 }, ai: { consent: true, consentAt: 5, health: false, scanConsent: true } },
@@ -190,7 +190,7 @@ test('weightAverage: 7-day trailing average of weigh-ins', () => {
 });
 
 test('pace 1 kg/week survives backup restore; effPace is limited by the calorie floor', () => {
-  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
   assert.equal(sanitizeState({ profile: { pace: '1.0' } }).profile.pace, '1.0');
   assert.equal(sanitizeState({ profile: { pace: '2' } }).profile.pace, '0.5');
   const mk = profile => load(['ACTIVITY', 'parseKey', 'sortedWeights', 'currentWeight', 'kcalFloor', 'canAuto', 'autoWater', 'calcTargets', 'effPace'],
@@ -251,7 +251,64 @@ test('"Simpan sebagai makanan sendiri": reuses same name & serving, keeps plate 
   assert.equal(S.customFoods.length, 1);
   const b = keepAsOwnFood({ name: 'Teh O ais kurang manis', unit: '1 gelas', kcal: 60, plate: 'lain' });
   assert.match(b.id, /^c_/); assert.equal(S.customFoods.length, 2); assert(!('mix' in b));
-  const { sanitizeState } = load(['DEFAULTS', 'uid', 'sanitizeState']);
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
   const out = sanitizeState({ profile: {}, customFoods: S.customFoods });
   assert.deepEqual(out.customFoods[0].mix, { karbo: 1.5, protein: 0.5 });
+});
+
+// ---------- v1.12: Piramid Makanan Malaysia 2020 ----------
+test('foods.js: pyramid servings match each preset\'s plate group, cooking/whole/salty flags are valid', () => {
+  const PYK = ['karbo', 'sayur', 'buah', 'ikan', 'daging', 'kekacang', 'susu'];
+  for (const f of FOODS) {
+    Object.entries(f.py || {}).forEach(([k, v]) => { assert(PYK.includes(k), f.id + ' ' + k); assert(v > 0 && v <= 3, f.id); });
+    if (f.plate === 'karbo') assert(f.py?.karbo > 0, f.id);
+    if (f.plate === 'serat') assert(f.py?.sayur > 0 || f.py?.buah > 0, f.id);
+    if (f.plate === 'protein') assert(['ikan', 'daging', 'kekacang', 'susu'].some(k => f.py?.[k] > 0), f.id);
+    if (f.cook) assert(['goreng', 'lemak', 'sihat'].includes(f.cook), f.id);
+  }
+  assert.equal(FOODS.find(f => f.id === 'nasip').py.karbo, 1);              // 1 sajian = 2 senduk nasi
+  assert.equal(FOODS.find(f => f.id === 'telurr').py.daging, 0.5);           // 2 biji telur = 1 sajian
+});
+
+const pyLoad = (S = { customFoods: [] }) => load(['PYRAMID', 'PY_KEYS', 'COOKS', 'pyOf', 'cookOf', 'pyAdd', 'pyZero', 'pyCounts', 'pyramidGap', 'heavyCount'], { FOODS, S });
+test('pyCounts: presets from foods.js, scanned items from the log, times portion; gap leaves out karbo', () => {
+  const { pyCounts, pyramidGap, heavyCount } = pyLoad();
+  const d = { meals: [
+    { foodId: 'nasi1', qty: 2, kcal: 260 }, { foodId: 'agoreng', qty: 1, kcal: 290 }, { foodId: 'pisang', qty: 1, kcal: 100 },
+    { foodId: 'scan_x', qty: 2, kcal: 300, py: { ikan: 0.5, sayur: 0.5 }, cook: 'lemak' }, { foodId: 'c_own', qty: 1, kcal: 200 }
+  ], water: 1500 };
+  const c = pyCounts(d);
+  assert.deepEqual({ ...c }, { karbo: 1, sayur: 1, buah: 1, ikan: 1, daging: 1, kekacang: 0, susu: 0 });
+  assert.deepEqual([...pyramidGap(d)], ['sayur', 'buah', 'kekacang', 'susu']);
+  assert.equal(heavyCount(d), 3);                                             // ayam goreng + 2 × santan
+});
+
+test('sanitizeState: pyramid servings & cooking kept for logs and own foods, junk dropped', () => {
+  const { sanitizeState } = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'DEFAULTS', 'uid', 'sanitizeState']);
+  const out = sanitizeState({ profile: {}, days: { '2026-11-15': { meals: [
+    { id: 'a', name: 'Laksa', kcal: 450, qty: 1, py: { karbo: 1.03, ikan: 0.5, bogus: 3, sayur: -1, susu: 'x' }, cook: 'lemak' },
+    { id: 'b', name: 'Teh', kcal: 90, qty: 1, py: 'nope', cook: 'rebus' }] } },
+    customFoods: [{ id: 'c_1', name: 'Laksa Kak Ros', kcal: 450, py: { karbo: 1, ikan: 9 }, cook: 'sihat' }] });
+  const [a, b] = out.days['2026-11-15'].meals;
+  assert.deepEqual(a.py, { karbo: 1.05, ikan: 0.5 }); assert.equal(a.cook, 'lemak');
+  assert(!('py' in b) && !('cook' in b));
+  assert.deepEqual(out.customFoods[0].py, { karbo: 1, ikan: 5 }); assert.equal(out.customFoods[0].cook, 'sihat');
+});
+
+test('menuQuality: grilled beats fried, fruit/fish favoured when missing today, salt counts more with darah tinggi', () => {
+  const S = { customFoods: [], profile: { health: [] } };
+  const ctx = load(['PYRAMID', 'PY_KEYS', 'COOKS', 'pyAdd', 'pyZero', 'hasHealth', 'menuQuality'], { FOODS, S });
+  const its = (...ids) => ids.map(id => ({ f: FOODS.find(f => f.id === id), qty: 1 }));
+  const none = ctx.pyZero(), full = { karbo: 4, sayur: 3, buah: 2, ikan: 1, daging: 1, kekacang: 1, susu: 2 };
+  const grill = ctx.menuQuality(its('nasib', 'agrill', 'sayurr'), full, 'tengahari');
+  const fried = ctx.menuQuality(its('nasi1', 'agoreng', 'sayurc'), full, 'tengahari');
+  assert(grill.score > fried.score + 10);
+  assert.deepEqual(grill.tags.map(t => t[1]), ['Bakar / rebus / sup', 'Bijirin penuh']);
+  assert.deepEqual(fried.tags.map(t => t[1]), ['Ada goreng']);
+  const fruitNeeded = ctx.menuQuality(its('pisang'), none, 'snek').score, fruitDone = ctx.menuQuality(its('pisang'), full, 'snek').score;
+  assert.equal(fruitNeeded - fruitDone, 12);
+  assert(ctx.menuQuality(its('ikanb'), none, 'malam').tags.some(t => t[1] === 'Ikan'));
+  const salty = ctx.menuQuality(its('dagingm'), full, 'malam').score;
+  S.profile.health = ['bp'];
+  assert.equal(ctx.menuQuality(its('dagingm'), full, 'malam').score, salty - 5);
 });

@@ -34,6 +34,8 @@ const PLATES = ['serat', 'protein', 'karbo', 'lain'];
 const CONFIDENCE = ['tinggi', 'sederhana', 'rendah'];
 const SOURCES = ['gambar', 'label', 'teks'];
 const PRESET_IDS = FOODS.map(f => f.id);
+const PY_KEYS = ['karbo', 'sayur', 'buah', 'ikan', 'daging', 'kekacang', 'susu'];
+const COOKS = ['goreng', 'lemak', 'sihat', 'lain'];
 
 const SYSTEM_PROMPT = `Anda menganggar kalori makanan dari gambar atau dari penerangan bertulis untuk app diet DietPal (pengguna di Malaysia).
 
@@ -46,6 +48,8 @@ CARA MENGANGGAR
 - "confidence": tinggi / sederhana / rendah — rendah jika hidangan atau saiznya sukar dipastikan.
 - "plate": serat (sayur & buah) / protein / karbo / lain (hidangan campur, minuman, kuih).
 - "mix": untuk hidangan campur (plate "lain") — anggaran bilangan hidangan setiap kumpulan dalam SATU sukatan: karbo (1 = 1 senduk nasi / 2 keping roti / 1 keping roti canai), protein (1 = 1 ketul ayam / 1 tapak tangan ikan atau daging / 2 biji telur), serat (1 = 1 senduk sayur / 1 biji buah). Contoh: sandwic telur roti putih → karbo 1, protein 0.5, serat 0. Minuman, kuih dan makanan satu kumpulan → semua 0.
+- "kumpulan": bilangan SAJIAN Piramid Makanan Malaysia 2020 dalam SATU sukatan item itu (bukan × qty). 1 sajian: karbo = nasi 2 senduk / 1 cawan, roti 2 keping, mee atau bihun 1 cawan, 1 keping tosai / capati, ubi 1 biji sederhana; sayur = ½ cawan sayur masak atau 1 cawan ulam; buah = 1 biji pisang / epal / oren atau 1 hiris betik / tembikai; ikan = 1 ekor kembung sederhana atau ½ tin tuna; daging (ayam, telur, daging) = ayam 1 ketul, telur 2 biji, daging 2 hiris; kekacang = tauhu 1 keping, tempe 2 keping, dal 1 cawan, kacang 1 genggam; susu = susu 1 gelas atau yogurt 1 cawan. Contoh: nasi lemak bungkus → karbo 1, daging 0.25, kekacang 0.25; telur rebus 1 biji → daging 0.5. Susu pekat manis, krimer, gula, minyak, sos dan kuah tidak dikira. Item preset: isi 0 (app guna nilai sendiri). Minuman manis & kuih → semua 0 kecuali yang jelas.
+- "masak": goreng (digoreng / banyak minyak) / lemak (santan, minyak sapi, krim, mayonis) / sihat (bakar, kukus, rebus, sup, mentah) / lain (tak pasti atau tidak berkenaan, cth minuman).
 - "note": satu ayat ringkas jika berguna (cth "Kuah lemak santan menambah kalori — ambil isi lebih dari kuah."). Kosong jika tiada. Tiada nasihat perubatan, tiada teguran.
 
 LABEL MAKANAN (panel "Maklumat Pemakanan" / "Nutrition Information" pada bungkusan)
@@ -97,7 +101,7 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['source', 'preset', 'name', 'unit', 'kcal', 'qty', 'plate', 'mix', 'confidence'],
+        required: ['source', 'preset', 'name', 'unit', 'kcal', 'qty', 'plate', 'mix', 'kumpulan', 'masak', 'confidence'],
         properties: {
           source: { type: 'string', enum: SOURCES, description: '"label" jika kcal dibaca dari label nutrisi, "teks" jika tiada gambar, selain itu "gambar".' },
           preset: { type: 'string', enum: ['', ...PRESET_IDS], description: 'id preset app jika sepadan, atau "".' },
@@ -106,6 +110,12 @@ const SCHEMA = {
           kcal: { type: 'integer', description: 'kcal untuk satu sukatan.' },
           qty: { type: 'number', description: 'Berapa kali sukatan itu.' },
           plate: { type: 'string', enum: PLATES },
+          kumpulan: {
+            type: 'object', additionalProperties: false, required: PY_KEYS,
+            description: 'Sajian Piramid Makanan Malaysia 2020 dalam satu sukatan. 0 untuk kumpulan yang tiada.',
+            properties: Object.fromEntries(PY_KEYS.map(k => [k, { type: 'number' }]))
+          },
+          masak: { type: 'string', enum: COOKS },
           mix: {
             type: 'object', additionalProperties: false, required: ['karbo', 'protein', 'serat'],
             description: 'Komposisi hidangan campur (bilangan hidangan setiap kumpulan untuk satu sukatan). Semua 0 jika bukan hidangan campur.',
@@ -165,6 +175,11 @@ function clean(out, mode = 'gambar') {
       ['karbo', 'protein', 'serat'].forEach(k => { const x = Number(i?.mix?.[k]); if (Number.isFinite(x) && x > 0) mix[k] = Math.min(3, Math.round(x * 4) / 4); });
       if (Object.keys(mix).length) out.mix = mix;
     }
+    // Food-pyramid servings in one unit (presets use foods.js instead) and cooking method.
+    const py = {};
+    PY_KEYS.forEach(k => { const x = Number(i?.kumpulan?.[k]); if (Number.isFinite(x) && x > 0) py[k] = Math.min(5, Math.round(x * 20) / 20); });
+    if (Object.keys(py).length) out.py = py;
+    if (['goreng', 'lemak', 'sihat'].includes(i?.masak)) out.cook = i.masak;
     return out;
   }).filter(Boolean);
   return { is_food: items.length > 0, items, note: str(out?.note, 200), kcal: Math.round(items.reduce((a, i) => a + i.kcal * i.qty, 0)) };

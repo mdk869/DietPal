@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.11.0
+**Versi semasa:** 1.12.0
 
 ## Ciri utama
 
@@ -18,6 +18,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Home baru (v1.6)** – reka bentuk dari Sleek: header hijau pandan dengan streak, ring kalori berbentuk pinggan (imbangan sayur/protein/karbo) + bar kemajuan ke sasaran, chip waktu makan, *Cadangan Coach* (mesej coach + satu menu), kad air & berat ringkas, dan pautan *Rasa tak selesa?* yang tenang.
 - **Tab Makan (log dulu)** – log hari ini ikut waktu makan; butang *Tambah* membuka carian makanan untuk waktu makan itu (kerap dimakan, tapis kategori, makanan sendiri).
 - **Makan v1.10** – anak panah ‹ › untuk lihat & log **hingga 7 hari lepas** (makanan yang terlupa) dengan nota *Anda sedang lihat log semalam · Balik ke hari ini*; tekan item untuk **ubah hidangan** atau padam; padam ada butang **Batal** (6 saat); baris **imbangan pinggan** (sayur/protein/karbo) dengan satu teguran ringkas (tanpa AI); **sasaran kcal** pada waktu makan yang belum dilog hari ini; *Idea menu* sentiasa ada untuk hari ini; **Sama macam semalam** — salin satu waktu makan dari hari sebelumnya dengan satu tekan.
+- **Piramid Makanan & menu lebih sihat (v1.12)** – setiap preset ada bilangan **sajian Piramid Makanan Malaysia 2020** (karbo, sayur, buah, ikan, ayam/telur/daging, kekacang, susu), **cara masak** (goreng / santan / bakar-rebus-kukus-sup), bijirin penuh dan tinggi garam. Page Makan papar kad **Piramid Makanan hari ini** (sajian vs saranan KKM + air 6–8 gelas, dengan *Apa itu sajian?*). Cadangan menu kini bukan sekadar kcal: + bakar/rebus/sup & bijirin penuh, − goreng/santan & garam (lebih untuk darah tinggi), + buah/ikan/kekacang/susu bila masih kurang hari ini; kad menu tunjuk tag (cth *Bakar / rebus / sup*, *Ada buah*, *Ada goreng*). Scan & Tulis makanan pulangkan sajian Piramid & cara masak, dan skrin semak papar pecahan setiap item + jumlah hidangan, dengan butang **+ Ulam** bila tiada sayur. Coach AI terima senarai kumpulan yang masih kurang hari ini. Teguran pinggan baru: banyak goreng/santan, belum ada buah.
 - **Tips lebih tepat (v1.10)** – hari dalam log hanya dikira bila ada sekurang-kurangnya 2 waktu makan utama (snek tak dikira); tip *kalori terlalu rendah* perlukan ketiga-tiga waktu makan utama dilog, supaya waktu makan yang terlupa log tak dianggap makan terlalu sikit.
 - **Scan makanan (v1.7)** – dalam sheet *Tambah*, ambil gambar atau pilih dari galeri; AI anggar item & kalori, padankan dengan preset app bila boleh. Pengguna **semak dan betulkan** (portion ½–5×, buang item) sebelum simpan — tiada apa dilog terus. Lihat bahagian *Scan makanan* di bawah.
 - **Scan + penerangan & Tulis makanan (v1.11)** – lepas ambil gambar, pengguna boleh *Terangkan sikit (pilihan)* (jenis lauk, cara masak, saiz, kurang manis) sebelum tekan *Anggar kalori*; AI ikut penerangan untuk jenis makanan dan gambar untuk saiz yang tak disebut. Butang **Tulis makanan** pula untuk log tanpa gambar (cth "nasi lemak ayam goreng, teh o ais kurang manis") — skrin semak sama macam scan, kuota sendiri yang lebih longgar. Pada skrin semak, **Simpan sebagai makanan sendiri** menyimpan item yang bukan preset ke kategori *Sendiri* (nama & sukatan sama → dikemas kini, bukan berganda).
@@ -94,6 +95,7 @@ Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v14` →
 ## Sumber rujukan
 | Digunakan untuk | Sumber |
 | --- | --- |
+| Bilangan sajian & saiz 1 sajian | [Piramid Makanan Malaysia 2020](https://hq.moh.gov.my/nutrition/wp-content/uploads/2023/12/Piramid-Makanan-Malaysia-2020-BI.pdf) & Panduan Diet Malaysia 2020 — KKM |
 | Pinggan Suku-Suku Separuh | Pinggan Sihat Malaysia, Kementerian Kesihatan Malaysia ([Album Makanan Malaysia Edisi Kedua, 2024](https://iku.moh.gov.my/images/teknikal-report/album-makanan-malaysia-edisi-kedua-2024-1.pdf)) |
 | Kadar turun berat selamat 0.5–1 kg seminggu; aktiviti 150–300 minit seminggu | [CPG Management of Obesity, Edisi Ke-2 (2023)](https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf) |
 | Senaman kekuatan 2 hari seminggu | [WHO Guidelines on Physical Activity and Sedentary Behaviour (2020)](https://www.ncbi.nlm.nih.gov/books/NBK566048/) |

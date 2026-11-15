@@ -264,6 +264,8 @@ function buildUserMessage(body) {
   if (list.length) lines.push(`Imbangan pinggan hari ini: ${plateSummary(list)}.`);
   const sweet = list.filter(x => isSweetMeal({ foodId: typeof x?.foodId === 'string' ? x.foodId : '', name: str(x?.name, 50) }));
   if (sweet.length) lines.push(`Minuman manis hari ini: ${sweet.map(x => str(x.name, 50)).join(', ')} (${sweet.reduce((a, x) => a + (num(x.kcal, 0, 3000) || 0), 0)} kcal).`);
+  const gap = pyramidGapLine(c.pyramidGap);
+  if (gap) lines.push(gap);
   const avoid = [...pick(c.avoid, AVOID), ...pick(c.allergies, ALLERGY), ...(c.noSpicy ? ['makanan pedas'] : [])];
   lines.push(`Pantang / alahan: ${avoid.length ? avoid.join(', ') : 'tiada'}.`);
   const health = pick(c.health, HEALTH);
@@ -276,6 +278,13 @@ function buildUserMessage(body) {
   if (catalog.length) lines.push(`Makanan sendiri pengguna (rujukan kcal; tidak wajib): ${catalog.map(f => `${f.name} ${f.unit} ${f.kcal}`).join('; ')}.`);
   lines.push('', `SOALAN PENGGUNA: ${str(body.question, MAX_QUESTION) || 'Apa yang sesuai saya makan sekarang?'}`);
   return lines.join('\n');
+}
+
+// Food-pyramid groups still under the daily recommendation (computed on the phone). Whitelisted keys → fixed wording.
+const PY_GAP = { sayur: 'sayur', buah: 'buah', ikan: 'ikan', daging: 'ayam / telur / daging', kekacang: 'kekacang (tauhu, tempe, dal)', susu: 'susu / yogurt' };
+function pyramidGapLine(list) {
+  const g = [...new Set(Array.isArray(list) ? list.filter(k => PY_GAP[k]) : [])];
+  return g.length ? `Piramid Makanan Malaysia hari ini — masih kurang: ${g.map(k => PY_GAP[k]).join(', ')}. Bila sesuai dengan soalan, utamakan menu yang menambah kumpulan ini.` : '';
 }
 
 // Weekly weight trend from the phone (never a weight). Whitelisted status → fixed wording.
@@ -496,4 +505,4 @@ module.exports = async function handler(req, res) {
 };
 
 // exported for local tests
-module.exports._test = { plateSummary, quotaTokens, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, hasCarb, presetKcal, parseUnit, SCHEMA };
+module.exports._test = { pyramidGapLine, plateSummary, quotaTokens, quotaKeys, quotaState, secsToMidnightMY, QUOTA, buildUserMessage, clean, originAllowed, sentenceCase, redFlag, targetRange, fitPortions, hasCarb, presetKcal, parseUnit, SCHEMA };
