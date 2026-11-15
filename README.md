@@ -2,7 +2,7 @@
 
 PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Malaysia. Mobile-first, **mesti dipasang ke home screen** (atau sebagai app di komputer) sebelum boleh digunakan, dan berfungsi offline. Data diet disimpan dalam telefon pengguna — tiada akaun.
 
-**Versi semasa:** 1.12.1
+**Versi semasa:** 1.13.0
 
 ## Ciri utama
 
@@ -34,6 +34,7 @@ PWA pembantu diet & turun berat badan dalam Bahasa Melayu untuk pengguna di Mala
 - **Berat & milestone** – graf trend (dengan garis purata 7 hari bila timbang lebih kerap dari seminggu sekali), BMI (had Asia), perubahan 7 hari, milestone yang boleh diedit.
 - **Tips untuk berat anda (v1.8.5)** – kad dalam tab Berat: tip ikut isyarat berat (naik / plateau), atau satu tip berat umum yang bertukar setiap hari. Tekan untuk sheet tip yang sama seperti *Tips hari ini*.
 - **Kadar sebenar vs kadar pilihan (v1.9)** – trend 3–4 minggu (regresi linear atas timbangan) dibanding dengan kadar pilihan (dihadkan oleh had kalori minimum). Turun > 1.2 kg seminggu → tip *makan cukup*. Turun kurang dari separuh kadar → jika log makan selalu lebih sasaran, tip saiz hidangan dulu; jika tidak, tip **senaman** (150 minit seminggu, kekuatan 2 kali seminggu, mesra lutut, kurang duduk lama, bila perlu berhenti). Kategori tips baru: *Senaman*.
+- **Nak turun lebih cepat? (v1.13)** – kad sentiasa ada dalam tab Berat (lebih menonjol bila progress perlahan/plateau). Sheet: (1) kadar semasa vs had selamat 1 kg seminggu, butang tukar ke 1 kg (mod auto), dan berapa yang boleh dicapai dengan had kalori minimum; (2) senaman ikut berat semasa — kalori tambahan 30 minit = (MET − 1) × kg × 0.5 j (Compendium of Physical Activities), senarai mesra lutut sahaja bila BMI ≥ 27.5, pelan jalan laju untuk tutup jurang kadar (maks 60 minit sehari) dan peringkat mula; (3) kawal makan tegas tapi sihat + puasa berselang 16:8 / puasa sunat dengan amaran kencing manis/gastrik; (4) kaedah ekstrem sebagai maklumat sahaja — risiko, dan VLCD/ubat obesiti hanya di bawah pengawasan doktor (CPG Obesiti).
 - **Panduan pinggan Suku-Suku Separuh** – ½ sayur, ¼ protein, ¼ karbo kompleks; prinsip 80/20; elak diet ekstrem.
 - **Makan di luar dengan bijak** – 3 cara mudah memesan dan tukaran kecil dengan anggaran kalori dijimat.
 - **Sumber rujukan** – senarai rujukan yang digunakan dalam app (lihat di bawah).
@@ -99,6 +100,7 @@ Bila menukar fail app, naikkan versi cache dalam `sw.js` (cth: `dietpal-v14` →
 | Bilangan sajian & saiz 1 sajian | [Piramid Makanan Malaysia 2020](https://hq.moh.gov.my/nutrition/wp-content/uploads/2023/12/Piramid-Makanan-Malaysia-2020-BI.pdf) & Panduan Diet Malaysia 2020 — KKM |
 | Pinggan Suku-Suku Separuh | Pinggan Sihat Malaysia, Kementerian Kesihatan Malaysia ([Album Makanan Malaysia Edisi Kedua, 2024](https://iku.moh.gov.my/images/teknikal-report/album-makanan-malaysia-edisi-kedua-2024-1.pdf)) |
 | Kadar turun berat selamat 0.5–1 kg seminggu; aktiviti 150–300 minit seminggu | [CPG Management of Obesity, Edisi Ke-2 (2023)](https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf) |
+| Kalori aktiviti (MET) | [Compendium of Physical Activities](https://pacompendium.com/) |
 | Senaman kekuatan 2 hari seminggu | [WHO Guidelines on Physical Activity and Sedentary Behaviour (2020)](https://www.ncbi.nlm.nih.gov/books/NBK566048/) |
 | Kategori BMI (18.5 / 23 / 27.5) | [CPG Management of Obesity, Edisi Ke-2 (2023)](https://medic.usm.my/images/Anaesthesiology%20and%20Intensive%20Care%20Unit/Guidelines/CPG%20Management%20of%20Obesity%20230518.pdf) — KKM, MEMS, MDA & lain-lain |
 | Sasaran kalori automatik (BMR → TDEE) | [Mifflin MD, St Jeor ST et al., Am J Clin Nutr 1990;51:241–247](https://agris.fao.org/search/ar/records/65de26fe7c7033e84be9ee76) |

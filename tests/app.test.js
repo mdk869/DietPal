@@ -312,3 +312,23 @@ test('menuQuality: grilled beats fried, fruit/fish favoured when missing today, 
   S.profile.health = ['bp'];
   assert.equal(ctx.menuQuality(its('dagingm'), full, 'malam').score, salty - 5);
 });
+
+test('boostPlan: activities follow current weight & BMI, walking plan fills the gap left by the calorie floor', () => {
+  const names = ['ACTIVITY', 'parseKey', 'sortedWeights', 'currentWeight', 'kcalFloor', 'canAuto', 'autoWater', 'calcTargets', 'effPace',
+    'BOOST_ACTS', 'BOOST_WALK_MET', 'MAX_PACE', 'actKcal', 'paceReach', 'boostPlan'];
+  const mk = (profile, kg) => load(names, { S: { profile, weights: [{ date: '2026-11-15', kg }] } });
+  assert.equal(load(['actKcal']).actKcal(4.3, 90, 30), 149);   // (4.3 − 1) × 90 kg × 0.5 h
+  // obese man, auto targets for 0.5 kg/week: knee-friendly list only, reachable, 30 min walk adds ~0.15 kg/week
+  let p = { sex: 'L', age: 35, height: 170, activity: 'rendah', pace: '0.5', kcalMode: 'auto' };
+  let c = mk(p, 95); const t = c.calcTargets(p); Object.assign(p, { kcalMin: t.min, kcalMax: t.max });
+  let b = c.boostPlan(p);
+  assert(b.lowImpact); assert(b.acts.every(a => a.low)); assert.equal(b.extraKcal, 0);
+  assert.equal(b.walkGain, 0.15); assert.equal(b.reach1, 0.55);   // TDEE ~2,210: 1 kg/week hits the 1,500 floor
+  // same man, BMI < 27.5: higher-impact options appear
+  b = mk(p, 75).boostPlan(p); assert(!b.lowImpact); assert(b.acts.some(a => a.n === 'Jogging'));
+  // small woman at 1 kg/week: floor limits food to ~0.15, the rest becomes a walking target (flagged when > 60 min)
+  p = { sex: 'P', age: 40, height: 152, activity: 'rendah', pace: '1.0', kcalMode: 'auto', kcalMin: 1200, kcalMax: 1400 };
+  b = mk(p, 62).boostPlan(p);
+  assert(b.reach < 0.3 && b.gap > 0.7, JSON.stringify(b)); assert(b.extraKcal > 700); assert(b.walkMin > 60); assert.equal(b.cardMin, 60);
+  assert(b.reach + b.cardGain <= 1);
+});
